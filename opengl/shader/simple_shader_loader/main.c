@@ -8,7 +8,7 @@
  * \sa      http://glew.sourceforge.net/
  *
  * \author  Ronan-Alexandre Cherrueau ronancherrueau{at}gmail{dot}com
- * \date    last modified 20/05/2011
+ * \date    last modified 06/06/2011
  * \date    first release 20/05/2011
  */
 
@@ -19,9 +19,10 @@
 #include <GL/glut.h>
 
 #include "shader_compiling.h"
+#include "shader_samples.h"
 
-shader_resources sc;
 double a=0;
+int light_pos[4] = {0,0,2,1};
 
 void init()
 {
@@ -32,18 +33,14 @@ void init()
 
 void display()
 { 
-  int light_pos[4] = {0,0,2,1};
-  int mat_spec [4] = {1,1,1,1};
 
-  glMaterialiv(GL_FRONT_AND_BACK, GL_SPECULAR, mat_spec);
-  glMateriali(GL_FRONT_AND_BACK, GL_SHININESS, 100);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glMatrixMode(GL_MODELVIEW);
 
   // Put Cam and Sphere
   glLoadIdentity();
-  gluLookAt(0, 5, 6, 0, 0, 0, 0, 1, 0);
-  glutSolidSphere(1, 50, 50);
+gluLookAt(0., 1., 5., 0., 0., 0., 0., 1., 0.);
+  glutSolidTeapot(1);
 
   // Rotate and put light
   glRotated(a, 0, 1, 0);
@@ -51,7 +48,7 @@ void display()
   glTranslatef(0,0,2.5);
   glutSolidSphere(0.1, 50, 50);
 
-  a += 0.05;
+  a += 0.1;
 
   glutSwapBuffers(); 
   glutPostRedisplay();
@@ -84,7 +81,7 @@ int main(int argc, char **argv)
   // Need create valid OpenGL rendering context before initialise GLEW
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
-  glutInitWindowSize(500, 500);
+  glutInitWindowSize(700, 500);
   glutCreateWindow("GLEW Test");
 
   glutReshapeFunc(reshape);
@@ -105,35 +102,9 @@ int main(int argc, char **argv)
     exit(0);
   }
 
-  sc.vertex_shader = load_shader(GL_VERTEX_SHADER,
-      "../samples/vertex_shaders/trivial_vertex_shader.vert");
-  if(sc.vertex_shader == 0) {
-    exit(0);
-  }
-  
-  /*
-  // Testing with one vertex shader.
-  sc.program = make_program_from_one(sc.vertex_shader);
-  if(sc.program == 0) {
-    exit(0);
-  }
-  //*/
+  // trivial_shader();
+  uniform_shader();
 
-  //*
-  // Testing with vertex shader ans pixel shader
-  sc.fragment_shader = load_shader(GL_FRAGMENT_SHADER,
-      "../samples/fragment_shaders/trivial_fragment_shader.frag");
-  if(sc.fragment_shader == 0) {
-    exit(0);
-  }
-
-  sc.program = make_program_from_two(sc.vertex_shader, sc.fragment_shader);
-  if(sc.program == 0) {
-    exit(0);
-  }
-  //*/
-
-  glUseProgram(sc.program);
   glutMainLoop();
   return 0;
 }

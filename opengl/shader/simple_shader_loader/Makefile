@@ -7,10 +7,12 @@ EXEC=shader_compiling
 
 all: $(EXEC)
 
-$(EXEC): shader_compiling.o main.o
+$(EXEC): shader_compiling.o shader_samples.o main.o
 	$(CC) -o $@ $^ $(LDFLAGS)
 
-main.o: shader_compiling.h
+main.o: shader_compiling.h shader_samples.h
+
+shader_samples.o:	shader_samples.h shader_compiling.h
 
 shader_compiling.o: shader_compiling.h
 
@@ -22,3 +24,4 @@ clean:
 
 mrproper: clean
 	@rm $(EXEC)
+
