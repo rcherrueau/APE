@@ -39,7 +39,7 @@ void display()
 
   // Put Cam and Sphere
   glLoadIdentity();
-gluLookAt(0., 1., 5., 0., 0., 0., 0., 1., 0.);
+  gluLookAt(0., 1., 5., 0., 0., 0., 0., 1., 0.);
   glutSolidTeapot(1);
 
   // Rotate and put light
@@ -64,6 +64,7 @@ void keyboard(unsigned char key, int x, int y)
       break;
   }
 }
+
 void reshape(int width, int height)
 {  
   glViewport(0,0,width,height);

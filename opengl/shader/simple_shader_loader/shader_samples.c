@@ -44,19 +44,9 @@ void uniform_shader(void)
   glUseProgram(sc.program);
 
   // Uniform Variables
-  float spec_intensity = 0.99;
-  float spec_color[4] = {.8, .8, .8, 1.};
-  float threshold[2] = {.5, .25};
-  float colors[12] = {.4, .4, .8, 1.,
-                      .2, .2, .4, 1.,
-                      .1, .1, .1, 1.};
-  glUniform1f(glGetUniformLocation(sc.program, "spec_intensity"),
-      spec_intensity);
-
-  glUniform4fv(glGetUniformLocation(sc.program, "spec_color"), 1, spec_color);
-
-  glUniform1fv(glGetUniformLocation(sc.program, "t"), 2, threshold);
-
-  glUniform4fv(glGetUniformLocation(sc.program, "colors"), 3, colors);
+  float render_color[4] = {.8, .3, .3, 1.};
+  float threshold[3] = {.85, .5, .25};
+  glUniform4fv(glGetUniformLocation(sc.program, "user_color"), 1, render_color);
+  glUniform1fv(glGetUniformLocation(sc.program, "threshold"), 3, threshold);
 }
 

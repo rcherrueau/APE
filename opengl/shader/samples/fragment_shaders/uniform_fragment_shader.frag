@@ -1,28 +1,48 @@
-uniform float spec_intensity;
-uniform vec4  spec_color;
-uniform float t[2];
-uniform vec4  colors[3];
+uniform vec4 user_color;
+uniform float threshold[3];
 
 varying vec3 normal, light_dir;
 
-void main(void)
+vec4 gouraud_shading(vec4 color)
 {
   float intensity;
-  vec3  n;
-  vec4  color;
 
-  n = normalize(normal);
-  intensity = max(dot(light_dir, n), 0.);
+  intensity = dot(light_dir, normalize(normal));
 
-  if(intensity > spec_intensity) {
-    color = spec_color;
-  } else if(intensity > t[0]) {
-    color = colors[0];
-  } else if(intensity > t[1]) {
-    color = colors[1];
+  color *= vec4(intensity, intensity, intensity, 1.);
+
+  return color;
+}
+
+vec4 cel_shading(vec4 color)
+{
+  float intensity, factor;
+
+  intensity = dot(light_dir, normalize(normal));
+
+  if(intensity >= threshold[0]) {
+    factor = 1.0;
+  } else if(intensity >= threshold[1]) {
+    factor = 0.5;
+  } else if(intensity >= threshold[2]) {
+    factor = 0.25;
   } else {
-    color = colors[2];
+    factor = 0.1;
   }
+
+  color *= vec4(factor, factor, factor, 1.);
+
+  return color;
+}
+
+void main(void)
+{
+  vec4 color;
+
+  color = user_color;
+
+  // color = gouraud_shading(color);
+  color = cel_shading(color);
 
   gl_FragColor = color;
 }
