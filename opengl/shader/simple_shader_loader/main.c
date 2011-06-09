@@ -22,7 +22,7 @@
 #include "shader_samples.h"
 
 double a=0;
-int light_pos[4] = {0,0,2,1};
+float light_pos[4] = {0,0.7,2,1};
 
 void init()
 {
@@ -33,7 +33,6 @@ void init()
 
 void display()
 { 
-
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glMatrixMode(GL_MODELVIEW);
 
@@ -44,8 +43,8 @@ void display()
 
   // Rotate and put light
   glRotated(a, 0, 1, 0);
-  glLightiv(GL_LIGHT0, GL_POSITION, light_pos);
-  glTranslatef(0,0,2.5);
+  glLightfv(GL_LIGHT0, GL_POSITION, light_pos);
+  glTranslatef(0,0.7,2.5);
   glutSolidSphere(0.1, 50, 50);
 
   a += 0.1;
@@ -105,6 +104,7 @@ int main(int argc, char **argv)
 
   // trivial_shader();
   gouraud_shader();
+  // cel_shader();
   // uniform_shader();
 
   glutMainLoop();

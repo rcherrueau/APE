@@ -4,7 +4,7 @@
  *
  *
  * \author  Ronan-Alexandre Cherrueau ronancherrueau{at}gmail{dot}com
- * \date    last modified 06/06/2011
+ * \date    last modified 09/06/2011
  * \date    first release 06/06/2011
  */
 
@@ -18,6 +18,9 @@ void trivial_shader(void);
 
 //! \brief Load shader, using Gouraud for render.
 void gouraud_shader(void);
+
+//! \brief Load shader, using cel-shading for render.
+void cel_shader(void);
 
 /*!
  * \brief  Load uniform shader sample.
