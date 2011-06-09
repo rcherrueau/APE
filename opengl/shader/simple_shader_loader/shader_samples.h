@@ -16,11 +16,14 @@
 //! \brief  Load trivial shader sample.
 void trivial_shader(void);
 
+//! \brief Load shader, using Gouraud for render.
+void gouraud_shader(void);
+
 /*!
  * \brief  Load uniform shader sample.
  *
  * Sample show how to pass uniform variable. Uniform variable
- * are just readable variable fro the shader but pass from program.
+ * are just readable variable for the shader but pass from program.
  */
 void uniform_shader(void);
 

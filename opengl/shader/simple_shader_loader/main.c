@@ -39,7 +39,7 @@ void display()
 
   // Put Cam and Sphere
   glLoadIdentity();
-  gluLookAt(0., 1., 5., 0., 0., 0., 0., 1., 0.);
+  gluLookAt(0., 2., 5., 0., 0., 0., 0., 1., 0.);
   glutSolidTeapot(1);
 
   // Rotate and put light
@@ -104,7 +104,8 @@ int main(int argc, char **argv)
   }
 
   // trivial_shader();
-  uniform_shader();
+  gouraud_shader();
+  // uniform_shader();
 
   glutMainLoop();
   return 0;
