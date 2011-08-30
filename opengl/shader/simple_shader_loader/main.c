@@ -8,7 +8,7 @@
  * \sa      http://glew.sourceforge.net/
  *
  * \author  Ronan-Alexandre Cherrueau ronancherrueau{at}gmail{dot}com
- * \date    last modified 06/06/2011
+ * \date    last modified 24/08/2011
  * \date    first release 20/05/2011
  */
 
@@ -16,12 +16,16 @@
 #include <stdio.h>
 
 #include <GL/glew.h>
-#include <GL/glut.h>
 
-#include "shader_compiling.h"
+#ifdef __APPLE__
+  #include <GLUT/glut.h>
+#else
+  #include <GL/glut.h>
+#endif
+
 #include "shader_samples.h"
 
-double a=0;
+double a = 0;
 float light_pos[4] = {0,0.7,2,1};
 
 void init()
@@ -29,22 +33,27 @@ void init()
 	glEnable(GL_DEPTH_TEST);
   glEnable(GL_LIGHTING);
   glEnable(GL_LIGHT0);
+
+  // To enable alpha transparency
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 void display()
 { 
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glMatrixMode(GL_MODELVIEW);
+  glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
   // Put Cam and Sphere
   glLoadIdentity();
-  gluLookAt(0., 2., 5., 0., 0., 0., 0., 1., 0.);
+  gluLookAt(0., 1., 5., 0., 0., 0., 0., 1., 0.);
   glutSolidTeapot(1);
 
   // Rotate and put light
   glRotated(a, 0, 1, 0);
   glLightfv(GL_LIGHT0, GL_POSITION, light_pos);
-  glTranslatef(0,0.7,2.5);
+  glTranslatef(0, 0.7, 2.5);
   glutSolidSphere(0.1, 50, 50);
 
   a += 0.1;
@@ -66,7 +75,7 @@ void keyboard(unsigned char key, int x, int y)
 
 void reshape(int width, int height)
 {  
-  glViewport(0,0,width,height);
+  glViewport(0,0, width, height);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
   gluPerspective(45, (float)width / (float)height, 0.1, 100);
@@ -80,7 +89,7 @@ int main(int argc, char **argv)
 
   // Need create valid OpenGL rendering context before initialise GLEW
   glutInit(&argc, argv);
-  glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
+  glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE);
   glutInitWindowSize(700, 500);
   glutCreateWindow("GLEW Test");
 
@@ -103,9 +112,10 @@ int main(int argc, char **argv)
   }
 
   // trivial_shader();
-  gouraud_shader();
+  // gouraud_shader();
   // cel_shader();
   // uniform_shader();
+  // xray_shader();
 
   glutMainLoop();
   return 0;

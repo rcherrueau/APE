@@ -3,13 +3,13 @@
 void trivial_shader(void)
 {
   sc.vertex_shader = load_shader(GL_VERTEX_SHADER,
-      "../samples/vertex_shaders/trivial_vertex_shader.vert");
+      "../samples/vertex_shaders/trivial.vert");
   if(sc.vertex_shader == 0) {
     exit(0);
   }
   
   sc.fragment_shader = load_shader(GL_FRAGMENT_SHADER,
-      "../samples/fragment_shaders/trivial_fragment_shader.frag");
+      "../samples/fragment_shaders/trivial.frag");
   if(sc.fragment_shader == 0) {
     exit(0);
   }
@@ -25,13 +25,13 @@ void trivial_shader(void)
 void gouraud_shader(void)
 {
   sc.vertex_shader = load_shader(GL_VERTEX_SHADER,
-      "../samples/vertex_shaders/gouraud_vertex_shader.vert");
+      "../samples/vertex_shaders/gouraud.vert");
   if(sc.vertex_shader == 0) {
     exit(0);
   }
   
   sc.fragment_shader = load_shader(GL_FRAGMENT_SHADER,
-      "../samples/fragment_shaders/gouraud_fragment_shader.frag");
+      "../samples/fragment_shaders/gouraud.frag");
   if(sc.fragment_shader == 0) {
     exit(0);
   }
@@ -47,13 +47,13 @@ void gouraud_shader(void)
 void cel_shader(void)
 {
   sc.vertex_shader = load_shader(GL_VERTEX_SHADER,
-      "../samples/vertex_shaders/cel_vertex_shader.vert");
+      "../samples/vertex_shaders/cel.vert");
   if(sc.vertex_shader == 0) {
     exit(0);
   }
   
   sc.fragment_shader = load_shader(GL_FRAGMENT_SHADER,
-      "../samples/fragment_shaders/cel_fragment_shader.frag");
+      "../samples/fragment_shaders/cel.frag");
   if(sc.fragment_shader == 0) {
     exit(0);
   }
@@ -69,13 +69,13 @@ void cel_shader(void)
 void uniform_shader(void)
 {
   sc.vertex_shader = load_shader(GL_VERTEX_SHADER,
-      "../samples/vertex_shaders/uniform_vertex_shader.vert");
+      "../samples/vertex_shaders/uniform.vert");
   if(sc.vertex_shader == 0) {
     exit(0);
   }
   
   sc.fragment_shader = load_shader(GL_FRAGMENT_SHADER,
-      "../samples/fragment_shaders/uniform_fragment_shader.frag");
+      "../samples/fragment_shaders/uniform.frag");
   if(sc.fragment_shader == 0) {
     exit(0);
   }
@@ -88,9 +88,31 @@ void uniform_shader(void)
   glUseProgram(sc.program);
 
   // Uniform Variables
-  float render_color[4] = {.8, .3, .3, 1.};
+  float render_color[4] = {0., 1., 0., 1.};
   float threshold[3] = {.85, .5, .25};
   glUniform4fv(glGetUniformLocation(sc.program, "user_color"), 1, render_color);
   glUniform1fv(glGetUniformLocation(sc.program, "threshold"), 3, threshold);
+}
+
+void xray_shader(void)
+{
+  sc.vertex_shader = load_shader(GL_VERTEX_SHADER,
+      "../samples/vertex_shaders/xray.vert");
+  if(sc.vertex_shader == 0) {
+    exit(0);
+  }
+  
+  sc.fragment_shader = load_shader(GL_FRAGMENT_SHADER,
+      "../samples/fragment_shaders/xray.frag");
+  if(sc.fragment_shader == 0) {
+    exit(0);
+  }
+
+  sc.program = make_program_from_two(sc.vertex_shader, sc.fragment_shader);
+  if(sc.program == 0) {
+    exit(0);
+  }
+
+  glUseProgram(sc.program);
 }
 

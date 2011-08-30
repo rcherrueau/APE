@@ -4,7 +4,7 @@
  *
  *
  * \author  Ronan-Alexandre Cherrueau ronancherrueau{at}gmail{dot}com
- * \date    last modified 09/06/2011
+ * \date    last modified 24/08/2011
  * \date    first release 06/06/2011
  */
 
@@ -29,6 +29,9 @@ void cel_shader(void);
  * are just readable variable for the shader but pass from program.
  */
 void uniform_shader(void);
+
+//! \brief Load shader, using xray-shading for render.
+void xray_shader(void);
 
 //! \var Resources of shader.
 shader_resources sc;
