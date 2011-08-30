@@ -25,14 +25,17 @@
 
 #include "shader_samples.h"
 
-double a = 0;
-float light_pos[4] = {0,0.7,2,1};
+#define SPEED_LIGHT 0.1
+double angle = 0;
 
 void init()
 {
 	glEnable(GL_DEPTH_TEST);
   glEnable(GL_LIGHTING);
   glEnable(GL_LIGHT0);
+  
+  // To activate color
+  glEnable(GL_COLOR_MATERIAL);
 
   // To enable alpha transparency
   glEnable(GL_BLEND);
@@ -41,9 +44,17 @@ void init()
 
 void display()
 { 
+  float material_spec[4] = {1., 1., 1., 1.};
+  float light_pos[4] = {0., .7, 2., 1.};
+
+  glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, material_spec);
+  glMateriali(GL_FRONT_AND_BACK, GL_SHININESS, 100);
+  glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glMatrixMode(GL_MODELVIEW);
   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+  glColor3f(1., 0., 0.);
 
   // Put Cam and Sphere
   glLoadIdentity();
@@ -51,12 +62,12 @@ void display()
   glutSolidTeapot(1);
 
   // Rotate and put light
-  glRotated(a, 0, 1, 0);
+  glRotated(angle, 1., 1., 1.);
   glLightfv(GL_LIGHT0, GL_POSITION, light_pos);
-  glTranslatef(0, 0.7, 2.5);
+  glTranslatef(0., .7, 2.5);
   glutSolidSphere(0.1, 50, 50);
 
-  a += 0.1;
+  angle += SPEED_LIGHT;
 
   glutSwapBuffers(); 
   glutPostRedisplay();
@@ -115,7 +126,8 @@ int main(int argc, char **argv)
   // gouraud_shader();
   // cel_shader();
   // uniform_shader();
-  // xray_shader();
+  xray_shader();
+  // phong_shader();
 
   glutMainLoop();
   return 0;

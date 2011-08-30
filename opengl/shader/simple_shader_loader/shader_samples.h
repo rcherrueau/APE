@@ -33,6 +33,7 @@ void uniform_shader(void);
 //! \brief Load shader, using xray-shading for render.
 void xray_shader(void);
 
+void phong_shader(void);
 //! \var Resources of shader.
 shader_resources sc;
 
