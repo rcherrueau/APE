@@ -13,16 +13,14 @@ vec4 gouraud_shading(vec4 color)
 
   intensity = dot(light_dir, normalize(normal));
 
-  color *= vec4(intensity, intensity, intensity, 1.);
-
-  return color;
+  return color * vec4(intensity, intensity, intensity, 1.);
 }
 
 void main(void)
 {
   vec4 color;
 
-  color = vec4(.5, .5, .0, 1.);
+  color = vec4(.5, .0, .5, 1.);
 
   color = gouraud_shading(color);
 

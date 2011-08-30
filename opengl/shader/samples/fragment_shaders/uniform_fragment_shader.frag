@@ -30,9 +30,7 @@ vec4 cel_shading(vec4 color)
     factor = 0.1;
   }
 
-  color *= vec4(factor, factor, factor, 1.);
-
-  return color;
+  return color * vec4(factor, factor, factor, 1.);
 }
 
 void main(void)

@@ -1,7 +1,7 @@
 varying vec3 normal, light_dir;
 
 /*!
- * \brief   Gouraud Shading
+ * \brief   Cel Shading
  *
  * Using light direction with dot product on normal of fragment, we
  * getting the intensity of light on the fragment (between [0,1]).
@@ -25,9 +25,8 @@ vec4 cel_shading(vec4 color)
 
   intensity = dot(light_dir, normalize(normal));
   factor = threshold(intensity);
-  color *= vec4(factor, factor, factor, 1.);
 
-  return color;
+  return color * vec4(factor, factor, factor, 1.);
 }
 
 void main(void)
