@@ -1,6 +1,11 @@
 CC=gcc
 CFLAGS=-Wall -Werror -ansi -std=c99
-LDFLAGS=-lGLEW -lGLU -lGL -lglut
+ifeq ($(shell uname), Darwin)
+	LDFLAGS += -framework OpenGL -framework GLUT -lGLEW
+else
+	LDFLAGS += -lGLEW -lGL -lglut -lGLU
+endif
+#LDFLAGS=-lGLEW -lGLU -lGL -lglut
 EXEC=shader_compiling
 
 .PHONY: clean mrproper
