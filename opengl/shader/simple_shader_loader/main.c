@@ -34,22 +34,44 @@ void init()
   glEnable(GL_LIGHTING);
   glEnable(GL_LIGHT0);
   
-  // To activate color
+  // To activate glColor when lightning is enabled = Color Tracking
   glEnable(GL_COLOR_MATERIAL);
 
   // To enable alpha transparency
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+  // Antialiasing
+  glEnable(GL_SMOOTH);
+}
+
+void init_light(void)
+{
+  // Lighting parameters:
+  float light_ambient[4] = {.2, .2, .2, 1.};
+  float light_diffuse[4] = {1., 1., 1., 1.};
+  float light_specular[4] = {1., 1., 1., 1.};
+  float light_position[4] = {0., 0., 2., 1.};
+
+  glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
+  glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+  glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+  glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+
+  // Material parameters:
+  float material_ambient[4] = {.2, .2, .2, 1.};
+  float material_diffuse[4] = {1., 1., 1., 1.};
+  float material_specular[4] = {1., 1., 1., 1.};
+  float material_shininess = 100.;
+
+  glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, material_ambient);
+  glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, material_diffuse);
+  glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, material_specular);
+  glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, material_shininess);
 }
 
 void display()
 { 
-  float material_spec[4] = {1., 1., 1., 1.};
-  float light_pos[4] = {0., .7, 2., 1.};
-
-  glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, material_spec);
-  glMateriali(GL_FRONT_AND_BACK, GL_SHININESS, 100);
-  glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glMatrixMode(GL_MODELVIEW);
   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -58,14 +80,14 @@ void display()
 
   // Put Cam and Sphere
   glLoadIdentity();
-  gluLookAt(0., 1., 5., 0., 0., 0., 0., 1., 0.);
+  gluLookAt(0., 0., 5., 0., 0., 0., 0., 1., 0.);
   glutSolidTeapot(1);
 
   // Rotate and put light
-  glRotated(angle, 1., 1., 1.);
-  glLightfv(GL_LIGHT0, GL_POSITION, light_pos);
-  glTranslatef(0., .7, 2.5);
-  glutSolidSphere(0.1, 50, 50);
+  glRotatef(angle, 0., 1., 0.);
+  init_light();
+  // glTranslatef(0., 0., 2.5);
+  // glutSolidSphere(.1, 50, 50);
 
   angle += SPEED_LIGHT;
 
@@ -126,7 +148,7 @@ int main(int argc, char **argv)
   // gouraud_shader();
   // cel_shader();
   // uniform_shader();
-  xray_shader();
+  // xray_shader();
   // phong_shader();
 
   glutMainLoop();

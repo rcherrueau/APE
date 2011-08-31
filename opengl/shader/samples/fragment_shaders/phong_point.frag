@@ -24,9 +24,6 @@ void main(void)
   vec3 light, eye, light_normal_reflect;
   vec4 ambient_term, diffuse_term, specular_term;
 
-  light = normalize(vec3(gl_LightSource[0].position) - vertex_vector);
-
-
   // Compute Ambient Term:
   //  * ambient_light = gl_LightSource[0].ambient
   //  * ambient_material = gl_FrontMaterial.ambient;
@@ -36,18 +33,30 @@ void main(void)
   //  * diffuse_light = gl_LightSource[0].diffuse;
   //  * diffuse_material = gl_FrontMaterial.diffuse;
   //  * lambert_term = max(dot(normal, light), 0.);
+  light = normalize(vec3(gl_LightSource[0].position) - vertex_vector);
   diffuse_term = gl_FrontLightProduct[0].diffuse * max(dot(normal, light), 0.);
   diffuse_term = clamp(diffuse_term, 0., 1.);
 
   // Compute Specular Term:
   //   * we are in Eye Coordinates, so EyePos is (0,0,0)
   eye = normalize(-vertex_vector);
-  light_normal_reflect = normalize(reflect(-light, normal));
+  light_normal_reflect = normalize(-reflect(light, normal));
   specular = pow(max(dot(light_normal_reflect, eye), 0.),
     gl_FrontMaterial.shininess);
   specular_term = gl_FrontLightProduct[0].specular * specular;
   specular_term = clamp(specular_term, 0., 1.);
 
-  gl_FragColor = ambient_term + diffuse_term + specular_term;
+  // Ambient Term:
+  // gl_FragColor = ambient_term;
+
+  // Diffuse Term:
+  // gl_FragColor = diffuse_term;
+
+  // Specular Term:
+  // gl_FragColor = specular_term;
+
+  // Phong Point lightning:
+  gl_FragColor = ambient_term + diffuse_term + specular_term +
+    gl_FrontLightModelProduct.sceneColor;
 }
 
