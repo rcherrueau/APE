@@ -11,7 +11,7 @@ vec4 gouraud_shading(vec4 color)
 {
   float intensity;
 
-  intensity = dot(light_dir, normalize(normal));
+  intensity = dot(normalize(light_dir), normalize(normal));
 
   return color * vec4(intensity, intensity, intensity, 1.);
 }
@@ -20,7 +20,7 @@ void main(void)
 {
   vec4 color;
 
-  color = vec4(.5, .0, .5, 1.);
+  color = gl_FrontMaterial.ambient;
 
   color = gouraud_shading(color);
 

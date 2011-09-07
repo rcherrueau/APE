@@ -89,7 +89,6 @@ void move_light(void)
 
   glLightfv(GL_LIGHT0, GL_POSITION, light_position);
 
-  glColor3f(1., 1., 1.);
   glTranslatef(light_position[X] + .5,
       light_position[Y],
       light_position[Z] + .5);
@@ -98,22 +97,55 @@ void move_light(void)
   angle_rad += SPEED_LIGHT;
 }
 
+void draw_cartesian_coordinates(void)
+{
+  GLUquadric *params = gluNewQuadric();
+
+  gluQuadricDrawStyle(params, GL_FILL);
+  gluQuadricTexture(params, GL_FALSE);
+
+  // Z
+  glTranslatef(0., 0., -2.);
+  glColor3f(0., 1., 0.);
+  gluCylinder(params, .02, .02, 4., 20., 1.); 
+  glTranslatef(0., 0., 2.);
+
+  // X
+  glRotatef(90., 0., 1., 0.);
+  glTranslatef(0., 0., -2.);
+  glColor3f(1., 0., 0.);
+  gluCylinder(params, .02, .02, 4., 20., 1.); 
+  glTranslatef(0., 0., 2.);
+  glRotatef(-90., 0., 1., 0.);
+
+  // Y
+  glRotatef(90., 1., 0., 0.);
+  glTranslatef(0., 0., -2.);
+  glColor3f(0., 0., 1.);
+  gluCylinder(params, .02, .02, 4., 20., 1.); 
+  glTranslatef(0., 0., 2.);
+  glRotatef(-90., 1., 0., 0.);
+
+  gluDeleteQuadric(params);
+}
+
 void display()
 { 
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glMatrixMode(GL_MODELVIEW);
   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
   init_light();
+
+  glLoadIdentity();
+  gluLookAt(3.5, 2., 3.5, 0., 0., 0., 0., 1., 0.);
+
+  draw_cartesian_coordinates();
 
   glColor3f(1., 0., 0.);
-
-  init_light();
-
-  // Put Cam and Sphere
-  glLoadIdentity();
-  gluLookAt(0., 2., 5., 0., 0., 0., 0., 1., 0.);
-
   glutSolidTeapot(1);
+
+  glColor3f(1., 1., 1.);
   move_light();
 
   glutSwapBuffers(); 
@@ -173,7 +205,7 @@ int main(int argc, char **argv)
   // gouraud_shader();
   // cel_shader();
   // uniform_shader();
-  xray_shader();
+  // xray_shader();
   phong_shader();
 
   glutMainLoop();
