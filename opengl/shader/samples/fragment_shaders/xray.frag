@@ -35,7 +35,7 @@ void main(void)
   vec4 color;
   xray_t xray;
 
-  color = vec4(0., .5, .5, 1.);
+  color = vec4(0., .5, .5, 1.) * gl_FrontMaterial.ambient;
   xray = xray_shading(color);
 
   gl_FragColor = xray.color;

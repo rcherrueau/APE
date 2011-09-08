@@ -142,7 +142,7 @@ void display()
 
   draw_cartesian_coordinates();
 
-  glColor3f(1., 0., 0.);
+  glColor3f(0.7, 0.7, 1.);
   glutSolidTeapot(1);
 
   glColor3f(1., 1., 1.);
