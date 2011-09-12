@@ -3,13 +3,13 @@
 void trivial_shader(void)
 {
   sc.vertex_shader = load_shader(GL_VERTEX_SHADER,
-      "../samples/vertex_shaders/trivial.vert");
+      "samples/vertex_shaders/trivial.vert");
   if(sc.vertex_shader == 0) {
     exit(0);
   }
   
   sc.fragment_shader = load_shader(GL_FRAGMENT_SHADER,
-      "../samples/fragment_shaders/trivial.frag");
+      "samples/fragment_shaders/trivial.frag");
   if(sc.fragment_shader == 0) {
     exit(0);
   }
@@ -25,13 +25,13 @@ void trivial_shader(void)
 void gouraud_shader(void)
 {
   sc.vertex_shader = load_shader(GL_VERTEX_SHADER,
-      "../samples/vertex_shaders/gouraud.vert");
+      "samples/vertex_shaders/gouraud.vert");
   if(sc.vertex_shader == 0) {
     exit(0);
   }
   
   sc.fragment_shader = load_shader(GL_FRAGMENT_SHADER,
-      "../samples/fragment_shaders/gouraud.frag");
+      "samples/fragment_shaders/gouraud.frag");
   if(sc.fragment_shader == 0) {
     exit(0);
   }
@@ -47,13 +47,13 @@ void gouraud_shader(void)
 void cel_shader(void)
 {
   sc.vertex_shader = load_shader(GL_VERTEX_SHADER,
-      "../samples/vertex_shaders/cel.vert");
+      "samples/vertex_shaders/cel.vert");
   if(sc.vertex_shader == 0) {
     exit(0);
   }
   
   sc.fragment_shader = load_shader(GL_FRAGMENT_SHADER,
-      "../samples/fragment_shaders/cel.frag");
+      "samples/fragment_shaders/cel.frag");
   if(sc.fragment_shader == 0) {
     exit(0);
   }
@@ -69,13 +69,13 @@ void cel_shader(void)
 void uniform_shader(void)
 {
   sc.vertex_shader = load_shader(GL_VERTEX_SHADER,
-      "../samples/vertex_shaders/uniform.vert");
+      "samples/vertex_shaders/uniform.vert");
   if(sc.vertex_shader == 0) {
     exit(0);
   }
   
   sc.fragment_shader = load_shader(GL_FRAGMENT_SHADER,
-      "../samples/fragment_shaders/uniform.frag");
+      "samples/fragment_shaders/uniform.frag");
   if(sc.fragment_shader == 0) {
     exit(0);
   }
@@ -97,13 +97,13 @@ void uniform_shader(void)
 void xray_shader(void)
 {
   sc.vertex_shader = load_shader(GL_VERTEX_SHADER,
-      "../samples/vertex_shaders/xray.vert");
+      "samples/vertex_shaders/xray.vert");
   if(sc.vertex_shader == 0) {
     exit(0);
   }
   
   sc.fragment_shader = load_shader(GL_FRAGMENT_SHADER,
-      "../samples/fragment_shaders/xray.frag");
+      "samples/fragment_shaders/xray.frag");
   if(sc.fragment_shader == 0) {
     exit(0);
   }
@@ -119,13 +119,13 @@ void xray_shader(void)
 void phong_shader(void)
 {
   sc.vertex_shader = load_shader(GL_VERTEX_SHADER,
-      "../samples/vertex_shaders/phong_point.vert");
+      "samples/vertex_shaders/phong_point.vert");
   if(sc.vertex_shader == 0) {
     exit(0);
   }
   
   sc.fragment_shader = load_shader(GL_FRAGMENT_SHADER,
-      "../samples/fragment_shaders/phong_point.frag");
+      "samples/fragment_shaders/phong_point.frag");
   if(sc.fragment_shader == 0) {
     exit(0);
   }
