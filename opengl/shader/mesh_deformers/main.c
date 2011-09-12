@@ -1,6 +1,6 @@
 /*!
  * \file    main.c
- * \brief   testing shader_compiling with glsl shaders.
+ * \brief   Testing mesh-deformers in glsl.
  *
  * Program uses GLEW to provide mechanisms for determining if GL_ARB_**_shader
  * extensions are supported on platform. This uses glut for window system.
@@ -8,13 +8,11 @@
  * \sa      http://glew.sourceforge.net/
  *
  * \author  Ronan-Alexandre Cherrueau ronancherrueau{at}gmail{dot}com
- * \date    last modified 24/08/2011
- * \date    first release 20/05/2011
+ * \date    first release 12/09/2011
  */
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <math.h>
 
 #include <GL/glew.h>
 
@@ -24,13 +22,9 @@
   #include <GL/glut.h>
 #endif
 
-#include "shader_samples.h"
-
-#define SPEED_LIGHT 0.005
+#include "utils/shader_compiling.h"
 
 enum AXES {X = 0, Y, Z, H};
-
-double angle_rad = 0;
 
 void init()
 {
@@ -55,10 +49,12 @@ void init_light(void)
   float light_ambient[4] = {.2, .2, .2, 1.};
   float light_diffuse[4] = {1., 1., 1., 1.};
   float light_specular[4] = {1., 1., 1., 1.};
+  float light_position[4] = {2., 0., 0., 1.};
 
   glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
   glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
   glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+  glLightfv(GL_LIGHT0, GL_POSITION, light_position);
 
   // Material parameters:
   float material_ambient[4] = {.2, .2, .2, 1.};
@@ -70,31 +66,6 @@ void init_light(void)
   glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, material_diffuse);
   glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, material_specular);
   glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, material_shininess);
-}
-
-void move_light(void)
-{
-  float light_position[4] = {2., 0., 0., 1.};
-
-  float light_norme = sqrt(
-      (light_position[X] * light_position[X]) +
-      (light_position[Y] * light_position[Y]) +
-      (light_position[Z] * light_position[Z]));
-
-  float x = cos(angle_rad) * light_norme;
-  float z = sin(angle_rad) * light_norme;
-  
-  light_position[X] = x;
-  light_position[Z] = z;
-
-  glLightfv(GL_LIGHT0, GL_POSITION, light_position);
-
-  glTranslatef(light_position[X] + .5,
-      light_position[Y],
-      light_position[Z] + .5);
-  glutSolidSphere(.1, 50, 50);
-
-  angle_rad += SPEED_LIGHT;
 }
 
 void draw_cartesian_coordinates(void)
@@ -138,15 +109,18 @@ void display()
   init_light();
 
   glLoadIdentity();
-  gluLookAt(3.5, 2., 3.5, 0., 0., 0., 0., 1., 0.);
+  gluLookAt(2.5, 2.5, 2.5, 0., 0., 0., 0., 1., 0.);
 
   draw_cartesian_coordinates();
 
   glColor3f(0.7, 0.7, 1.);
-  glutSolidTeapot(1);
 
-  glColor3f(1., 1., 1.);
-  move_light();
+  glBegin(GL_QUADS);
+    glVertex3f(1., 0., -1.);
+    glVertex3f(-1., 0., -1.);
+    glVertex3f(-1., 0., 1.);
+    glVertex3f(1., 0., 1.);
+  glEnd();
 
   glutSwapBuffers(); 
   glutPostRedisplay();
@@ -181,7 +155,7 @@ int main(int argc, char **argv)
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE);
   glutInitWindowSize(700, 500);
-  glutCreateWindow("GLEW Test");
+  glutCreateWindow("Mesh-Deformers Test");
 
   glutReshapeFunc(reshape);
   glutDisplayFunc(display);
@@ -200,13 +174,6 @@ int main(int argc, char **argv)
     fprintf (stderr, "Shaders non supportés.\n");
     exit(0);
   }
-
-  // trivial_shader();
-  // gouraud_shader();
-  // cel_shader();
-  // uniform_shader();
-  // xray_shader();
-  phong_shader();
 
   glutMainLoop();
   return 0;
