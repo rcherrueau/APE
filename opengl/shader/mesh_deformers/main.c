@@ -24,7 +24,17 @@
 
 #include "utils/shader_compiling.h"
 
-enum AXES {X = 0, Y, Z, H};
+shader_resources shader_phong, shader_mdeformers;
+
+void exit_program(void)
+{
+  glDeleteShader(shader_phong.vertex_shader);
+  glDeleteShader(shader_phong.fragment_shader);
+  glDeleteShader(shader_mdeformers.vertex_shader);
+  glDeleteShader(shader_mdeformers.fragment_shader);
+  glDeleteProgram(shader_phong.program);
+  glDeleteProgram(shader_mdeformers.program);
+}
 
 void init()
 {
@@ -49,7 +59,7 @@ void init_light(void)
   float light_ambient[4] = {.2, .2, .2, 1.};
   float light_diffuse[4] = {1., 1., 1., 1.};
   float light_specular[4] = {1., 1., 1., 1.};
-  float light_position[4] = {0.1, 0.25, 0.1, 1.};
+  float light_position[4] = {0., 2.5, 0., 1.};
 
   glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
   glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
@@ -60,12 +70,54 @@ void init_light(void)
   float material_ambient[4] = {.2, .2, .2, 1.};
   float material_diffuse[4] = {1., 1., 1., 1.};
   float material_specular[4] = {1., 1., 1., 1.};
-  float material_shininess = 50.;
+  float material_shininess = 100.;
 
   glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, material_ambient);
   glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, material_diffuse);
   glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, material_specular);
   glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, material_shininess);
+}
+
+void init_phong_point(void)
+{
+  shader_phong.vertex_shader = load_shader(GL_VERTEX_SHADER,
+      "glsl/phong_point.vert");
+  if(shader_phong.vertex_shader == 0) {
+    exit_program();
+  }
+  
+  shader_phong.fragment_shader = load_shader(GL_FRAGMENT_SHADER,
+      "glsl/phong_point.frag");
+  if(shader_phong.fragment_shader == 0) {
+    exit_program();
+  }
+
+  shader_phong.program = make_program_from_two(
+      shader_phong.vertex_shader, shader_phong.fragment_shader);
+  if(shader_phong.program == 0) {
+    exit_program();
+  }
+}
+
+void init_mesh_deformers()
+{
+  shader_mdeformers.vertex_shader = load_shader(GL_VERTEX_SHADER,
+      "glsl/deformers.vert");
+  if(shader_mdeformers.vertex_shader == 0) {
+    exit_program();
+  }
+  
+  shader_mdeformers.fragment_shader = load_shader(GL_FRAGMENT_SHADER,
+      "glsl/phong_point.frag");
+  if(shader_mdeformers.fragment_shader == 0) {
+    exit_program();
+  }
+
+  shader_mdeformers.program = make_program_from_two(
+      shader_mdeformers.vertex_shader, shader_mdeformers.fragment_shader);
+  if(shader_mdeformers.program == 0) {
+    exit_program();
+  }
 }
 
 void draw_cartesian_coordinates(void)
@@ -128,19 +180,24 @@ void draw_square(float width, float height, int slices)
 
 void display()
 { 
+
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glMatrixMode(GL_MODELVIEW);
-  glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+  glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
   init_light();
 
   glLoadIdentity();
-  gluLookAt(2.5, 2.5, 2.5, 0., 0., 0., 0., 1., 0.);
+  gluLookAt(4., 4., 4., 0., 0., 0., 0., 1., 0.);
 
+  glUseProgram(shader_phong.program);
   draw_cartesian_coordinates();
 
   glColor3f(0.7, 0.7, 1.);
-  draw_square(2., 2., 50);
+  glUseProgram(shader_mdeformers.program);
+  glUniform1f(glGetUniformLocation(shader_mdeformers.program, "amplitude_"),.5);
+  glUniform1f(glGetUniformLocation(shader_mdeformers.program, "frequency_"),4.);
+  draw_square(5., 5., 100);
 
   glutSwapBuffers(); 
   glutPostRedisplay();
@@ -165,38 +222,6 @@ void reshape(int width, int height)
   gluPerspective(45, (float)width / (float)height, 0.1, 100);
   glMatrixMode(GL_MODELVIEW);
 }  
-
-void mesh_deformers(void)
-{
-  shader_resources sc;
-
-  sc.vertex_shader = load_shader(GL_VERTEX_SHADER,
-      "glsl/deformers.vert");
-      // "glsl/phong_point.vert");
-  if(sc.vertex_shader == 0) {
-    exit(0);
-  }
-  
-  sc.fragment_shader = load_shader(GL_FRAGMENT_SHADER,
-      "glsl/phong_point.frag");
-  if(sc.fragment_shader == 0) {
-    exit(0);
-  }
-
-  sc.program = make_program_from_two(sc.vertex_shader, sc.fragment_shader);
-  if(sc.program == 0) {
-    exit(0);
-  }
-
-  glUseProgram(sc.program);
-
-  // Uniform Variables
-  float phase = .01;
-  float frequency = .01; 
-
-  glUniform1f(glGetUniformLocation(sc.program, "phase"), phase);
-  glUniform1f(glGetUniformLocation(sc.program, "frequency"), frequency);
-}
 
 //! \brief Main program.
 int main(int argc, char **argv)
@@ -227,9 +252,11 @@ int main(int argc, char **argv)
     exit(0);
   }
 
-  // mesh_deformers();
+  init_phong_point();
+  init_mesh_deformers();
 
   glutMainLoop();
+
   return 0;
 }
 
