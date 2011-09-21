@@ -12,8 +12,6 @@
  */
 
 #include <stdlib.h>
-#include <stdio.h>
-
 #include <GL/glew.h>
 
 #ifdef __APPLE__
@@ -38,7 +36,7 @@ void exit_program(void)
 
 void init()
 {
-	glEnable(GL_DEPTH_TEST);
+  glEnable(GL_DEPTH_TEST);
   glEnable(GL_LIGHTING);
   glEnable(GL_LIGHT0);
   
@@ -162,11 +160,11 @@ void draw_square(float width, float height, int slices)
 
 
   x = - (width / 2.);
-  for(float i=0.; i<slices; ++i) {
+  for(int i=0.; i<slices; ++i) {
     z = - (height / 2.);
 
     glBegin(GL_QUAD_STRIP);
-    for(float j=0.; j<=slices; ++j) {
+    for(int j=0.; j<=slices; ++j) {
       glVertex3f(x, 0., z);
       glVertex3f(x + new_width, 0., z);
 
@@ -180,7 +178,6 @@ void draw_square(float width, float height, int slices)
 
 void display()
 { 
-
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glMatrixMode(GL_MODELVIEW);
   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
