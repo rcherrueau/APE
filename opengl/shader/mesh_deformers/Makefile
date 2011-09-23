@@ -11,7 +11,7 @@ EXEC=mesh_deformers
 
 all: $(EXEC)
 
-$(EXEC): utils/shader_compiling.o main.o
+$(EXEC): utils/shader_compiling.o mesh_deformers.o main.o 
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 main.o: utils/shader_compiling.h 
