@@ -7,3 +7,11 @@ http://devzone.zend.com/article/1021
 http://devzone.zend.com/article/1022
 http://devzone.zend.com/article/1023
 
+== Compile ==
+phpize
+./configure --enable-hello
+make
+
+copy modules/hello.so to your php/extension dir.
+In php.ini add "extension=hello.so"
+
