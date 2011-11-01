@@ -9,7 +9,17 @@
  * \see   http://devzone.zend.com/article/1023
  */
 #ifndef PHP_HELLO_H
-#define PHP_HELLO_H 1
+#define PHP_HELLO_H
+
+#define PHP_HELLO_WORLD_VERSION "0.1"
+#define PHP_HELLO_WORLD_EXTNAME "hello"
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#include "php.h"
+#include "php_ini.h"
 
 #ifdef ZTS
 #include "TSRM.h"
@@ -25,9 +35,6 @@ ZEND_END_MODULE_GLOBALS(hello)
 #else
 #define HELLO_G(v) (hello_globals.v)
 #endif
-
-#define PHP_HELLO_WORLD_VERSION "1.0"
-#define PHP_HELLO_WORLD_EXTNAME "hello"
 
 PHP_MINIT_FUNCTION(hello);
 PHP_MSHUTDOWN_FUNCTION(hello);

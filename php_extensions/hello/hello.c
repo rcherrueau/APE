@@ -8,33 +8,26 @@
  * \see   http://devzone.zend.com/article/1022
  * \see   http://devzone.zend.com/article/1023
  */
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
-#include "php.h"
-#include "php_ini.h"
 #include "php_hello.h"
 
 ZEND_DECLARE_MODULE_GLOBALS(hello)
 
-  static function_entry hello_functions[] = {
-    PHP_FE(hello_world, NULL)
-    PHP_FE(hello_long, NULL)
-    PHP_FE(hello_double, NULL)
-    PHP_FE(hello_bool, NULL)
-    PHP_FE(hello_null, NULL)
-    PHP_FE(hello_greetme, NULL)
-    PHP_FE(hello_add, NULL)
-    PHP_FE(hello_dump, NULL)
-    PHP_FE(hello_array, NULL)
-    PHP_FE(hello_array_strings, NULL)
-    PHP_FE(hello_array_walk, NULL)
-    PHP_FE(hello_array_value, NULL)
-    PHP_FE(hello_get_global_var, NULL)
-    PHP_FE(hello_set_local_var, NULL)
-    {NULL, NULL, NULL}
-  };
+static function_entry hello_functions[] = {
+  PHP_FE(hello_world, NULL)
+  PHP_FE(hello_long, NULL)
+  PHP_FE(hello_double, NULL)
+  PHP_FE(hello_bool, NULL)
+  PHP_FE(hello_null, NULL)
+  PHP_FE(hello_greetme, NULL)
+  PHP_FE(hello_add, NULL)
+  PHP_FE(hello_dump, NULL)
+  PHP_FE(hello_array, NULL)
+  PHP_FE(hello_array_strings, NULL)
+  PHP_FE(hello_array_walk, NULL)
+  PHP_FE(hello_array_value, NULL)
+  PHP_FE(hello_get_global_var, NULL)
+  {NULL, NULL, NULL}
+};
 
 zend_module_entry hello_module_entry = {
 #if ZEND_MODULE_API_NO >= 20010901
