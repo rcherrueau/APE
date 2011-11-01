@@ -1,0 +1,15 @@
+Php Extension Writing with Zend.
+
+This vehicles is the implementation of Wrapping C++ Classes in a PHP Extension
+by Paul Osman.
+
+http://devzone.zend.com/article/4486
+
+== Compile ==
+phpize
+./configure --enable-vehicles
+make
+
+copy modules/vehicles.so to your php/extension dir
+In php.ini add "extension=vehicles.so"
+
