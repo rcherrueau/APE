@@ -12,22 +12,22 @@
 
 ZEND_DECLARE_MODULE_GLOBALS(hello)
 
-static function_entry hello_functions[] = {
-  PHP_FE(hello_world, NULL)
-  PHP_FE(hello_long, NULL)
-  PHP_FE(hello_double, NULL)
-  PHP_FE(hello_bool, NULL)
-  PHP_FE(hello_null, NULL)
-  PHP_FE(hello_greetme, NULL)
-  PHP_FE(hello_add, NULL)
-  PHP_FE(hello_dump, NULL)
-  PHP_FE(hello_array, NULL)
-  PHP_FE(hello_array_strings, NULL)
-  PHP_FE(hello_array_walk, NULL)
-  PHP_FE(hello_array_value, NULL)
-  PHP_FE(hello_get_global_var, NULL)
-  {NULL, NULL, NULL}
-};
+  static function_entry hello_functions[] = {
+    PHP_FE(hello_world, NULL)
+      PHP_FE(hello_long, NULL)
+      PHP_FE(hello_double, NULL)
+      PHP_FE(hello_bool, NULL)
+      PHP_FE(hello_null, NULL)
+      PHP_FE(hello_greetme, NULL)
+      PHP_FE(hello_add, NULL)
+      PHP_FE(hello_dump, NULL)
+      PHP_FE(hello_array, NULL)
+      PHP_FE(hello_array_strings, NULL)
+      PHP_FE(hello_array_walk, NULL)
+      PHP_FE(hello_array_value, NULL)
+      PHP_FE(hello_get_global_var, NULL)
+      {NULL, NULL, NULL}
+  };
 
 zend_module_entry hello_module_entry = {
 #if ZEND_MODULE_API_NO >= 20010901
@@ -53,7 +53,7 @@ ZEND_GET_MODULE(hello)
 PHP_INI_BEGIN()
   PHP_INI_ENTRY("hello.greeting", "Hello World", PHP_INI_ALL, NULL)
   STD_PHP_INI_ENTRY("hello.direction", "1", PHP_INI_ALL, OnUpdateBool,
-  direction, zend_hello_globals, hello_globals)
+      direction, zend_hello_globals, hello_globals)
 PHP_INI_END()
 
 static void php_hello_init_globals(zend_hello_globals *hello_globals)
@@ -119,7 +119,7 @@ PHP_FUNCTION(hello_greetme)
 {
   zval *zname;
 
-  if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z", &zname)
+  if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z", &zname)
       == FAILURE) {
     RETURN_NULL();
   }
@@ -139,12 +139,12 @@ PHP_FUNCTION(hello_add)
   double b;
   zend_bool return_long = 0;
 
-  if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ld|b", &a, &b,
-      &return_long) == FAILURE) {
+  if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ld|b", &a, &b,
+        &return_long) == FAILURE) {
     RETURN_NULL();
   }
 
-  if (return_long) {
+  if(return_long) {
     RETURN_LONG(a + b);
   } else {
     RETURN_DOUBLE(a + b);
@@ -155,7 +155,7 @@ PHP_FUNCTION(hello_dump)
 {
   zval *uservar;
 
-  if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z", &uservar)
+  if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z", &uservar)
       == FAILURE) {
     RETURN_NULL();
   }
@@ -223,7 +223,7 @@ PHP_FUNCTION(hello_array_strings)
   HashPosition pointer;
   int array_count;
 
-  if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "a", &arr) == FAILURE) {
+  if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "a", &arr) == FAILURE) {
     RETURN_NULL();
   }
 
@@ -234,7 +234,7 @@ PHP_FUNCTION(hello_array_strings)
 
   for(zend_hash_internal_pointer_reset_ex(arr_hash, &pointer);
       zend_hash_get_current_data_ex(arr_hash, (void**) &data, &pointer)
-        == SUCCESS;
+      == SUCCESS;
       zend_hash_move_forward_ex(arr_hash, &pointer)) {
 
     zval temp;
@@ -242,8 +242,8 @@ PHP_FUNCTION(hello_array_strings)
     int key_len;
     long index;
 
-    if (zend_hash_get_current_key_ex(arr_hash, &key, &key_len, &index, 0,
-        &pointer) == HASH_KEY_IS_STRING) {
+    if(zend_hash_get_current_key_ex(arr_hash, &key, &key_len, &index, 0,
+          &pointer) == HASH_KEY_IS_STRING) {
       PHPWRITE(key, key_len);
     } else {
       php_printf("%ld", index);
@@ -281,7 +281,7 @@ PHP_FUNCTION(hello_array_walk)
   zval *zarray;
   int print_newline = 1;
 
-  if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "a", &zarray)
+  if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "a", &zarray)
       == FAILURE) {
     RETURN_NULL();
   }
@@ -299,7 +299,7 @@ PHP_FUNCTION(hello_array_value)
   char *key = NULL;
   int key_len = 0;
 
-  if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "az", &zarray, &zoffset)
+  if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "az", &zarray, &zoffset)
       == FAILURE) {
     RETURN_NULL();
   }
@@ -333,12 +333,12 @@ PHP_FUNCTION(hello_array_value)
       key_len = sizeof("Unknown") - 1;
   }
 
-  if (key && zend_hash_find(Z_ARRVAL_P(zarray), key, key_len + 1,
-      (void**)&zvalue) == FAILURE) {
+  if(key && zend_hash_find(Z_ARRVAL_P(zarray), key, key_len + 1,
+        (void**)&zvalue) == FAILURE) {
     php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Undefined index: %s", key);
     RETURN_NULL();
-  } else if (!key && zend_hash_index_find(Z_ARRVAL_P(zarray), index,
-      (void**)&zvalue) == FAILURE) {
+  } else if(!key && zend_hash_index_find(Z_ARRVAL_P(zarray), index,
+        (void**)&zvalue) == FAILURE) {
     php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Undefined index: %ld", index);
     RETURN_NULL();
   }
@@ -353,13 +353,13 @@ PHP_FUNCTION(hello_get_global_var)
   int varname_len;
   zval **varvalue;
 
-  if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &varname,
-      &varname_len) == FAILURE) {
+  if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &varname,
+        &varname_len) == FAILURE) {
     RETURN_NULL();
   }
 
-  if (zend_hash_find(&EG(symbol_table), varname, varname_len + 1,
-      (void**)&varvalue) == FAILURE) {
+  if(zend_hash_find(&EG(symbol_table), varname, varname_len + 1,
+        (void**)&varvalue) == FAILURE) {
     php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Undefined variable: %s",
         varname);
     RETURN_NULL();
