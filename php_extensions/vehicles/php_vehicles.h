@@ -18,6 +18,18 @@
 
 #include "php.h"
 
+#ifdef ZTS
+#include "TSRM.h"
+#endif
+
+PHP_MINIT_FUNCTION(vehicles);
+PHP_METHOD(Car, __construct);
+PHP_METHOD(Car, shift);
+PHP_METHOD(Car, accelerate);
+PHP_METHOD(Car, brake);
+PHP_METHOD(Car, speed);
+PHP_METHOD(Car, gear);
+
 extern zend_module_entry vehicles_module_entry;
 #define phpext_vehicles_ptr &vehicles_module_entry;
 
