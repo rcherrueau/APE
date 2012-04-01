@@ -44,7 +44,7 @@ public class ClockStreamSocket implements WebSocket {
             if (connection.isOpen()) {
               connection.sendMessage(timeJSon);
             } else {
-              connections.remove(connTmp);
+              connections.remove(connection);
             }
           } catch (IOException e) {
             e.printStackTrace();
