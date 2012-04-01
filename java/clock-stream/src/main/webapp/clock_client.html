@@ -2,18 +2,18 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>WebSocket Test</title>
+    <title>Clock Stream WebSocket</title>
     <script language="javascript" type="text/javascript"> 
       var wsUri = "ws://localhost:8080/clock-webapp/clock-stream";
-      var output;
       
       function init() {
-        output = document.getElementById("output");
-        testWebSocket();
-      }
-      
-      function testWebSocket() {
+        if (!("WebSocket" in window)) {
+          console.error("Websockets NOT supported");
+          return ;
+        }
+
         websocket = new WebSocket(wsUri);
+
         websocket.onopen = function(evt) { onOpen(evt) };
         websocket.onclose = function(evt) { onClose(evt) };
         websocket.onmessage = function(evt) { onMessage(evt) };
@@ -21,25 +21,25 @@
       }
       
       function onOpen(evt) {
-        writeToScreen("CONNECTED");
+        console.log("CONNECTED");
       }
       
       function onClose(evt) {
-        writeToScreen("DISCONNECTED");
+        console.log("DISCONNECTED");
       }
       
       function onMessage(evt) {
-        writeToScreen('<span style="color: blue;">RESPONSE:</span> ' + evt.data);
+        console.log(evt.data);
+        time = JSON.parse(evt.data);
+
+        // Place current time
+        document.getElementById("hour").innerHTML = time.hour;
+        document.getElementById("minute").innerHTML = time.minute;
+        document.getElementById("second").innerHTML = time.second;
       }
       
       function onError(evt) {
-        writeToScreen('<span style="color: red;">ERROR:</span> ' + evt.data);
-      }
-      
-      function writeToScreen(message) {
-        var pre = document.createElement("p");
-        pre.style.wordWrap = "break-word";
-        pre.innerHTML = message; output.appendChild(pre);
+        console.error(evt.data);
       }
       
       window.addEventListener("load", init, false);
@@ -47,7 +47,9 @@
   </head>
   
   <body>
-    <h2>WebSocket Test</h2> 
-    <div id="output"></div>
+    <h2>Clock Stream WebSocket</h2> 
+    <div id="time">
+      <span id="hour"></span>:<span id="minute"></span>:<span id="second"></span>
+    </div>
   </body>
  </html>
