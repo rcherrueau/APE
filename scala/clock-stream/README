@@ -1,0 +1,13 @@
+== About ==
+Simple app stream clock time using websocket in Scala
+
+== How To ==
+git clone https://code.google.com/p/rol3x-place/scala/clock-stream/
+mvn jetty:run
+
+With your browser open http://localhost:8080/clock-webapp/clock_client.html
+Open console to view console.log
+Enjoy :)
+
+Ronan-Alexandre Cherrueau
+
