@@ -24,6 +24,7 @@
 
 #define AMPLITUDE 0.5
 #define FREQUENCY 6.0
+float freq = 1.;
 
 void init()
 {
@@ -59,8 +60,10 @@ void display()
   draw_cartesian_coordinates();
 
   glColor3f(0.7, 0.7, 1.);
-  use_mesh_deformers_shader(AMPLITUDE, FREQUENCY);
+  use_mesh_deformers_shader(AMPLITUDE, freq);
   draw_square(10., 4., 500);
+
+  freq += .005;
 
   glutSwapBuffers(); 
   glutPostRedisplay();
