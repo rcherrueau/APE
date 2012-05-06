@@ -1,0 +1,185 @@
+<!--
+/*!
+ * \brief   WebSocketChatServer
+ *
+ * WebSocketChat is a simple test of how to write a chat in full javascript
+ * with websocket (for real time responsive application). This test is
+ * inspired from Martin Sikora , use Node.js for server side and Twitter
+ * Boostrap for style. Because this is a test, the code is not robust.
+ *
+ * \see websocketChatServer.js - The Server
+ * \see http://martinsikora.com/nodejs-and-websocket-simple-chat-tutorial
+ * \see https://github.com/Worlize/WebSocket-Node
+ * \see http://nodejs.org/
+ *
+ * \author  Ronan-Alexandre Cherrueau ronancherrueau{at}gmail{dot}com
+ * \date    06/05/2012
+ */
+-->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>WebSocketChat Example</title>
+    <link rel="stylesheet" type="text/css" href="bootstrap.min.css">
+    <style type="text/css">
+      #chatBox {
+        margin: 0;
+        padding-top: 20px;
+        list-style: none;
+        max-height: 200px;
+        max-width: 620px;
+        overflow: auto;
+      }
+      .chatLine {
+        padding-left: 10px;
+        padding-right: 10px;
+      }
+      .chatAuthor {
+        font-weight: bold;
+      }
+      .chatText {
+      }
+    </style>
+  </head>
+  
+  <body>
+    <div class="container">
+      <div class="hero-unit" style="margin-top: 20px;">
+        <h1>WebSocketChat</h1>
+        <p>
+        WebSocketChat is a simple test of how to write a chat in full javascript
+        with websocket (for real time responsive application). This test is
+        inspired from
+        <a href="http://martinsikora.com/nodejs-and-websocket-simple-chat-tutorial">
+          Martin Sikora</a>, use <a href="http://nodejs.org/">Node.js</a> for
+        server side and <a href="http://twitter.github.com/bootstrap">Twitter
+          Boostrap</a> for style. Because this is a test, the code is not
+        robust, please see console log for debug.
+        </p>
+        <p><a href="http://code.google.com/p/rol3x-place/source/browse/"
+          class="btn btn-primary">Source Page »</a></p> 
+      </div>
+
+      <div class="row">
+        <div class="span8 offset2">
+          <fieldset>
+            <legend>WebSocket Chat</legend>
+            <ul id="chatBox">
+            </ul>
+            <div class="form-actions">
+              <div id="chatConnectTool" class="input-append">
+                <input class="span6" id="chatName" type="text" maxlength="10"
+                placeholder="Name"/><button class="btn" type="button"
+                id="chatConnect">Connect</button>
+              </div>
+              <div id="chatMessageTool" class="input-append"
+                style="display: none">
+                <input class="span6" id="chatMessage" type="text"
+                placeholder="Message"/><button class="btn" type="button"
+                id="chatSend">Send</button>
+              </div>
+            </div>
+          </fieldset>
+        </div>
+      </div>
+    </div>
+
+    <script language="javascript" type="text/javascript"> 
+      var wsUri = "ws://localhost:1337/";
+      var websocket;
+      var username;
+
+      //************************** Initialization -- Connect to WebSocket Server
+      function init() {
+        document.getElementById("chatName").focus();
+
+        if (!("WebSocket" in window)) {
+          console.error("Websockets NOT supported");
+          return ;
+        }
+
+        // Connect to websocket server and defined handlers.
+        console.log("TRY TO CONNECT ON " + wsUri);
+        websocket = new WebSocket(wsUri);
+        websocket.onopen = function(evt) {
+          console.log("CONNECTED");
+        };
+        websocket.onclose = function(evt) {
+          console.log("DISCONNECTED FROM SERVER");
+        };
+        websocket.onmessage = function(evt) { 
+          console.log(evt.data);
+          var obj = JSON.parse(evt.data);
+          addChatBox(obj.text, obj.author);
+        };
+        websocket.onerror = function(evt) {
+          console.error(evt.data);
+        };
+      }
+      
+      //********************************************************* Chat Functions
+      function chatConnect(name) {
+        username = name;
+        websocket.send(username);
+      }
+
+      function chatSend(message) {
+        websocket.send(message);
+      }
+
+      function addChatBox(text, author) {
+        // Author Span
+        var authorSpan = document.createElement("span");
+        authorSpan.appendChild(document.createTextNode(author + ": "));
+        authorSpan.className = "chatAuthor";
+
+        // Text Span
+        var textSpan = document.createElement("span");
+        textSpan.appendChild(document.createTextNode(text));
+        textSpan.className = "chatText";
+
+        // New Line
+        var newLine = document.createElement("li");
+        newLine.appendChild(authorSpan);
+        newLine.appendChild(textSpan);
+        newLine.className = "chatLine";
+
+        var chatBox = document.getElementById("chatBox");
+        chatBox.appendChild(newLine);
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      //***************************************************** Listener Functions
+      function onConnect() {
+        chatConnect(document.getElementById("chatName").value);
+        document.getElementById("chatConnectTool").style.display = "none";
+        document.getElementById("chatMessageTool").style.display = "block";
+        document.getElementById("chatMessage").focus();
+      }
+
+      function onSend() {
+        var chatMessageInput = document.getElementById("chatMessage");
+        chatSend(chatMessageInput.value);
+        chatMessageInput.value = "";
+        document.getElementById("chatMessage").focus();
+      }
+
+      // LoadPageListener
+      window.addEventListener("load", init, false);
+
+      // ConnectListener
+      document.getElementById("chatConnect").addEventListener("click",
+          onConnect, false);
+      document.getElementById("chatName").addEventListener("keyup",
+          function(evt) { if (evt.keyCode == 13) { onConnect() } }, false);
+
+      // SendMessageListener
+      document.getElementById("chatSend").addEventListener("click",
+          onSend, false);
+      document.getElementById("chatMessage").addEventListener("keyup",
+          function(evt) { if (evt.keyCode == 13) { onSend() } }, false);
+    </script>
+  </body>
+</html>
+

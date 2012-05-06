@@ -1,0 +1,15 @@
+WebSocket Chat Server.
+
+Using Worlize/WebSocket-Node implementation and inspired from Martin Sikora.
+https://github.com/Worlize/WebSocket-Node
+http://martinsikora.com/nodejs-and-websocket-simple-chat-tutorial
+
+== Run ==
+1. Install Node.js from http://nodejs.org/
+2. Install websocket support for Node.js: npm install websocket
+3. Run Server: node websocketChatServer.js
+4. Launch http://localhost:1337
+5. Connect client, See console.log, Enjoy :)
+
+Ronan-Alexandre Cherrueau ronancherrueau{at}gmail{dot}com
+
