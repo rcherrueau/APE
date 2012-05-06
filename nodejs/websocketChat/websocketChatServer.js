@@ -70,7 +70,6 @@ wsServer.on('request', function(request) {
       // Process WebSocket Message.
       if (userName === false) {
         userName = htmlEntities(message.utf8Data);
-        userName = htmlEntities(message.utf8Data);
       } else {
         var obj = {
           time:   (new Date()).getTime(),
