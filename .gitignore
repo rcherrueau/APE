@@ -3,42 +3,22 @@
 # Exemple at https://github.com/github/gitignore/tree/master/Global
 ################################################################################
 
-###################################################################### Eclipse #
-*.pydevproject
-.project
-.metadata
-bin/**
-tmp/**
-tmp/**/*
-*.tmp
-*.bak
-*.swp
-*~.nib
-local.properties
-.classpath
-.settings/
-.loadpath
+######################################################################## Emacs #
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+.elc
+auto-save-list
+tramp
+.\#*
 
-# External tool builders
-.externalToolBuilders/
-
-# Locally stored "Eclipse launch configurations"
-*.launch
-
-# CDT-specific
-.cproject
-
-# PDT-specific
-.buildpath
+# Org-mode
+.org-id-locations
+*_archive
 
 ########################################################################## Vim #
 .*.sw[a-z]
 *.un~
 Session.vim
-
-##################################################################### IntelliJ #
-*.iml
-*.ipr
-*.iws
-.idea/
 
