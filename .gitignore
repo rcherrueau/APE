@@ -17,8 +17,20 @@ tramp
 .org-id-locations
 *_archive
 
+########################################################################## OSX #
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+# Thumbnails
+._*
+
+# Files that might appear on external disk
+.Spotlight-V100
+.Trashes
+
 ########################################################################## Vim #
 .*.sw[a-z]
 *.un~
 Session.vim
-
