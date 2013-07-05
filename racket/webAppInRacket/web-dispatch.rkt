@@ -22,20 +22,5 @@
 
 ; start: request -> response
 (define (start request)
-  ;(phase-1 request))
-  (send/suspend
-   (lambda (k-url)
-     (case
-       [(equal? k-url (request-uri request)) 
-        (response/xexpr
-         `(html (head (title "Action"))
-                (body (h1 "Action"))))]
-       [else 
-        (response/xexpr
-         `(html (head (title "Enter a number"))
-                (body
-                 (form ([action ,k-url])
-                       "Enter a number: "
-                       (input ([name "number"]))
-                       (input ([type "submit"]))))))]))))
+  (phase-1 request))
 
