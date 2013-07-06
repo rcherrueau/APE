@@ -1,4 +1,4 @@
-![ScreenShot](https://raw.github.com/rcherrueau/APE/master/illustration.svg)
+![ScreenShot](https://raw.github.com/rcherrueau/APE/master/illustrations/playground.png)
 
 APEs' Playground: Enjoy!
-/random project name for APE recursive aronym/
+_random project name for APE recursive aronym_
