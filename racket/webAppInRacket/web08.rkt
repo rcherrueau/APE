@@ -1,20 +1,10 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Web Applications in Racket
+;; http://docs.racket-lang.org/continue/
+;; 
+;; 8. Extending the Model
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 #lang web-server/insta
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Utils
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-; render-as-itemized-list: (listof xexpr) -> xexpr
-; Consumes a list of items, and produces a rendering
-; as an unordered list.
-(define (render-as-itemized-list fragments)
-  `(ul ,@(map render-as-item fragments)))
- 
-; render-as-item: xexpr -> xexpr
-; Consumes an xexpr, and produces a rendering
-; as a list item.
-(define (render-as-item a-fragment)
-  `(li ,a-fragment))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Blog Structure
@@ -26,21 +16,21 @@
 
 ; Blog post data-structure
 ; A blog post is title, a body (content) and a list of comments.
-(struct post (title body comments) #:mutable)
+(struct post(title body comments) #:mutable)
 
 ; post-add-comment! : post comment -> void
 ; Consumes a post and a comment, adds the comment at the end of the post.
-(define (post-add-comment! a-post comment)
-  (set-post-comments! a-post (append (post-comments a-post) (list comment))))
+(define (post-add-comment! post comment)
+  (set-post-comments! (append (post-comments post) (list comment))))
 
 ;;;;;;;;;;;;;;;;;;;;;
 ;; Blog
 ;;;;;;;;;;;;;;;;;;;;;
 
 ; A blog is a (blog posts) where posts is a (listof post)
-; Mutable structure provide mutators to change their filds.
-; So blog struct provide value set-blog-posts! : blog (listof post) -> void to
-; set the posts value.
+; Mutable structure provide mutators to change their fields.
+; So blog struct provide function set-blog-posts! : blog (listof post) -> void
+; to set the posts value
 (struct blog (posts) #:mutable)
 
 ; blog-insert-post!: blog post -> void
@@ -58,14 +48,14 @@
                (list "Comment1" "Comment2"))
          (post "First Post"
                "This is my first post"
-               (list "Comment1" "Comment2" "Comment3")))))
+               (list "Comment1" "Comment2")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Blog Bindings & Params
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; can-parse-post?: bindings -> boolean
-; Test if bindings for a blog post are provided.
+; Test if bindings for a blog post are provided
 ; When creating a blog post, the list of comment is obviously empty
 ; so there is no test on comments argument.
 (define (can-parse-post? bindings)
@@ -82,84 +72,58 @@
         (extract-binding/single 'body bindings)
         (list)))
 
-; can-parse-comment?: bindings -> boolean
-; Test if bindings for a post comment are provided.
-(define (can-parse-comment? bindings)
-  (and (exists-binding? 'comment bindings)
-       (> (string-length (extract-binding/single 'comment bindings)) 0)))
-
-; parse-comment: bindings -> comment
-; Consumes a bindings and produce a post comment out of the bindindgs
-(define (parse-comment bindings)
-  (extract-binding/single 'comment bindings))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Blog Render Function
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 ; render-comment: comment -> xexpr
 ; Consumes a post comment and produce an xexpr fragment
 (define (render-comment comment)
   `(div ((class "comment")) (p ,comment)))
 
+
 ; render-comments: (listof comment) -> xexpr
 ; Consume a list of post comment and produce an xexpr fragment
 (define (render-comments comments)
+  ; render-as-itemized-list: (listof xexpr) -> xexpr
+  ; Consumes a list of items, and produces a rendering
+  ; as an unordered list.
+  (define (render-as-itemized-list fragments)
+    `(ul ,@(map render-as-item fragments)))
+ 
+  ; render-as-item: xexpr -> xexpr
+  ; Consumes an xexpr, and produces a rendering
+  ; as a list item.
+  (define (render-as-item a-fragment)
+    `(li ,a-fragment))
+
   `(div ((class "comments")) 
         ,(render-as-itemized-list (map render-comment comments))))
 
-; render-post-without-comments: post  (handler -> string) -> xexpr
+; render-post: post -> xexpr
 ; Consumes a blog post and produce an xexpr fragment
-(define (render-post-without-comments a-post embed/url)
-  (local [(define (view-post-handler request)
-            (render-post-detail-page a-post request))]
+(define (render-post post)
   `(div ((class "post"))
-        (a ((href ,(embed/url view-post-handler))) ,(post-title a-post))
-        (p ,(post-body a-post))
-        (p ,(number->string (length (post-comments a-post))) " comments"))))
+        ,(post-title post)
+        (p ,(post-body post))
+        ,(render-comments (post-comments post))))
 
-; render-post-with-comments: post -> xexpr
-; Consumes a blog post and produce an xexpr fragment
-(define (render-post-with-comments a-post)
-  `(div ((class "post"))
-        (h1 ,(post-title a-post))
-        (p ,(post-body a-post))
-        ,(render-comments (post-comments a-post))))
-
-; render-posts: (listof post) (handler -> string) -> xexpr
+; render-posts: (listof post)  -> xexpr
 ; Consume a list of post and produce an xexpr fragment
-(define (render-posts posts embed/url)
+(define (render-posts posts)
+  ; render-as-itemized-list: (listof xexpr) -> xexpr
+  ; Consumes a list of items, and produces a rendering
+  ; as an unordered list.
+  (define (render-as-itemized-list fragments)
+    `(ul ,@(map render-as-item fragments)))
+ 
+  ; render-as-item: xexpr -> xexpr
+  ; Consumes an xexpr, and produces a rendering
+  ; as a list item.
+  (define (render-as-item a-fragment)
+    `(li ,a-fragment))
+  
   `(div ((class "posts"))
-        ,(render-as-itemized-list
-          (map 
-           (lambda (a-post) (render-post-without-comments a-post embed/url))
-           posts))))
-
-;;;;;;;;;;;;;;;;;;;;;
-;; Pages
-;;;;;;;;;;;;;;;;;;;;;
-
-; render-post-detail-page: post request -> doesn't return
-; Consumes a post request and produces an HTML page of the content of the post
-(define (render-post-detail-page a-post request)
-  (local [(define (response-generator embed/url)
-            (response/xexpr
-             `(html (head (title ,(post-title a-post)))
-                    (body 
-                     ,(render-post-with-comments a-post)
-           
-                     ; Form to add a new comment
-                     (form ((action ,(embed/url insert-comment-handler)))
-                           (textarea ((name "comment")))
-                           (input ((type "submit"))))))))
-          
-          (define (insert-comment-handler a-request)
-            (let ([bindings (request-bindings a-request)])
-              (cond [(can-parse-comment? bindings)
-                     (post-add-comment! a-post (parse-comment bindings))]))
-            (render-post-detail-page a-post a-request))]
-    
-    (send/suspend/dispatch response-generator)))
+        ,(render-as-itemized-list (map render-post posts))))
 
 ; render-blog-page: blog request -> doesn't return
 ; Consumes a blog request and produces an HTML page of the content of the blog
@@ -168,20 +132,16 @@
             (response/xexpr
              `(html (head (title "My Blog"))
                     (body (h1 "My Blog")
-                          ,(render-posts (blog-posts a-blog)  embed/url)
-                          
-                          ; Form to add a new blog post
+                          ,(render-posts (blog-posts a-blog))
                           (form ((action ,(embed/url insert-post-handler)))
                                 (input ((name "title")))
                                 (input ((name "body")))
                                 (input ((type "submit"))))))))
-          
           (define (insert-post-handler request)
             ((let ([bindings (request-bindings request)])
                (cond [(can-parse-post? bindings)
                       (blog-insert-post! a-blog (parse-post bindings))]))
             (render-blog-page a-blog request)))]
-   
   (send/suspend/dispatch response-generator)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -1,11 +1,10 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Web Applications in Racket
+;; http://docs.racket-lang.org/continue/
+;; 
+;; 6. Advanced Control Flow
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 #lang web-server/insta
-
-;; render-greeting: string -> response
-;; Consumes a name and produces a dynamic response.
-;(define (render-greeting a-name)
-;  (response/xexpr
-;   `(html (head (title "My Blog"))
-;          (body (p ,(string-append "Hello " a-name))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Blog Structure
@@ -28,7 +27,9 @@
 ; Test if bindings for a blog post are provided
 (define (can-parse-post? bindings)
   (and (exists-binding? 'title bindings)
-       (exists-binding? 'body bindings)))
+       (> (string-length (extract-binding/single 'title bindings)) 0)
+       (exists-binding? 'body bindings)
+       (> (string-length (extract-binding/single 'body bindings)) 0)))
 
 ; parse-post: bindings -> post
 ; Consumes a bindings and produce a blog post out of the bindings
@@ -63,20 +64,30 @@
   `(div ((class "posts"))
         ,(render-as-itemized-list (map render-post posts))))
 
-; render-add-post-form: xexpr -> xexpr
-(define (render-add-post-form a-fragment)
-  `(div ,a-fragment (form ((class "add-post-form"))
-                          (input ((name "title")))
-                          (input ((name "body")))
-                          (input ((type "submit"))))))
-
-; render-blog-page: blog request -> response
+; render-blog-page: blog request -> doesn't return
 ; Consumes a blog request and produces an HTML page of the content of the blog
 (define (render-blog-page a-blog request)
-  (response/xexpr
-   `(html (head (title "My Blog"))
-          (body (h1 "My Blog")  
-                ,(render-add-post-form (render-posts a-blog))))))
+  (local [(define (response-generator embed/url)
+            (response/xexpr
+             `(html (head (title "My Blog"))
+                    (body (h1 "My Blog")
+                          ,(render-posts a-blog)
+                          ; Add post form
+                          (form ((action ,(embed/url insert-post-handler)))
+                                (input ((name "title")))
+                                (input ((name "body")))
+                                (input ((type "submit"))))))))
+
+            (define (insert-post-handler request)
+            (render-blog-page
+             (let ([bindings (request-bindings request)])
+               (cond [(can-parse-post? bindings)
+                      (cons (parse-post (request-bindings request)) a-blog)]
+                     [else
+                      a-blog]))
+             request))]
+
+  (send/suspend/dispatch response-generator)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Entry Point
@@ -85,11 +96,6 @@
 ; start: request -> response
 ; Consumes a requets and produces a page that displays all the web content
 (define (start request)
-  (let* ([bindings (request-bindings request)]
-         [a-blog (cond 
-                  [(can-parse-post? bindings)
-                   (cons (parse-post bindings) BLOG)]
-                  [else BLOG])])
-    (render-blog-page a-blog request)))
+  (render-blog-page BLOG request))
 
 

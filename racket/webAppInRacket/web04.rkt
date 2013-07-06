@@ -1,11 +1,10 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Web Applications in Racket
+;; http://docs.racket-lang.org/continue/
+;; 
+;; 4. Rendering HTML
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 #lang web-server/insta
-
-;; render-greeting: string -> response
-;; Consumes a name and produces a dynamic response.
-;(define (render-greeting a-name)
-;  (response/xexpr
-;   `(html (head (title "My Blog"))
-;          (body (p ,(string-append "Hello " a-name))))))
 
 ; Blog post data-structure
 (struct post(title body))

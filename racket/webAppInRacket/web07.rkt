@@ -1,11 +1,10 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Web Applications in Racket
+;; http://docs.racket-lang.org/continue/
+;; 
+;; 7. Share and Share Alike
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 #lang web-server/insta
-
-;; render-greeting: string -> response
-;; Consumes a name and produces a dynamic response.
-;(define (render-greeting a-name)
-;  (response/xexpr
-;   `(html (head (title "My Blog"))
-;          (body (p ,(string-append "Hello " a-name))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Blog Structure
@@ -14,11 +13,25 @@
 ; Blog post data-structure
 (struct post(title body))
 
+; A blog is a (blog posts) where posts is a (listof post)
+; Mutable structure provide mutators to change their fields.
+; So blog struct provide function set-blog-posts! : blog (listof post) -> void
+; to set the posts value.
+(struct blog (posts) #:mutable)
+
+
+; blog-insert-post!: blog post -> void
+; Consumes a blog and a post, adds the pot at the top of the blog.
+(define (blog-insert-post! a-blog a-post)
+  (set-blog-posts! a-blog
+                   (cons a-post (blog-posts a-blog))))
+
 ; BLOG: blog
-; The static blog
+; The initial BLOG.
 (define BLOG 
-  (list (post "Second Post" "This is another post")
-        (post "First Post" "This is my first post")))
+  (blog 
+   (list (post "Second Post" "This is another post")
+         (post "First Post" "This is my first post"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Blog Bindings & Params
@@ -72,19 +85,19 @@
             (response/xexpr
              `(html (head (title "My Blog"))
                     (body (h1 "My Blog")
-                          ,(render-posts a-blog)
+                          ,(render-posts (blog-posts a-blog))
+                          ; Add post form
                           (form ((action ,(embed/url insert-post-handler)))
                                 (input ((name "title")))
                                 (input ((name "body")))
                                 (input ((type "submit"))))))))
+
           (define (insert-post-handler request)
-            (render-blog-page
-             (let ([bindings (request-bindings request)])
+            ((let ([bindings (request-bindings request)])
                (cond [(can-parse-post? bindings)
-                      (cons (parse-post (request-bindings request)) a-blog)]
-                     [else
-                      a-blog]))
-             request))]
+                      (blog-insert-post! a-blog (parse-post bindings))]))
+            (render-blog-page a-blog request)))]
+
   (send/suspend/dispatch response-generator)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -95,5 +108,3 @@
 ; Consumes a requets and produces a page that displays all the web content
 (define (start request)
   (render-blog-page BLOG request))
-
-

@@ -1,11 +1,10 @@
-#lang web-server/insta
-
-;; render-greeting: string -> response
-;; Consumes a name and produces a dynamic response.
-;(define (render-greeting a-name)
-;  (response/xexpr
-;   `(html (head (title "My Blog"))
-;          (body (p ,(string-append "Hello " a-name))))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Web Applications in Racket
+;; http://docs.racket-lang.org/continue/
+;; 
+;; 5. Inspecting Requests
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+#lang web-server/insta 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Blog Structure
@@ -14,25 +13,11 @@
 ; Blog post data-structure
 (struct post(title body))
 
-; A blog is a (blog posts) where posts is a (listof post)
-; Mutable structure provide mutators to change their filds.
-; So blog struct provide value set-blog-posts! : blog (listof post) -> void to
-; set the posts value.
-(struct blog (posts) #:mutable)
-
-
-; blog-insert-post!: blog post -> void
-; Consumes a blog and a post, adds the pot at the top of the blog.
-(define (blog-insert-post! a-blog a-post)
-  (set-blog-posts! a-blog
-                   (cons a-post (blog-posts a-blog))))
-
 ; BLOG: blog
-; The initial BLOG.
+; The static blog
 (define BLOG 
-  (blog 
-   (list (post "Second Post" "This is another post")
-         (post "First Post" "This is my first post"))))
+  (list (post "Second Post" "This is another post")
+        (post "First Post" "This is my first post")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Blog Bindings & Params
@@ -42,9 +27,7 @@
 ; Test if bindings for a blog post are provided
 (define (can-parse-post? bindings)
   (and (exists-binding? 'title bindings)
-       (> (string-length (extract-binding/single 'title bindings)) 0)
-       (exists-binding? 'body bindings)
-       (> (string-length (extract-binding/single 'body bindings)) 0)))
+       (exists-binding? 'body bindings)))
 
 ; parse-post: bindings -> post
 ; Consumes a bindings and produce a blog post out of the bindings
@@ -79,24 +62,20 @@
   `(div ((class "posts"))
         ,(render-as-itemized-list (map render-post posts))))
 
-; render-blog-page: blog request -> doesn't return
+; render-add-post-form: xexpr -> xexpr
+(define (render-add-post-form a-fragment)
+  `(div ,a-fragment (form ((class "add-post-form"))
+                          (input ((name "title")))
+                          (input ((name "body")))
+                          (input ((type "submit"))))))
+
+; render-blog-page: blog request -> response
 ; Consumes a blog request and produces an HTML page of the content of the blog
 (define (render-blog-page a-blog request)
-  (local [(define (response-generator embed/url)
-            (response/xexpr
-             `(html (head (title "My Blog"))
-                    (body (h1 "My Blog")
-                          ,(render-posts (blog-posts a-blog))
-                          (form ((action ,(embed/url insert-post-handler)))
-                                (input ((name "title")))
-                                (input ((name "body")))
-                                (input ((type "submit"))))))))
-          (define (insert-post-handler request)
-            ((let ([bindings (request-bindings request)])
-               (cond [(can-parse-post? bindings)
-                      (blog-insert-post! a-blog (parse-post bindings))]))
-            (render-blog-page a-blog request)))]
-  (send/suspend/dispatch response-generator)))
+  (response/xexpr
+   `(html (head (title "My Blog"))
+          (body (h1 "My Blog")  
+                ,(render-add-post-form (render-posts a-blog))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Entry Point
@@ -105,4 +84,11 @@
 ; start: request -> response
 ; Consumes a requets and produces a page that displays all the web content
 (define (start request)
-  (render-blog-page BLOG request))
+  (let* ([bindings (request-bindings request)]
+         [a-blog (cond 
+                  [(can-parse-post? bindings)
+                   (cons (parse-post bindings) BLOG)]
+                  [else BLOG])])
+    (render-blog-page a-blog request)))
+
+
