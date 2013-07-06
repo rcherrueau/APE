@@ -16,9 +16,9 @@
    version="1.1"
    inkscape:version="0.48.3.1 r9886"
    sodipodi:docname="playground.svg"
-   inkscape:export-filename="/home/rl3x/Pictures/playground.png"
-   inkscape:export-xdpi="106.78"
-   inkscape:export-ydpi="106.78">
+   inkscape:export-filename="/home/rl3x/prog/APE/illustrations/playground.png"
+   inkscape:export-xdpi="109.63882"
+   inkscape:export-ydpi="109.63882">
   <defs
      id="defs4">
     <linearGradient
@@ -354,11 +354,11 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="1.4142136"
-     inkscape:cx="382.11161"
-     inkscape:cy="460.12746"
+     inkscape:zoom="0.70710678"
+     inkscape:cx="737.04048"
+     inkscape:cy="311.70274"
      inkscape:document-units="px"
-     inkscape:current-layer="layer5"
+     inkscape:current-layer="layer8"
      showgrid="false"
      inkscape:window-width="1615"
      inkscape:window-height="1026"
@@ -731,7 +731,7 @@
          sodipodi:nodetypes="csc"
          inkscape:connector-curvature="0"
          id="path5500"
-         d="m 389.37499,514.00504 c 0,0 -0.3066,3.39286 -11.63243,3.39286 -21.64848,0 -21.23718,-5.98083 -21.23718,-5.98083"
+         d="m 389.37499,512.00504 c 0,0 -0.3066,5.39286 -11.63243,5.39286 -21.64848,0 -21.23718,-5.16833 -21.23718,-5.16833"
          style="fill:none;stroke:#2e3436;stroke-width:3;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
     </g>
   </g>
