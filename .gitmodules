@@ -1,3 +1,3 @@
-[submodule "racket/webAppInRacket/flat-ui"]
-	path = racket/webAppInRacket/flat-ui
+[submodule "racket/webAppInRacket/style/flat-ui"]
+	path = racket/webAppInRacket/style/flat-ui
 	url = git@github.com:designmodo/Flat-UI.git

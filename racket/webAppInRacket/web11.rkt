@@ -23,8 +23,8 @@
 (define (render-as-item a-fragment)
   `(li ,a-fragment))
 
-; Include Flat-ui for css
-(static-files-path "flat-ui")
+; Include style
+(static-files-path "style")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Blog Structure
@@ -160,13 +160,23 @@
            (lambda (a-post) (render-post-without-comments a-post a-blog embed/url))
            posts))))
 
+(define (render-menu-li s1 s2 a-href an-icon)
+  (cond
+    [(eq? s1 s2) `(li
+                  ((class "active"))
+                  (a ((href ,a-href))
+                     (i ((class ,(string-append "icon-" an-icon))))))]
+    [else `(li
+            (a ((href ,a-href))
+               (i ((class ,( string-append "icon-" an-icon))))))]))
+
 ; render-menu
 (define (render-menu s)
-  `(ul ((class "nav nav-list bs-docs-sidenav affix"))
-       (@(li (i ((class "icon-home")) ()))
-        @(li (i ((class "icon-file")) ()))
-        @(li (i ((class "icon-plus")) ())))))
-
+  `(ul ((class "nav nav-list"))
+       ,(render-menu-li s 'home "#Home" "home")
+       ,(render-menu-li s 'new-post "#NewPost" "pencil")
+       ,(render-menu-li s 'view-post "#ViewPost" "file"))) 
+      
 ;;;;;;;;;;;;;;;;;;;;;
 ;; Pages
 ;;;;;;;;;;;;;;;;;;;;;
@@ -179,10 +189,7 @@
 (define (render-confirm-add-comment-page a-comment a-post a-blog request)
   (local [(define (response-generator embed/url)
             (response/xexpr
-             `(html (head (title "Confirm / Cancel")
-                          (link ((rel "stylesheet")
-                                 (href "/css/flat-ui.css")
-                                 (type "text/css"))))
+             `(html (head (title "Confirm / Cancel"))
                     (body
                      (h1 "Confirm add of comment")
                      (div
@@ -214,10 +221,7 @@
 (define (render-post-detail-page a-post a-blog request)
   (local [(define (response-generator embed/url)
             (response/xexpr
-             `(html (head (title ,(post-title a-post))
-                          (link ((rel "stylesheet")
-                                 (href "/css/flat-ui.css")
-                                 (type "text/css"))))
+             `(html (head (title ,(post-title a-post)))
                     (body 
                      ,(render-post-with-comments a-post)
            
@@ -252,17 +256,20 @@
              #:preamble #"<!DOCTYPE html>"
              `(html (head (title "My Blog")
                           (link ((rel "stylesheet")
-                                 (href "/bootstrap/css/bootstrap.css")
+                                 (href "/flat-ui/bootstrap/css/bootstrap.css")
                                  (type "text/css")))
                           (link ((rel "stylesheet")
-                                 (href "/css/flat-ui.css")
+                                 (href "/flat-ui/css/flat-ui.css")
+                                 (type "text/css")))
+                          (link ((rel "stylesheet")
+                                 (href "/web-racket.css")
                                  (type "text/css"))))
-                    (body 
+                    (body
                      (div ((class "container"))
                           (div ((class "row"))
-                               (div ((class "span3")) ,(render-menu 'home))
-                               (div ((class "span9"))
-                                    (h1 ((style "color:#e74c3c")) "My Blog")
+                               (div ((class "span1 menu")) ,(render-menu 'new-post))
+                               (div ((class "span11"))
+                                    (h1 "My Blog")
                                     ,(render-posts (blog-posts a-blog) a-blog embed/url)
                           
                                     ; Form to add a new blog post
