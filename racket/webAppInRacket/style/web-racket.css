@@ -2,15 +2,96 @@
  * Web-racket
  */
 
-body {
-    background-color: #2E3641;
-    padding-top: 0;
+html {
+    height: 100%;
 }
 
-h1 {
-    color: #E74C3C;
+body {
+    background-color: #2E3641;
+    padding: 0;
+    margin: 0;
+    height: 100%;
+}
+
+.container {
+    width: 700px;
+    margin: 0;
+    height: 100%;
+}
+
+.container > .row {
+    display: -moz-box;
+    dipslay: -webkit-box;
+    display: box;
+    -moz-box-orient: horizontal;
+    -webkit-box-orient: horizontal;
+    box-orient: horizontal;
 }
 
 .menu {
-  background-color: #F0F0F0;
+    position: fixed;
+    padding-top: 43px;
+    background-color: #ecf0f1;
+    min-height:100%;
+    height:100%;
+    width: auto;
+}
+
+.content {
+    margin-left: 100px;
+}
+
+dl > dt,
+h1, h2, h3, h4, h5, h6 {
+    color: #E74C3C;
+}
+
+.nav-list > li {
+    line-height: 44px;
+}
+
+.nav-list > li > a:hover,
+.nav-list > li > a:focus {
+    background-color: #bdc3c7;
+}
+
+.nav-list > .active > a {
+    background-color: #2E3641;
+}
+
+.nav-list > .active > a:hover,
+.nav-list > .active > a:focus {
+    background-color: #34495e;
+}
+
+.posts > ul,
+.post > .comments > ul {
+    list-style: none outside none;
+    margin: 0;
+}
+
+.post {
+    margin-bottom: 20px;
+}
+
+.post > p {
+    text-align: justify;
+}
+
+dl > dd,
+.comment {
+    color: rgb(127, 140, 141);
+    font-size: 12px;
+    line-height: 17px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.comments li + li {
+    border: 0;
+    border-top: 1px double #ecf0f1;
+}
+
+button[type="submit"] + a {
+    margin-left: 10px;
 }

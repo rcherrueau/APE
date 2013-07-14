@@ -14,8 +14,7 @@
 ; Consumes a list of items, and produces a rendering
 ; as an unordered list.
 (define (render-as-itemized-list fragments)
-  `(ul ((style "list-style-type: none;")) 
-       ,@(map render-as-item fragments)))
+  `(ul ,@(map render-as-item fragments)))
  
 ; render-as-item: xexpr -> xexpr
 ; Consumes an xexpr, and produces a rendering
@@ -138,17 +137,17 @@
   (local [(define (view-post-handler request)
             (render-post-detail-page a-post a-blog request))]
   `(div ((class "post"))
-        (h4 ((style "color:#e74c3c")) ,(post-title a-post))
-        (p ((style "text-align:justify")) ,(post-body a-post))
-        (p (a ((href ,(embed/url view-post-handler))) 
-              ,(number->string (length (post-comments a-post))) " comments...")))))
+        (h4 ,(post-title a-post))
+        (p ((class "palette-paragraph")) ,(post-body a-post))
+        (a ((href ,(embed/url view-post-handler))) 
+              ,(number->string (length (post-comments a-post))) " comments..."))))
 
 ; render-post-with-comments: post -> xexpr
 ; Consumes a blog post and produce an xexpr fragment
 (define (render-post-with-comments a-post)
   `(div ((class "post"))
         (h1 ,(post-title a-post))
-        (p ,(post-body a-post))
+        (p ((class "palette-paragraph")) ,(post-body a-post))
         ,(render-comments (post-comments a-post))))
 
 ; render-posts: (listof post) blog (handler -> string) -> xexpr
@@ -157,26 +156,51 @@
   `(div ((class "posts"))
         ,(render-as-itemized-list
           (map 
-           (lambda (a-post) (render-post-without-comments a-post a-blog embed/url))
+           (lambda (a-post) 
+             (render-post-without-comments a-post a-blog embed/url))
            posts))))
 
-(define (render-menu-li s1 s2 a-href an-icon)
+; render-menu-li: 'active url-tag icon -> xexpr
+; Consume element to construct an li for the menu. 
+(define (render-menu-li active url-tag icon)
   (cond
-    [(eq? s1 s2) `(li
-                  ((class "active"))
-                  (a ((href ,a-href))
-                     (i ((class ,(string-append "icon-" an-icon))))))]
-    [else `(li
-            (a ((href ,a-href))
-               (i ((class ,( string-append "icon-" an-icon))))))]))
+    [(eq? 'active active) 
+     `(li
+       ((class "active"))
+       (a ((href ,url-tag))
+          (i ((class ,(string-append "fui-" icon))) "")))]
+    [else 
+     `(li
+       (a ((href ,url-tag))
+          (i ((class ,(string-append "fui-" icon))) "")))]))
 
-; render-menu
-(define (render-menu s)
-  `(ul ((class "nav nav-list"))
-       ,(render-menu-li s 'home "#Home" "home")
-       ,(render-menu-li s 'new-post "#NewPost" "pencil")
-       ,(render-menu-li s 'view-post "#ViewPost" "file"))) 
-      
+; render-container: a-title (list-of li) content -> xexpr
+(define (render-container a-title lis content)
+  
+  ; render-menu: (list-of xexpr) -> xexpr
+  ; Consume a list of li and produce an 
+  ; xexpr for the menu
+  (define (render-menu lis)
+    `(ul ((class "nav nav-list"))
+         ,@lis))
+  
+  `(html (head (title ,a-title)
+               (link ((rel "stylesheet")
+                      (href "/flat-ui/bootstrap/css/bootstrap.css")
+                      (type "text/css")))
+               (link ((rel "stylesheet")
+                      (href "/flat-ui/css/flat-ui.css")
+                      (type "text/css")))
+               (link ((rel "stylesheet")
+                      (href "/web-racket.css")
+                      (type "text/css"))))
+         (body
+          (div ((class "container"))
+               (div ((class "row"))
+                    (div ((class "span1 menu")) 
+                         ,(render-menu lis))
+                    (div ((class "span8 content")) ,content))))))
+
 ;;;;;;;;;;;;;;;;;;;;;
 ;; Pages
 ;;;;;;;;;;;;;;;;;;;;;
@@ -189,21 +213,28 @@
 (define (render-confirm-add-comment-page a-comment a-post a-blog request)
   (local [(define (response-generator embed/url)
             (response/xexpr
-             `(html (head (title "Confirm / Cancel"))
-                    (body
-                     (h1 "Confirm add of comment")
-                     (div
-                      (dl (dt (b "Title")) (dd ,(post-title a-post))
-                          (dt (b "Body")) (dd ,(post-body a-post))
-                          (dt (b "Comment")) (dd ,a-comment)))
-                     (div 
-                      ; Confirm insert comment
-                      (a ((href ,(embed/url confirm-add-handler)))
-                         "Ok")
-                      " / "
-                      ; Cancel insert comment
-                      (a ((href ,(embed/url cancel-add-handler)))
-                         "Cancel"))))))
+             #:preamble #"<!DOCTYPE html>"
+             (render-container
+              "Confirm add of comment"
+              (list 
+               (render-menu-li 'not-active (embed/url back-handler) "cmd")
+               (render-menu-li 'not-active "#ViewPost" "eye")
+               (render-menu-li 'active "#NewComment" "new"))
+              `(div
+                (h1  "Confirm add of comment")
+                (div
+                 (dl (dt (b "Title")) (dd ,(post-title a-post))
+                     (dt (b "Body")) (dd ,(post-body a-post))
+                     (dt (b "Comment")) (dd ,a-comment)))
+                (div 
+                 ; Confirm insert comment
+                 (a ((href ,(embed/url confirm-add-handler)))
+                    (button ((type "submit")
+                             (class "span2 btn btn-primary btn-large"))
+                            "Confirm"))
+                 ; Cancel insert comment
+                 (a ((href ,(embed/url cancel-add-handler)))
+                    (button ((class "span2 btn btn-large"))  "Cancel")))))))
           
           ; Add comment to post and route to render-post-detail-page.
           (define (confirm-add-handler a-request)
@@ -212,7 +243,11 @@
           
           ; Doesn't add comment to post and route to render-post-detail-page.
           (define (cancel-add-handler a-request)
-            (render-post-detail-page a-post a-blog a-request))]
+            (render-post-detail-page a-post a-blog a-request))
+          
+          ; Come Back to main page
+          (define (back-handler request)
+            (render-blog-page a-blog request))]
    
     (send/suspend/dispatch response-generator)))
 
@@ -221,20 +256,31 @@
 (define (render-post-detail-page a-post a-blog request)
   (local [(define (response-generator embed/url)
             (response/xexpr
-             `(html (head (title ,(post-title a-post)))
-                    (body 
-                     ,(render-post-with-comments a-post)
-           
-                     ; Form to add a new comment
-                     (form ((action ,(embed/url insert-comment-handler)))
-                           (textarea ((name "comment")))
-                           (br)
-                           (input ((type "submit"))))
-                     
-                     ; Comme back to render-blog-page
-                     (a ((href ,(embed/url back-handler))) "Back")))))
+             #:preamble #"<!DOCTYPE html>"
+             (render-container 
+              (post-title a-post)
+              (list 
+               (render-menu-li 'not-active (embed/url back-handler) "cmd")
+               (render-menu-li 'active "#ViewPost" "eye")
+               (render-menu-li 'not-active "#NewComment" "new"))
+              `(div ,(render-post-with-comments a-post)
+                    ; Form to add a new comment
+                    (h4 ((id "NewComment")) "New Post")
+                    (form 
+                     ((action ,(embed/url insert-comment-handler)))
+                     (div ((class "controls docs-input-sizes"))
+                          (textarea ((name "comment")
+                                     (class "span8")
+                                     (rows "10")) "")
+                          (button ((type "submit")
+                                   (class "btn btn-primary btn-large"))
+                                  "Publish")
+                          ; Comme back to render-blog-page
+                          (a ((href ,(embed/url back-handler))
+                              (class "btn btn-large"))  
+                             "Back")))))))
           
-          ; insert
+          ; Form action
           (define (insert-comment-handler a-request)
             (let ([bindings (request-bindings a-request)])
               (cond [(can-parse-comment? bindings)
@@ -242,9 +288,9 @@
                                                       a-post 
                                                       a-blog
                                                       a-request)])))
-
-          (define (back-handler a-request)
-            (render-blog-page a-blog a-request))]
+          ; Come Back to main page
+          (define (back-handler request)
+            (render-blog-page a-blog request))]
     
     (send/suspend/dispatch response-generator)))
 
@@ -254,30 +300,33 @@
   (local [(define (response-generator embed/url)
             (response/xexpr
              #:preamble #"<!DOCTYPE html>"
-             `(html (head (title "My Blog")
-                          (link ((rel "stylesheet")
-                                 (href "/flat-ui/bootstrap/css/bootstrap.css")
-                                 (type "text/css")))
-                          (link ((rel "stylesheet")
-                                 (href "/flat-ui/css/flat-ui.css")
-                                 (type "text/css")))
-                          (link ((rel "stylesheet")
-                                 (href "/web-racket.css")
-                                 (type "text/css"))))
-                    (body
-                     (div ((class "container"))
-                          (div ((class "row"))
-                               (div ((class "span1 menu")) ,(render-menu 'new-post))
-                               (div ((class "span11"))
-                                    (h1 "My Blog")
-                                    ,(render-posts (blog-posts a-blog) a-blog embed/url)
-                          
-                                    ; Form to add a new blog post
-                                    (form ((action ,(embed/url insert-post-handler)))
-                                          (input ((name "title")))(br)
-                                          (textarea ((name "body")))(br)
-                                          (input ((type "submit")))))))))))
-            
+             (render-container 
+              "My Blog"
+              (list 
+               (render-menu-li 'active "#Home" "cmd")
+               (render-menu-li 'not-active "#NewPost" "new"))
+              `(div 
+                (h1 ((id "Home")) "My Blog")
+                ,(render-posts (blog-posts a-blog) a-blog embed/url)
+                
+                ; Form to add a new blog post
+                (div ((class "new-post"))
+                     (h4 ((id "NewPost")) "New Post")
+                     (form 
+                      ((action ,(embed/url insert-post-handler)))
+                      (div ((class "controls docs-input-sizes"))
+                           (input ((type "text")
+                                   (name "title")
+                                   (class "span8")
+                                   (placeholder "Enter title here")))
+                           (textarea ((name "body")
+                                      (class "span8")
+                                      (rows "10")) "")                                   
+                           (button
+                            ((type "submit")
+                             (class "btn btn-large btn-block btn-primary"))
+                            "Publish"))))))))
+          ; Form action  
           (define (insert-post-handler request)
             ((let ([bindings (request-bindings request)])
                (cond [(can-parse-post? bindings)
@@ -285,6 +334,7 @@
             (render-blog-page a-blog request)))]
    
   (send/suspend/dispatch response-generator)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Entry Point
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
