@@ -239,7 +239,7 @@
           ; Add comment to post and route to render-post-detail-page.
           (define (confirm-add-handler a-request)
             (post-add-comment! a-post a-comment)
-            (render-post-detail-page a-post a-blog a-request))
+            (render-post-detail-page a-post a-blog (redirect/get)))
           
           ; Doesn't add comment to post and route to render-post-detail-page.
           (define (cancel-add-handler a-request)
@@ -285,7 +285,7 @@
             (let ([bindings (request-bindings request)])
               (cond [(can-parse-comment? bindings)
                      (render-confirm-add-comment-page 
-                      (parse-comment bindings) a-post a-blog request)]
+                      (parse-comment bindings) a-post a-blog (redirect/get))]
                     [else
                      (render-post-detail-page a-post a-blog request)])))
           
