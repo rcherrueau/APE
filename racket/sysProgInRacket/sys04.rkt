@@ -12,12 +12,11 @@
   
   ; Create a "listening" server on the local machin with
   ; maximum 5 simultaneous connection.
-  (define (listener port-no)
-    (tcp-listen port-no 5 #t))
+  (define listener (tcp-listen port-no 5 #t))
   
   ; Loop to accept connections from listeners.
   (define (loop)
-    (accept-and-handle (listener port-no))
+    (accept-and-handle listener)
     (loop))
   
   (loop))
