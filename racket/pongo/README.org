@@ -1,0 +1,120 @@
+#+TITLE: Pongo
+#+DESCRIPTION: Plain text into static wiki.
+
+* Pongo
+  I've given myself a project as I learn Racket. Pongo is a plain text
+  into static wiki in keeping with [[https://github.com/mojombo/jekyll][jekyll]] and [[https://github.com/zacharyvoase/markdoc][markdoc]].
+
+** Structure
+   #+BEGIN_EXAMPLE
+   .
+   ├── _templates
+   |   ├── default.html
+   |   ├── footer.html
+   |   └── header.html
+   ├── _wiki
+   └── *.html
+   #+END_EXAMPLE
+
+   - =_templates= :: [[http://mustache.github.io/mustache.5.html][Mustache]] templates.
+   - =_wiki= :: Containing wiki. Wiki is directories with plain text
+                file in them.
+   - =*.html= :: Any HTML files will be automatically included.
+
+** Usage
+   #+BEGIN_EXAMPLE
+   pongo pongo_wiki/ generated_wiki/
+   #+END_EXAMPLE
+
+** Writing articles
+   Pongo is based on the idea of Barebones Wikis (see [[https://github.com/zacharyvoase/markdoc][Markdoc]]) that
+   just look like directories with easy-to-read/write articles.
+
+   The =wiki= folder is where wiki articles lives. Directories are
+   categories and files are articles. To create a new article, all you
+   need is to create a plain text file in any categories. Pongo
+   requires articles to be named according to the following format:
+
+   #+begin_example
+   YEAR-MONTH-DAY-title.MARKUP
+   #+end_example
+
+   - =YEAR= :: Four digit number. Year of article creation.
+   - =MONTH= :: Two digit number. Month of article creation.
+   - =DAY= :: Two digit number. Day of article creation.
+   - =MARKUP= :: File extension representing the format of article.
+
+** Wiki variable
+   - =wiki.articles= :: A reverse chronological list of all articles.
+     #+BEGIN_EXAMPLE
+     {
+       "wiki.articles": [
+         "Customizing your theme",
+         "Can I change my username?",
+         "How secure is my password?",
+       ]
+     }
+     #+END_EXAMPLE
+
+   - =wiki.categories= :: Wiki categories (see composite pattern for
+        data structure).
+     #+BEGIN_EXAMPLE
+     {
+       "wiki.categories": [
+         {
+           "category": {
+             "title": "Account Settings",
+             "contents": [
+               { "article": { "title": "How secure is my password?" }},
+               { "article": { "title": "Can I change my username?" }}
+             ]
+           }
+         },
+         {
+           "category": {
+             "title": "Using KnowHow"
+             "content": [
+               {"category": { "title": "Customization", "content": [] }},
+               {"category": { "title": "Upgrading", "content": [] }},
+               {"article": { "title": "Customizing your theme" }}
+             ]
+           }
+         }
+       ]
+     }
+     #+END_EXAMPLE
+
+** Article variable
+   - =article.title= :: Title of the article.
+   - =article.date= :: Date of creation of the article. Date format is
+                       YYYY-MM-DD.
+   - =article.content= :: Rendered content of the article.
+   - =article.category= :: Category to which this article belongs.
+   - =article.path= :: Path
+
+** General process
+   1. List all files in =_wiki=
+   2. Compute the  list of articles and =wiki.category=
+   3. Compute =wiki.articles=
+   4. Generate static wiki.
+
+** Architecture
+*** TemplateRender
+    - =render-template: template data -> generated-content= :: Take a
+         template on the input string port and data and generate
+         content as a string.
+
+*** ArticleRender
+    - =render-article: article -> generated-article= :: Take an
+         article on the input string port and generate it as html
+         string.
+
+*** WikiModel
+    - =is-category?: file-path -> boolean= :: Test if the current file
+         path is a wiki category.
+    - =create-category: file-path -> a-category= :: Create a category
+         model from the current file path.
+    - =is-article?: file-path -> boolean= :: Test if the current file
+         is an article.
+    - =create-article: file-path -> an-article= :: Create an article
+         model from the current file path.
