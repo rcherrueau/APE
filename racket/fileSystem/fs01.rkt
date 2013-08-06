@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Reporting the size of a file
-;; This exercize come from boost filesystem tutorial
+;; This exercize comes from boost filesystem tutorial
 ;;
 ;; http://www.boost.org/doc/libs/1_49_0/libs/filesystem/v3/doc/tutorial.html
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
