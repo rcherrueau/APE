@@ -1,6 +1,3 @@
-#+TITLE: Pongo
-#+DESCRIPTION: Plain text into static wiki.
-
 * Pongo
   I've given myself a project as I learn Racket. Pongo is a plain text
   into static wiki in keeping with [[https://github.com/mojombo/jekyll][jekyll]] and [[https://github.com/zacharyvoase/markdoc][markdoc]].
