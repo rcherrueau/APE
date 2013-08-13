@@ -9,12 +9,45 @@
 ;; Recursive directory listing.
 (define (tree file-path)
 
+  ;; Levels indicates the structure of parents. For each parent, level
+  ;; mention if parent is the last one at its depth ('final) or not
+  ;; ('not-final). In the following directory listing levels are
+  ;; represented at each depths:
+  ;;
+  ;; ()
+  ;; ../../scala
+  ;; (final)
+  ;;     └── clock-stream
+  ;; (final final)
+  ;;         ├── pom.xml
+  ;; (final final)
+  ;;         ├── README
+  ;; (final final)
+  ;;         └── src
+  ;; (final final final)
+  ;;             └── main
+  ;; (final final final final)
+  ;;                 ├── scala
+  ;; (final final final final not-final)
+  ;;                 │   └── fr
+  ;;                ...
+  ;; (final final final final not-final final final final final)
+  ;;                 │                   └── CurrentTime.scala
+  ;; (final final final final)
+  ;;                 └── webapp
+
+  ;; levels-add-not-final: (listof level) -> (listof level)
+  ;; Add a not final level to the levels list.
   (define (levels-add-not-final levels)
     (append levels (list 'not-final)))
 
+  ;; levels-add-final: (listof level) -> (listof level)
+  ;; Add a final level to the levels list.
   (define (levels-add-final levels)
     (append levels (list 'final)))
 
+  ;; final-level?: level -> boolean
+  ;; Test if the given level is final or not.
   (define (final-level? level)
     (eq? 'final level))
 
@@ -27,14 +60,15 @@
     (cond
      [(file-exists? a-file-path) 'file]
      [(directory-exists? a-file-path) 'dir]
-     [(link-exists? a-file-path) 'link]))
+     [(link-exists? a-file-path) 'link]
+     [else 'not-a-file]))
 
-  ;; indent: level file-path-name level final-level [final?] ->
-  ;;                                           indented-file-path-name
-  ;; Indent file-path-name with the correct level of indentation. If
-  ;; file is the last of it's sub-tree (final? to #t), the indentation
-  ;; system use specific character. level is the level of indentation.
-  ;; final-level is the level of final indentation.
+  ;; indent: level file-path-name levels [final?] -> indented-file-path-name
+  ;; Indents file-path-name with the correct level of indentation. If
+  ;; file is the last of its sub-tree (final? to #t), the indentation
+  ;; system use specific character. To indent correctly a file path,
+  ;; the system uses a structure (levels) which indicates for each
+  ;; parents if the parent is the last one at its depth or not.
   (define (indent file-path-name levels [final? #f])
     (define (make-right-part levels [right-part ""])
       (cond
@@ -51,21 +85,34 @@
                      (if final? "└── " "├── ")
                      file-path-name)]))
 
-  ;; tree-rec: a-file-path file-ype level file-id -> void
-  ;; Recursive directory listing.
-  (define (tree-rec a-file-path file-type levels file-id)
+  ;; tree-rec: a-file-path file-ype levels file-id [print-base?] -> void
+  ;; Recursive directory listing. Takes the current file path to
+  ;; print, the type of file (one of the 'file, 'dir, 'link), the
+  ;; strucutre of its parents (final or not) and the id of the file in
+  ;; its sub-tree (0 is for the last file of its sub tree).
+  (define (tree-rec a-file-path file-type levels file-id [print-base? #f])
+    (define-values (base name _) (split-path a-file-path))
+    (define file-path-to-print
+      (cond
+       [(not (path? name)) a-file-path]
+       [print-base? (string-append (path->string base) (path->string name))]
+       [else (path->string name)]))
     (define final? (<= file-id 0))
 
-    (cond
-     [(eq? 'file file-type)
-      (define-values (base name must-be-dir?) (split-path a-file-path))
-      (displayln (indent (path->string name) levels final?))]
-     [(eq? 'dir file-type)
-      (define-values (base name must-be-dir?) (split-path a-file-path))
-      (displayln (indent (path->string name) levels final?))
+    (displayln (indent file-path-to-print levels final?))
 
+    (cond
+     [(eq? 'dir file-type)
       (define sub-file-paths (directory-list a-file-path))
       (define sub-file-paths-ids (reverse (range (length sub-file-paths))))
+
+      ;; directory-listing: sub-file-path (listof file-id) -> (listof
+      ;; file-id) Takes a file path and launch the directory listing
+      ;; under this file path. file-ids indicates the position of
+      ;; current file path regarding to its brothers. Position of
+      ;; current file path is the first element of file-ids list. For
+      ;; the last brother of a sub directory, file-ids would be a list
+      ;; with only the value 0.
       (define (directory-listing sub-file-path file-ids)
         (define new-file-path (build-path a-file-path sub-file-path))
 
@@ -75,29 +122,14 @@
                       (levels-add-final levels)
                       (levels-add-not-final levels))
                   (first file-ids))
-
         (rest file-ids))
 
       (void (foldl directory-listing sub-file-paths-ids sub-file-paths))]))
 
-
   (define file-type (get-file-type file-path))
-  (cond
-   [(eq? 'file file-type)
-    (displayln file-path)]
-   [(eq? 'dir file-type)
-    (displayln file-path)
-
-    (define sub-file-paths (directory-list file-path))
-    (define sub-file-paths-ids (reverse (range (length sub-file-paths))))
-    (define (directory-listing a-file-path file-ids)
-      (define new-file-path (build-path file-path a-file-path))
-
-      (tree-rec new-file-path
-                (get-file-type new-file-path)
-                empty
-                (first file-ids))
-
-      (rest file-ids))
-
-    (void (foldl directory-listing sub-file-paths-ids sub-file-paths))]))
+  (define print-base #t)
+  (define levels empty)
+  (define file-id 0)
+  (if (eq? file-type 'not-a-file)
+      (displayln (string-append file-path " is not a file or directory"))
+      (tree-rec file-path file-type levels file-id print-base)))
