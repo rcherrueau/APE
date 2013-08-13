@@ -15,26 +15,31 @@
   ;; represented at each depths:
   ;;
   ;; ()
-  ;; ../../scala
+  ;; ../../racket
   ;; (final)
-  ;;     └── clock-stream
+  ;;     ├── fileSystem
+  ;; (final not-final)
+  ;;     │   ├── fs01.rkt
+  ;;    ...
+  ;; (final not-final)
+  ;;     │   └── fs03.rkt
+  ;; (final)
+  ;;     └── webAppInRacket
   ;; (final final)
-  ;;         ├── pom.xml
+  ;;         ├── compiled
+  ;; (final final not-final)
+  ;;         │   └── drracket
+  ;; (final final not-final final)
+  ;;         │       └── errortrace
+  ;; (final final not-final final final)
+  ;;         │           ├── model_rkt.dep
+  ;; (final final not-final final final)
+  ;;         │           └── model_rkt.zo
   ;; (final final)
-  ;;         ├── README
+  ;;         ├── model.rkt
+  ;;        ...
   ;; (final final)
-  ;;         └── src
-  ;; (final final final)
-  ;;             └── main
-  ;; (final final final final)
-  ;;                 ├── scala
-  ;; (final final final final not-final)
-  ;;                 │   └── fr
-  ;;                ...
-  ;; (final final final final not-final final final final final)
-  ;;                 │                   └── CurrentTime.scala
-  ;; (final final final final)
-  ;;                 └── webapp
+  ;;         └── web13.rkt
 
   ;; levels-add-not-final: (listof level) -> (listof level)
   ;; Add a not final level to the levels list.
@@ -98,7 +103,7 @@
        [print-base? (string-append (path->string base) (path->string name))]
        [else (path->string name)]))
     (define final? (<= file-id 0))
-
+    (displayln levels)
     (displayln (indent file-path-to-print levels final?))
 
     (cond
