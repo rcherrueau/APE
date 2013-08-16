@@ -8,13 +8,6 @@
 (define article-file-path-pattern
   (pregexp "(\\d{4}-\\d{2}-\\d{2})-(.+)?\\..+"))
 
-; Get file name from the file path
-(define (file-name file-path)
-  (cond [(path? file-path)
-         (define-values (base name _) (split-path file-path))
-         (path->string name)]
-        [else file-path]))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Category
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -51,7 +44,8 @@
   ; Pongo requires articles to be named as
   ; YYYY-MM-DD-title.MARKUP
   (define (is-well-formed? a-file-path)
-    (regexp-match-exact? article-file-path-pattern (file-name a-file-path)))
+    (regexp-match-exact? article-file-path-pattern
+                         (file-name-from-path a-file-path)))
 
   (and (file-exists? file-path)
        (is-well-formed? file-path)))
