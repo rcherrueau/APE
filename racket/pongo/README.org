@@ -97,12 +97,12 @@
 
 ** Architecture
 *** TemplateRender
-    - =render-template: template data -> generated-content= :: Take a
+    - =render: template data -> generated-content= :: Take a
          template on the input string port and data and generate
          content as a string.
 
-*** ArticleRender
-    - =render-article: article -> generated-article= :: Take an
+*** ArticleProcessor
+    - =processes: article -> generated-article= :: Take an
          article on the input string port and generate it as html
          string.
 
