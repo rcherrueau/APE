@@ -102,7 +102,7 @@
          content as a string.
 
 *** ArticleProcessor
-    - =processes: article -> generated-article= :: Take an
+    - =processes: article -> generated-content-port= :: Take an
          article on the input string port and generate it as html
          string.
 
