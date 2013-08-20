@@ -7,15 +7,15 @@
   (string->url "https://api.github.com/markdown/raw"))
 
 ; processes: article -> generated-content
-; Take an markdown article and returns the html result on the
-; input-port.
+; Take an markdown article as input-port and returns the html result
+; on the input-port.
 ; Example usage:
-;  (copy-port (processes (file->string "../tests/sample_content.mrk"))
+;  (copy-port (processes (open-input-file "../tests/sample_content.mrk"))
 ;             (open-output-file "tmptmp.html"))
 ;
 ;  (port->list read-line
-;              (processes (file->string "../tests/sample_content.mrk")))
+;              (processes (open-input-file "../tests/sample_content.mrk")))
 (define (processes article)
   (post-pure-port markdown-service
-                  (string->bytes/locale article)
+                  (port->bytes article)
                   (list "Content-Type: text/plain")))
