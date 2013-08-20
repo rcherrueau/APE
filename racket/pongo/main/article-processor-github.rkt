@@ -19,3 +19,5 @@
   (post-pure-port markdown-service
                   (port->bytes article)
                   (list "Content-Type: text/plain")))
+
+(provide (all-defined-out))

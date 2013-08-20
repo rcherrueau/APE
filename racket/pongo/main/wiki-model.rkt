@@ -27,7 +27,7 @@
 ; empty.
 (define (create-category file-path)
   (define-values (base name _) (split-path file-path))
-  (category ((path->string name) empty file-path)))
+  (category (path->string name) empty file-path))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Artcile
@@ -56,7 +56,17 @@
 (define (create-article file-path processor)
   (define-values (base name _) (split-path file-path))
   (define-values (parent-base parent-name __) (split-path base))
-  (define-values (___ date title) (regexp-match article-file-path-pattern name))
-  (define content (file->string file-path))
+  (define l (regexp-match article-file-path-pattern name))
+  (define date (second l))
+  (define title (third l))
+  (define in-mrk (open-input-file file-path))
 
-  (article (title date (processor content) parent-name file-path)))
+  (define the-article
+    (article title date (processor in-mrk) (path->string parent-name) file-path))
+
+  (when (port-closed? in-mrk)
+    (close-input-port in-mrk))
+
+  the-article)
+
+(provide (all-defined-out))
