@@ -64,9 +64,15 @@
   (define the-article
     (article title date (processor in-mrk) (path->string parent-name) file-path))
 
-  (when (port-closed? in-mrk)
-    (close-input-port in-mrk))
+  (when (not (port-closed? in-mrk)) (close-input-port in-mrk))
 
   the-article)
 
-(provide (all-defined-out))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Module definitions
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(provide (except-out (all-defined-out)
+                     article-file-path-pattern
+                     is-category?
+                     is-article?))
