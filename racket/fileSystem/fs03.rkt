@@ -103,7 +103,6 @@
        [print-base? (string-append (path->string base) (path->string name))]
        [else (path->string name)]))
     (define final? (<= file-id 0))
-    ; (displayln levels)
     (displayln (indent file-path-to-print levels final?))
 
     (cond
