@@ -17,7 +17,10 @@
 (letrec-syntax ([and* (lambda (x)
                         (syntax-case x ()
                           [(_) #'#t]
+                          ; Base case clause.
                           [(_ e) #'e]
+                          ; Recursive case clause. See the `and*` in
+                          ; the syntax form
                           [(_ e1 e2 e3 ...)
                            #'(if e1 (and* e2 e3 ...) #f)]))])
   (let ([x '(a b c d)])
