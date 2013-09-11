@@ -23,7 +23,7 @@
 
 (print-test (let_3 ([v1 '4]
                     [v2 '2])
-                   (printf "~a~a\n" v1 v2))
+                   (format "~s~s" v1 v2))
 
             (let_3 fac ([n 10])
                    (if (zero? n)

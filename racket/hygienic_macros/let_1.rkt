@@ -9,8 +9,8 @@
 
 (require "print-test.rkt")
 
-; Ellipse of pattern `[i v] ...` can be split up in the output as
-; `i ...` and `v ...`
+; Ellipse of pattern `[i v] ...' can be split up in the output as
+; `i ...' and `v ...'
 (define-syntax (let_1 x)
   (syntax-case x ()
     [(_ ([i v] ...) e1 e2 ...)
@@ -18,4 +18,4 @@
 
 (print-test (let_1 ([v1 '4]
                     [v2 '2])
-                   (printf "~a~a\n" v1 v2)))
+                   (format "~s~s" v1 v2)))

@@ -10,10 +10,10 @@
 (require "print-test.rkt")
 
 ; Local macro using let-syntax and letrec-syntax.
-; Here, `letREC-syntax` form is important because macro is
-; recursively-defined. `and*` macro appears in the `syntax` form of
-; the last clause. For this reason, `letREC-syntax` has to be used
-; instead of `let-syntax`
+; Here, `letREC-syntax' form is important because macro is
+; recursively-defined. `and*' macro appears in the `syntax' form of
+; the last clause. For this reason, `letREC-syntax' has to be used
+; instead of `let-syntax'.
 (letrec-syntax ([and* (lambda (x)
                         (syntax-case x ()
                           [(_) #'#t]
@@ -26,6 +26,7 @@
   (let ([x '(a b c d)])
     (print-test
      (and* (pair? x) (pair? (cddr x)) (pair? (cdddr x)) (cadddr x))))
+
   (print-test
    (and* #t #f #f #t #t #t #f)
    (and* #t #t #t)

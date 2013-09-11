@@ -33,7 +33,7 @@
               (display "hi")
               (displayln " there"))
 
-            ; In hygienic macro, the new binding for `begin` and `if`
+            ; In hygienic macro, the new binding for `begin' and `if'
             ; introduce by the `let` will not alter the semantics of the
             ; when*.
             (let ([begin list]
