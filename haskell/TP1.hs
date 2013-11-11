@@ -1,22 +1,3 @@
-{-
-{-
--- un commentaire sur une ligne
-plusieurs lignes
-
--}
-imbriques
--}
-
--- constante
-un :: Int
-un = 1
-
-deux :: Int
-deux = 3
-
-quatre :: Int
-quatre = un+deux
-
 mySub :: Int -> Int -> Int
 mySub x y = x-y
 
@@ -31,28 +12,6 @@ myNeg x = mySub 0 x
 
 myNeg' :: Int -> Int
 myNeg' = mySub 0
-
--- type Bool
--- && || not
--- == /=
-
-l0 :: [Int]
-l0 = []
-
-l1 :: [Int]
-l1 = 1 : l0
-
-l2 :: [Int]
-l2 = 2 : l1
-
-l3 :: [Int]
-l3 = [1..10]
-
-l3' :: [Int]
-l3' = [1,3..10]
-
-l3'' :: [Int]
-l3'' = [10,8..1]
 
 myHead :: [Int] -> Int
 myHead (x:_) = x
@@ -148,11 +107,6 @@ myProduct []     = 1
 -- | take n, applied to a list xs, returns the prefix of xs of length
 -- n, or xs itself if n > length xs.
 myTake :: Int -> [Int] -> [Int]
--- myTake val l = myTake' val l []
---     where
---       myTake' val (x:xs) l' | length l' < val = myTake' val xs (l'++[x])
---       myTake' val (x:xs) l' | length l' >= val = l'
---       myTake' val [] l' = l'
 myTake n _ | n <= 0 = []
 myTake _ []         = []
 myTake n (x:xs)     = x : myTake (n-1) xs
