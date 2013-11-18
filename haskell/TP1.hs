@@ -1,51 +1,31 @@
-mySub :: Int -> Int -> Int
-mySub x y = x-y
+-- Operation on Integer Lists.
+-- http://hackage.haskell.org/package/base-4.2.0.1/docs/Data-List.html
 
-mySub' :: Int -> Int -> Int
-mySub' x y = (-) x y
-
-mySub'' :: Int -> Int -> Int
-mySub'' x y = x `mySub` y
-
-myNeg :: Int -> Int
-myNeg x = mySub 0 x
-
-myNeg' :: Int -> Int
-myNeg' = mySub 0
-
+-- | Extract the first element of a list, which must be non-empty.
 myHead :: [Int] -> Int
 myHead (x:_) = x
 
+-- | Extract the elements after the head of a list, which must be
+-- non-empty.
 myTail :: [Int] -> [Int]
 myTail (_:xs) = xs
 
+-- | Append two lists.
 myAppend :: [Int] -> [Int] -> [Int]
 myAppend (x:xs) ys = x : myAppend xs ys
 myAppend []     ys = ys
 
 myAppend' :: [Int] -> [Int] -> [Int]
-myAppend' xs ys | not (null xs) = head xs : myAppend' (tail xs) ys
-                | null xs       = ys
---                | otherwise = ys
-
-myAppend'' :: [Int] -> [Int] -> [Int]
-myAppend'' (x:xs) ys = x : suite
+myAppend' (x:xs) ys = x : suite
     where
       suite :: [Int]
-      suite = myAppend'' xs ys
-myAppend'' []     ys = ys
+      suite = myAppend' xs ys
+myAppend' []     ys = ys
 
-myAppend''' :: [Int] -> [Int] -> [Int]
-myAppend''' (x:xs) ys = let suite = myAppend''' xs ys
-                        in x : suite
-myAppend''' []    ys = ys
-
-myAppend'''' :: [Int] -> [Int] -> [Int]
-myAppend'''' xs ys = myAppendAux xs
-    where
-      myAppendAux :: [Int] -> [Int]
-      myAppendAux (x:xs) = x : myAppendAux xs
-      myAppendAux []     = ys
+myAppend'' :: [Int] -> [Int] -> [Int]
+myAppend'' (x:xs) ys = let suite = myAppend'' xs ys
+                       in x : suite
+myAppend'' []    ys = ys
 
 -- | Retun all elements of a list except the last one.
 myInit :: [Int] -> [Int]
@@ -78,6 +58,7 @@ myReverse []     = []
 myReverse' :: [Int] -> [Int]
 myReverse' l = rev l []
     where
+      rev :: [Int] -> [Int] -> [Int]
       rev []     l' = l'
       rev (x:xs) l' = rev xs (x:l')
 
@@ -102,24 +83,19 @@ myProduct :: [Int] -> Int
 myProduct (x:xs) = x * myProduct(xs)
 myProduct []     = 1
 
--- pas d'element neutre pour max et min !
-
 -- | take n, applied to a list xs, returns the prefix of xs of length
 -- n, or xs itself if n > length xs.
 myTake :: Int -> [Int] -> [Int]
-myTake n _ | n <= 0 = []
-myTake _ []         = []
-myTake n (x:xs)     = x : myTake (n-1) xs
+myTake n _      | n <= 0 = []
+myTake _ []              = []
+myTake n (x:xs)          = x : myTake (n-1) xs
 
 -- | drop n xs returns the suffix of xs after the first n elements, or
 -- [] if n > length xs.
 myDrop :: Int -> [Int] -> [Int]
-myDrop n l | n <= 0 = l
-myDrop _ []         = []
-myDrop n (_:xs)     = myDrop (n-1) xs
-
-myBangBang :: [Int] -> Int -> Int
-myBangBang = undefined
+myDrop n l      | n <= 0 = l
+myDrop _ []              = []
+myDrop n (_:xs)          = myDrop (n-1) xs
 
 -- | The insert function takes an element and a list and inserts the
 -- element into the list at the last position where it is still less
@@ -127,11 +103,12 @@ myBangBang = undefined
 myInsert :: Int -> [Int] -> [Int]
 myInsert e (x:xs) | e > x     = x : myInsert e xs
                   | otherwise = e : x : xs
-myInsert e []             = [e]
+myInsert e []                 = [e]
 
--- | The sort function implements a stable sorting algorithm.
+-- | The sort function.
 mySort :: [Int] -> [Int]
-mySort l =  mySort' l []
+mySort l =  srt l []
     where
-      mySort' (x:xs) l' = mySort' xs (myInsert x l')
-      mySort' [] l' = l'
+      srt :: [Int] -> [Int] -> [Int]
+      srt (x:xs) l' = srt xs (myInsert x l')
+      srt []     l' = l'
