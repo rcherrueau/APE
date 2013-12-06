@@ -10,7 +10,7 @@
 (require "print-test.rkt")
 ; `with-syntax' creates a pattern variable bindingjto hold ;
 ; intermediate output within the body of the macro. `with-syntax';
-; form for pattern wariable is similar to `let' for ordinary ;
+; form for pattern variable is similar to `let' for ordinary ;
 ; variables.
 (define-syntax (with-syntax x)
   (syntax-case x ()
@@ -27,6 +27,16 @@
      ; from the whole.
      (with-syntax [(rest #'(or* e2 e3 ...))]
        #'(let ([t e1]) (if t t (or* rest))))]))
+
+;; (define-syntax (or* x)
+;;   (write x)
+;;   (syntax-case x ()
+;;     [(_) #'#f]
+;;     [(_ e) #'e]
+;;     [(_ e1 e2 e3 ...)
+;;      #'(syntax-case (list #'(or* e2 e3 ...)) ()
+;;          [rest #'(let ([t e1])
+;;                    (if t t rest))])]))
 
 (print-test (or*)
             (or* #f #f #f)
