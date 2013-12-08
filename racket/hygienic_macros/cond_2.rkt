@@ -3,7 +3,7 @@
 ;; R. Kent Dybvig
 ;; Technical Report #356
 ;;
-;; page 13,14
+;; page 14,15
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 #lang racket
 
@@ -69,52 +69,54 @@
 ;;       (cond
 ;;        [else 5])))
 
-(define-syntax (cond_1 x)
-  ;; else and => in the literals list informs that when these
-  ;; identifiers appear in the pattern, they are literals rather than
-  ;; pattern variables.
-  (syntax-case x (else =>)
-    ;; Order of the clauses is important. In general, more specific
-    ;; patterns must appear before more general patterns that might
-    ;; also match the same input.
+;; Use `free-identifier=?' in place of the `syntax-case' literals
+;; list.
+(define-syntax (cond_2 x)
+  (syntax-case x ()
     [(_)
      #'(void)]
-    [(_ [else e1 e2 ...])
+    [(_ [x e1 e2 ...])
+     (and (identifier? #'x)
+          (free-identifier=? #'x #'else))
      #'(begin e1 e2 ...)]
-    [(_ [test => func])
+    [(_ [test x func])
+     (and (identifier? #'x)
+          (free-identifier=? #'x #'=>))
      #'(let ([t test]) (when t (func t)))]
-    [(_ [test => func] c1 c2 ...)
-     #'(let ([t test]) (if t (func t) (cond_1 c1 c2 ...)))]
+    [(_ [test x func] c1 c2 ...)
+     (and (identifier? #'x)
+          (free-identifier=? #'x #'=>))
+     #'(let ([t test]) (if t (func t) (cond_2 c1 c2 ...)))]
     [(_ [test])
      #'(let ([t test]) (when t t))]
     [(_ [test] c1 c2 ...)
-     #'(let ([t test]) (if t t (cond_1 c1 c2 ...)))]
+     #'(let ([t test]) (if t t (cond_2 c1 c2 ...)))]
     [(_ [test e1 e2 ...])
      #'(let ([t test]) (when t (begin e1 e2 ...)))]
     [(_ [test e1 e2 ...] c1 c2 ...)
-     #'(let ([t test]) (if t (begin e1 e2 ...) (cond_1 c1 c2 ...)))]))
+     #'(let ([t test]) (if t (begin e1 e2 ...) (cond_2 c1 c2 ...)))]))
 
-(print-test (cond_1)
+(print-test (cond_2)
 
-            (cond_1
+            (cond_2
              [(member 2 '(1 2 3))])
 
-            (cond_1
+            (cond_2
              [(zero? -5)]
              [(positive? -5)]
              [(positive? 5)])
 
-            (cond_1
+            (cond_2
              [else 5 6 7 8])
 
-            (cond_1
+            (cond_2
              [(positive? -5) (error "doesn't get there")]
              [(zero? -5) (error "doesn't get here, either")]
              [(positive? 5) 'here])
 
-            (cond_1
+            (cond_2
              [(member 2 '(1 2 3)) => (lambda (l) (map - l))])
 
-            (cond_1
+            (cond_2
              [(member 9 '(1 2 3)) => (lambda (l) (map - l))]
              [else 5]))
