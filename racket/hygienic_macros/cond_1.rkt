@@ -92,7 +92,7 @@
     [(_ [test e1 e2 ...])
      #'(let ([t test]) (when t (begin e1 e2 ...)))]
     [(_ [test e1 e2 ...] c1 c2 ...)
-     #'(let ([t test]) (if t (begin e1 e2 ...) (cond_1 c1 c2 ...)))]))
+     #'(if test (begin e1 e2 ...) (cond_1 c1 c2 ...))]))
 
 (print-test (cond_1)
 
