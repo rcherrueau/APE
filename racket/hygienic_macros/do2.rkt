@@ -27,39 +27,56 @@
 ;;     (printf "i:~s " i)
 ;;     (printf "j:~s\n" j)
 ;;     (doloop (add1 i) (add1 j))))
-;;
+
 ;; (displayln
 ;;  (do ([i 0 (add1 i)]
 ;;       [j 0 (add1 j)])
 ;;      ([> (+ i j) 10]
-;;       [format "i+j:~s"(+ i j)])
+;;       [format "i+j:~s" (+ i j)])
 ;;    (printf "i:~s " i)
 ;;    (printf "j:~s\n" j)))
 ;;
-;; (let doloop ([i 0]
-;;              [j 0])
-;;   (if (> (+ i j) 10)
-;;     ;; if this is the end of the loop, we return the value of the
-;;     ;; finish expression
-;;     (format "i+j:~s" (+ i j))
-;;     ;; else, we conitnue the loop
-;;     (begin
-;;       (printf "i:~s " i)
-;;       (printf "j:~s\n" j)
-;;       (doloop (add1 i) (add1 j)))))
+;; (displayln
+;;  (let doloop ([i 0]
+;;               [j 0])
+;;    (if (> (+ i j) 10)
+;;        (format "i+j:~s" (+ i j))
+;;        (begin
+;;          (printf "i:~s " i)
+;;          (printf "j:~s\n" j)
+;;          (doloop (add1 i) (add1 j))))))
 
 (define-syntax (do2 orig-x)
   (syntax-case orig-x ()
-    [(_ ((var init . step) ...) (test? e1 ...) c ...)
-     (with-syntax [(step ...)
-                   (map (lambda (v s)) #'(var ...) #'(step ...))]
-       (syntax-case #'(e1 ...) ()
+    [(_ ([var init . step] ...) (test e0 ...) c ...)
+     ; step is not mandatory
+     (with-syntax ([(step ...)
+                    (map (lambda (v s)
+                           (syntax-case s ()
+                             [() v]
+                             [(s) #'s]))
+                         (syntax->list #'(var ...))
+                         (syntax->list #'(step ...)))])
+       (syntax-case #'(e0 ...) ()
          [()
           #'(let doloop ([var init] ...)
-              (when (not test?)
+              (when (not test)
                 (begin c ... (doloop step ...))))]
-         [(e1 e2 ...)
+         [(e0 e1 ...)
           #'(let doloop ([var init] ...)
-              (if (test?)
-                  (begin e1 e2 ...)
+              (if test
+                  (begin e0 e1 ...)
                   (begin c ... (doloop step ...))))]))]))
+
+(print-test (do2 ([i 0 (add1 i)]
+                  [j 0 (add1 j)])
+                 ((> (+ i j) 10))
+              (printf "i:~s " i)
+              (printf "j:~s\n" j))
+
+            (displayln
+             (do ([i 0]
+                  [j 0 (add1 j)])
+                 ((> (+ i j) 10) (format "i+j:~s" (+ i j)))
+               (printf "i:~s " i)
+               (printf "j:~s\n" j))))
