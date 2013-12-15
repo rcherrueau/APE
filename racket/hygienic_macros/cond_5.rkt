@@ -9,7 +9,6 @@
 #lang racket
 
 (require "print-test.rkt")
-(require racket/syntax)
 
 ;; Construct the tail before even looking at the current clause, and
 ;; uses simplified patterns to be matched only against the current
