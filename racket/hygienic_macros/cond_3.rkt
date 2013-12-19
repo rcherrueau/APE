@@ -11,7 +11,7 @@
 (require "print-test.rkt")
 
 ;; `cond_3' recurs internally so that it always has a handle on the
-;; original input expression.
+;; original input expression `orig-x'.
 (define-syntax (cond_3 orig-x)
   (let docond ([x orig-x])
     (syntax-case x (else =>)
