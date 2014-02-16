@@ -1,18 +1,37 @@
-window.onload = function() {
-  var canvas = document.getElementById('myCanvas');
+// Copy over all fields from the paper object.
+paper.install(window);
 
-  // Create an empty project and a view for the canvas
-  paper.setup(canvas);
-  // Create a Paper.js Path to draw a line into it
-  var path = new paper.Path();
-  // Give the stroke a color
-  path.strokeColor = 'black';
-  var start = new paper.Point(100, 100);
-  // Move to start and draw a line from there
-  path.moveTo(start);
-  // Note that the plus operator on Point objects does not work
-  // in JavaScript. Instead, we need to call the add() function:
-  path.lineTo(start.add([ 200, -50 ]));
-  // Draw the view now:
-  paper.view.draw();
+// Keep global references to both tools, so the HTML links below can
+// access them.
+var tool1, tool2;
+
+window.onload = function() {
+  paper.setup('myCanvas');
+
+  // Create two drawing tools.
+  // tool1 will draw straight lines,
+  // tool2 will draw clouds.
+
+  // Both share the mouseDown event:
+  var path;
+
+  function onMouseDown(event) {
+    path = new Path();
+    path.strokeColor = 'black';
+    path.add(event.point);
+  }
+
+  tool1 = new Tool();
+  tool1.onMouseDown = onMouseDown;
+  tool1.onMouseDrag = function(event) {
+    path.add(event.point);
+  }
+
+  tool2 = new Tool();
+  tool2.minDistance = 20;
+  tool2.onMouseDown = onMouseDown;
+  tool2.onMouseDrag = function(event) {
+    // Use the arcTo command to draw cloudy lines
+    path.arcTo(event.point);
+  }
 }

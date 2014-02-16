@@ -1,0 +1,6 @@
+{
+  "name": "usingjs",
+  "dependencies" : {
+    "paper": "0.9.15"
+  }
+}
