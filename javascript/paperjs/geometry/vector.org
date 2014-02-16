@@ -1,0 +1,49 @@
+* Points and Vectors
+  Dealing with point and vectors in paper js. Reminder that operator
+  overloading only works when you include the library =paperscript=.
+  Otherwise use =add=, =subtract=, =multiply=, =divide=, =modulo= and
+  =equals= [1].
+
+
+*** Expressing Vector
+    Calculates a vector by subtracting two points. The result is still
+    a =Point= object. But, it's meaning changes from absolute to
+    relative. From a certain point =p1=, the vector =vector= describes
+    a transformation to get the point =p2=.
+    #+BEGIN_SRC javascript
+    var p1 = new Point(50, 50);   // Point {x: 50, y: 50}
+    var p2 = new Point(110, 200); // Point {x: 110, y: 200}
+
+    var x = p2.x - p1.x;          // 60
+    var y = p2.y - p1.y;          // 150
+
+    var vector = p2.subtract(p1); // Point {x: 60, y: 150}
+
+    vector.x == x;                // true
+    vector.y == y;                // true
+    p2.equals(p1.add(vector));    // true
+    #+END_SRC
+
+    A vector can also be described as an =angle= and a =length=:
+    #+BEGIN_SRC javascript
+    var p1 = new Point(50, 50);                      // Point {x: 50, y: 50}
+    var p2 = new Point(110, 200);                    // Point {x: 110, y: 200}
+
+    var x = p2.x - p1.x;                             // 60
+    var y = p2.y - p1.y;                             // 150
+
+    var vector = p2.subtract(p1);                    // Point {x: 60, y: 150}
+
+    vector.length;                                   // 161.55494421403512
+    var length = Math.sqrt(x*x + y*y);               // 161.55494421403512
+    length == vector.length                          // true
+
+    vector.angle;                                    // 68.19859051364818
+    var angle = Math.acos(x/length) * (180/Math.PI); // 68.19859051364818
+    vector.angle == angle                            // true
+    #+END_SRC
+
+
+* Footnotes
+
+[1] http://stackoverflow.com/a/21672652
