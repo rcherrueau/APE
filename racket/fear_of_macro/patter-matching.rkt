@@ -231,3 +231,94 @@
            (lambda ()
              (convert-syntax-error
               (my-struct/fendered "blah" ("bli" "blo")))))
+
+; Using dot notation -------------------------------------------------
+
+; The previsous two examples used a macro to define functions whose
+; names were made by joining identifiers provided to the macro. This
+; example does the opposite: The identifier given to the macro is
+; split into pieces.
+
+; If you write programs for web services you deal with JSON, which is
+; represented in Racket by a `jsexpr?'. JSON often has dictionaries
+; that contain other dictionaires. In a `jsexpr?' these are
+; represented by nested `hashed' tables:
+
+; Nested `hasheq' typical of a jsexpr:
+(define js (hasheq 'a (hasheq 'b (hasheq 'c "value"))))
+
+; In Javascript you can use dot notation: `foo = js.a.b.c'. In Racket
+; it's not so convenient:
+; `(hash-ref (hash-ref (hash-ref js 'a) 'b) 'c)'
+; We can write a helper function to make this a bit cleaner:
+(define/contract (hash-refs h ks [def #f])
+  ((hash? (listof any/c)) (any/c) . ->* . any)
+  (with-handlers ([exn:fail? (const (cond [(procedure? def) (def)]
+                                          [else def]))])
+    (for/fold ([h h])
+        ([k (in-list ks)])
+      (hash-ref h k))))
+(hash-refs js '(a b c))
+
+; That's better. Can we go even further and use a dot notation
+; somewhat like Javascript?
+(require (for-syntax racket/syntax))
+(define-syntax (hash.refs stx)
+  (syntax-case stx ()
+    ; Assume default is #f
+    [(_ chain)
+     #'(hash.refs chain #f)]
+    [(_ chain default)
+     (let ([xs (map (lambda (x)
+                      (datum->syntax stx (string->symbol x)))
+                    (regexp-split
+                     #rx"\\."
+                     (symbol->string (syntax->datum #'chain))))])
+       (with-syntax ([h (car xs)]
+                     [ks (cdr xs)])
+         #'(hash-refs h 'ks default)))]))
+(hash.refs js.a.b.c)
+(hash.refs js.a.blah 'did-not-exist)
+
+; We've started to appreciate that our macros should give helpful
+; messages when used in error. Let's trys to do that here:
+(require (for-syntax racket/syntax))
+(define-syntax (hash.refs/fendered stx)
+  (syntax-case stx ()
+    ; No args
+    [(_)
+     ; Fence: raises syntax error
+     (raise-syntax-error #f
+                         "Expected (hash.key0[.key1 ...] [default])"
+                         stx #'chain)]
+    ; No default: Assume default is #f
+    [(_ chain)
+     #'(hash.refs/fendered chain #f)]
+    [(_ chain default)
+     ; Fence: Test chain is not a string or number
+     (unless (symbol? (syntax-e #'chain))
+       (raise-syntax-error #f
+                           "Expected (hash.key0[.key1 ...] [default])"
+                           stx #'chain))
+       (let ([xs (map (lambda (x)
+                        (datum->syntax stx (string->symbol x)))
+                      (regexp-split
+                       #rx"\\."
+                       (symbol->string (syntax->datum #'chain))))])
+         ; Fence: Test that we have at least hash.key
+         (unless (and (>= (length xs) 2)
+                      (not (eq? (syntax-e (cadr xs)) '||)))
+           (raise-syntax-error #f
+                               "Expected (hash.key0[.key1 ...] [default])"
+                               stx #'chain))
+         (with-syntax ([h (car xs)]
+                       [ks (cdr xs)])
+           #'(hash-refs h 'ks default)))]))
+(hash.refs/fendered js.a.b.c)
+(hash.refs/fendered js.a.blah 'did-not-exist)
+(with-handlers ([exn:fail? (lambda (e) 'syntax-error-caught)])
+  (convert-syntax-error (hash.refs/fendered)))
+(with-handlers ([exn:fail? (lambda (e) 'syntax-error-caught)])
+  (convert-syntax-error (hash.refs/fendered js."lala")))
+(with-handlers ([exn:fail? (lambda (e) 'syntax-error-caught)])
+  (convert-syntax-error (hash.refs/fendered js)))
