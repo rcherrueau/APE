@@ -109,9 +109,10 @@
 ; You wouldn't want
 ; `(if user-wants-file-deleted? (delete-file) (void))'
 ; to delete a file even when `user-want-file-deleted?' is #f.
+(define (display-and-return x) (displayln x) x)
 (my-if #t
-       ((lambda () (displayln "true") "true"))
-       ((lambda () (displayln "false") "false")))
+       (display-and-return "true")
+       (display-and-return "false"))
 
 ; So the if simply can't work as a plain function. However a syntax
 ; transformer can rearrange the syntax -- rewrite the code -- at
@@ -129,8 +130,8 @@
   (datum->syntax stx `(cond [,condition? ,true-exp]
                             [else ,false-exp])))
 (my-if2 #t
-       ((lambda () (displayln "true") "true"))
-       ((lambda () (displayln "false") "false")))
+       (display-and-return "true")
+       (display-and-return "false"))
 
 ; And you can do the same with `match'. Using that would let you do
 ; pattern-matching. But be careful, Racket will complaining that
@@ -147,8 +148,8 @@
      (datum->syntax stx `(cond [,condition? ,true-expr]
                                [else ,false-expr]))]))
 (my-if-with-match #t
-       ((lambda () (displayln "true") "true"))
-       ((lambda () (displayln "false") "false")))
+       (display-and-return "true")
+       (display-and-return "false"))
 
 ; begin-for-syntax ---------------------------------------------------
 
