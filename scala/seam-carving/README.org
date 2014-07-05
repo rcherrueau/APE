@@ -1,0 +1,7 @@
+#+TITLE: Seam Carving
+
+* Seam Carving
+  http://en.wikipedia.org/wiki/Seam_carving
+  http://www.win.tue.nl/~wstahw/edu/2IV05/seamcarving.pdf
+  https://github.com/manoart/seam_carving
+  http://kirilllykov.github.io/blog/2013/06/06/seam-carving-algorithm/
