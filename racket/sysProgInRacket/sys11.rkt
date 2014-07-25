@@ -7,6 +7,7 @@
 #lang racket
 
 (require xml net/url)
+(require racket/control)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Utils
@@ -69,6 +70,30 @@
 (hash-set! dispatch-table "sum" sum)
 (hash-set! dispatch-table "one" one)
 (hash-set! dispatch-table "two" two)
+
+; Same as above but in a direct style:
+
+; 
+(define (get-number label)
+  (define query
+    ; Generate a URL for the current computation:
+    (send/suspend
+     ; Receive the computation-as-URL here:
+     (lambda (k-url)
+       ; Generate the query-page result for this connection.
+       ; Send the query result to the saved-computation URL:
+       (build-request-page label k-url ""))))
+  ; We arrive here later, in a new connection
+  (string->number (cdr (assq'number query))))
+
+(define (sum2 query)
+  (define m (get-number "First number:"))
+  (define n (get-number "Second number:"))
+  `(html
+    (head (title "Sum of one and two"))
+    (body "The sum is: " ,(number->string (+ m n)))))
+
+(hash-set! dispatch-table "sum2" sum2)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Server
@@ -135,7 +160,11 @@
     ; Discard the rest of the header (up to blank line):
     (regexp-match #rx"(\r\n|^)\r\n" in)
     ; Dispatch
-    (let ([xexpr (dispatch (list-ref req 1))])
+    ; prompt mark the place where a servlet is started. So that
+    ; we can abrt a computation to that point (see continuation:
+    ; http://docs.racket-lang.org/reference/eval-model.html#(part._cont-model)
+    ; http://docs.racket-lang.org/reference/eval-model.html#%28part._prompt-model%29
+    (let ([xexpr (prompt (dispatch (list-ref req 1)))])
       ; Send reply
       (display "HTTP/1.0 200 Okay\r\n" out)
       (display "Server: k\r\nContent-Type: text/html\r\n\r\n" out)
