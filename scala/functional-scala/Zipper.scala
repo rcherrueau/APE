@@ -1,13 +1,32 @@
+/** Scala implementation of Gérard Huet's The Zipper.
+  *
+  * The Zipper is a kind of Iterator for Tree. The Zipper offers
+  * navigation and edition primitives in constant time.
+  * [[http://www.dblp.org/rec/bibtex/journals/jfp/Huet97 The Zipper]]
+  */
+
+/** Tree data structure. */
 sealed abstract class Tree[T]
 case class Item[T] (val item: T) extends Tree[T]
 case class Section[T] (val trees: List[Tree[T]]) extends Tree[T]
 
+/** Path in a [[Tree]].
+  *
+  * A [[Tree]] presented by a path has sibling trees, uncle trees,
+  * great-uncle trees, ... but its father is a [[Path]], not a
+  * [[Tree]] like in usual graph editors. '''This is the trick!''' In
+  * [[Location]], saving the path of a ref rather than its father's
+  * tree enables the modification of that ref without changing the
+  * path. Thus, the modification is done in constante time instead of
+  * copying the path from the root to the ref.
+  */
 sealed abstract class Path[T]
 case class Top[T]() extends Path[T]
 case class Node[T] (val ysibling: List[Tree[T]],
                     val path: Path[T],
                     val esibling: List[Tree[T]]) extends Path[T]
 
+/** Location of a ref in a [[Tree]]. */
 sealed abstract class Location[T]
 class Loc[T] (val current: Tree[T],
               val path: Path[T]) extends Location[T] {
@@ -80,7 +99,9 @@ object Loc {
     new Loc[T](current, path)
   def apply[T](current: Tree[T]) =
     new Loc[T](current)
+}
 
+object Tests {
   def main(args: Array[String]) {
     // a * b + c * d
     val tree = Section(List(
@@ -90,7 +111,7 @@ object Loc {
 
     // a * b + c * d
     //     loc --^
-    val expectedStarLoc  = Loc(
+    val expectedTimesLoc = Loc(
       Item("*"),
       Node(Item("c") :: Nil,
            Node(Item("+") ::
@@ -102,9 +123,29 @@ object Loc {
            Item("d") :: Nil))
 
 
-    val starLoc = Loc(tree).goDown.goRight.goRight.goDown.goRight
+    // a * b + c / d
+    //     loc --^
+    val expectedDivLoc = Loc(
+      Item("/"),
+      Node(Item("c") :: Nil,
+           Node(Item("+") ::
+                Section(Item("a") ::
+                        Item("*") ::
+                        Item("b") :: Nil) :: Nil,
+                Top[String],
+                Nil),
+           Item("d") :: Nil))
 
-    assert (starLoc.path.toString == expectedStarLoc.path.toString,
+
+    val timesLoc = Loc(tree).goDown.goRight.goRight.goDown.goRight
+
+    assert (timesLoc.path.toString == expectedTimesLoc.path.toString,
       { println("Bad path construction") })
+
+    val timesToDivLoc = timesLoc change Item("/")
+
+    assert(timesToDivLoc.current.toString == expectedDivLoc.current.toString
+        && timesToDivLoc.path.toString == expectedDivLoc.path.toString,
+      { println("Bad times modification") })
   }
 }
