@@ -1,6 +1,6 @@
 {
   "name": "vector",
   "dependencies" : {
-    "paper": "0.9.15"
+    "paper": "0.9.18"
   }
 }

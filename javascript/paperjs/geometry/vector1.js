@@ -17,7 +17,7 @@ window.onload = function() {
       strokeWidth: 2}),
     new PointText({
       point: new Point(point1.x + 10, point1.y + 2.5),
-      content: 'point1\n{ x: ' + point1.x + ', y: ' + point2.y + '}',
+      content: 'point1\n{ x: ' + point1.x + ', y: ' + point1.y + '}',
       fillColor: 'black'})]);
 
   var pointItem2 = new Group([

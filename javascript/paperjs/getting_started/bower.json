@@ -1,6 +1,21 @@
 {
   "name": "usingjs",
-  "dependencies" : {
-    "paper": "0.9.15"
-  }
+  "dependencies": {
+    "paper": "0.9.18"
+  },
+  "main": "usingjs.js",
+  "version": "0.0.0",
+  "homepage": "https://github.com/rcherrueau/APE",
+  "authors": [
+    "Rl3x Fish <ronancherrueau@gmail.com>"
+  ],
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ]
 }
