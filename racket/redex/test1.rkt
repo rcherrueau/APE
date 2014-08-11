@@ -32,7 +32,7 @@
 (define (∈-B? term)
   (and (redex-match bool-any-lang B term) #t))
 
-(displayln "Test term ∈ B?")
+(displayln "* Test term ∈ B?")
 (for ([t (list B1 B2 B3 B4 B5 "hello")])
   (cond
    [(∈-B? t)
@@ -45,7 +45,7 @@
 ;; Consider the example of matching a filled context with an
 ;; expression.
 
-(displayln (string-append "Redex (• true (• true false)) matching "
+(displayln (string-append "* Redex (• true (• true false)) matching "
                           "while context is filling with "
                           "(• true B): "))
 (redex-match bool-any-lang
@@ -76,13 +76,10 @@
 (newline)
 
 
-;; Specification of the single step reduction with *no context*.
-(define r
-  (reduction-relation
-   bool-any-lang
-   (--> (• false B) B a)
-   (--> (• true B) true b)))
-
+;; Reduction sequence printer.
+;;
+;; /Note/ this function print one reduction. To see all availbale
+;; possibilities, see `traces`.
 (define (reduction-sequence r r-name)
   (define (_red-seq term [nest 0])
     (define rts (apply-reduction-relation r term))
@@ -109,27 +106,51 @@
         (_red-seq red-term nest)])]))
   _red-seq)
 
-(displayln "Reduction sequence based on the r one-step relation:")
+;; Specification of the single step reduction with *no context*.
+(displayln "* Reduction sequence based on the r one-step relation:")
+(define r
+  (reduction-relation
+   bool-any-lang
+   (--> (• false B) B "[a]")
+   (--> (• true B) true "[b]")))
+
 (define r-red-seq (reduction-sequence r "r"))
-(for ([t (list (term (• false (• false (• true false)))) B1 B2 B5)])
+(for ([t (list (term (• false (• false (• true false)))) B5)])
   (printf "Reduction of ~a:~n" t)
   (r-red-seq t))
 (newline)
 
-;; The r relation doesn't reduce expression like `true`, `false` or
-;; `(• (• true false) false))`. What we need is the compatible closure
-;; which is a single step reduction within a *context*.
+;; The r relation doesn't reduce expression like `(• (• true false)
+;; false))`. If we wish to reduce (• (• f t) f) we must extend r to
+;; its *compatible closure* that supports the reduction of
+;; sub-expressions.
+;;
+;;  B₁ ->r B₂                 if B₁ r B₂    [a]
+;;  (• B₁ B₂) ->r (• B₁' B₂)  if B₁ ->r B₁' [b]
+;;  (• B₁ B₂) ->r (• B₁ B₂')  if B₂ ->r B₂' [c]
+;;
+;; In [b], B₁ should be reduce to B₁'. In that case, B₁ is called the
+;; *redex*. All parts which surrounds the redex, e.g.: `(• _ B₂)` is
+;; called the *context*. Thus, the compatible closure is a single step
+;; reduction within a *context*
 
-;; Specification of the single step reduction within a *context*.
-(displayln "Reduction sequence based on the r one-step relation:")
+;; Specification of the single step reduction within a *context* is
+;; simply the r relation surrounded by its context. The general idea
+;; is the following: In C, `hole` is a redex, what we want in [b] and
+;; [c] is applying the r relation to the redex. To do that, first you
+;; have to say where is your redex in the context grammar `C`. Then,
+;; apply each rule of r relation on C.
+(displayln (string-append "* Reduction sequence based on the ->r "
+                          "single-step within a context relation:"))
 (define ->r
   (reduction-relation
    bool-any-lang
-   (-->  (in-hole C (• true B))
-         (in-hole C true)
-         b)
    (-->  (in-hole C (• false B))
-         (in-hole C B)
-         c)))
-
-(traces ->r B5)
+         (in-hole C B) "[a]")
+   (-->  (in-hole C (• true B))
+         (in-hole C true) "[b]")))
+(define ->r-red-seq (reduction-sequence ->r "->r"))
+(for ([t (list (term (• false (• false (• true false)))) B5)])
+  (printf "Reduction of ~a:~n" t)
+  (->r-red-seq t))
+(newline)
