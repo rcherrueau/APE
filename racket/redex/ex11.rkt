@@ -1,42 +1,12 @@
 #lang racket
 
-(require redex)
-
-;;-------------------------------------------------------------- Utils
-;; Reduction sequence printer.
-;;
-;; /Note/ this function print one reduction. To see all availbale
-;; possibilities, see `traces`.
-(define (reduction-sequence r r-name)
-  (define (_red-seq term [nest 0])
-    (define rts (apply-reduction-relation r term))
-    (cond
-     [(null? rts)
-      (cond
-       [(equal? nest 0)
-        (printf "No reduction for ~a~n" term)]
-       [else
-        (void)])]
-     [else
-      (cond
-       [(equal? nest 0)
-        (define red-term (car rts))
-        (define new-nest (string-length (format "~a" term)))
-        (printf "~a ~a ~a~n" term r-name red-term)
-        (_red-seq red-term new-nest)]
-       [else
-        (define red-term (car rts))
-        (printf "~a ~a ~a~n"
-                (make-string nest #\space)
-                r-name
-                red-term)
-        (_red-seq red-term nest)])]))
-  _red-seq)
-
+(require redex
+         "utils.rkt")
 
 ;;------------------------------------------------------ Exercise 11.1
 (term (+ ,(first (term (,(+ 12 34)))) 5))
 ;;> '(+ 46 5)
+
 
 ;;------------------------------------------------------ Exercise 11.2
 (newline)
@@ -144,12 +114,12 @@
 ;; *compatible closure* that supports the reduction of
 ;; sub-expressions.
 ;;
-;;  B₁ ->%₃ B₂                 if B₁ %₃ B₂    [a]
-;;  (+ B₁ B₂) ->%₃ (+ B₁' B₂)  if B₁ ->%₃ B₁' [b]
-;;  (+ B₁ B₂) ->%₃ (+ B₁ B₂')  if B₂ ->%₃ B₂' [c]
+;;  A₁ ->%₃ A₂                 if A₁ %₃ A₂    [a]
+;;  (+ A₁ A₂) ->%₃ (+ A₁' A₂)  if A₁ ->%₃ A₁' [b]
+;;  (+ A₁ A₂) ->%₃ (+ A₁ A₂')  if A₂ ->%₃ A₂' [c]
 ;;
-;; In [b], B₁ should be reduce to B₁'. In that case, B₁ is called the
-;; *redex*. All parts which surrounds the redex, e.g.: `(• _ B₂)` is
+;; In [b], A₁ should be reduce to A₁'. In that case, A₁ is called the
+;; *redex*. All parts which surrounds the redex, e.g.: `(• _ A₂)` is
 ;; called the *context*. Thus, the compatible closure is a single step
 ;; reduction within a *context*
 
@@ -192,10 +162,82 @@
         "[i]")
    (--> (in-hole C (+ 2 (+ 2 A)))
         (in-hole C (+ 1 A))
-
         "[j]")))
 
 (define ->%₃-red-seq (reduction-sequence ->%₃ "->%₃"))
 (->%₃-red-seq (term (+ (+ 2 1) 1)))
 (->%₃-red-seq (term (+ (+ 2 (+ 2 (+ 2 1))) (+ 2 (+ 1 (+ 2 1))))))
+
+
+;;------------------------------------------------------ Exercise 11.4
+(newline)
+;; The reduction sequence only prints one from many reduction
+;; sequences. To see all reduction sequences, Redex provides a tool
+;; called traces.
+(displayln (string-append "Uncomment block to see traces for:\n"
+                          "(+ (+ 2 (+ 2 1)) (+ 2 (+ 1 2))) and\n"
+                          "(+ \n"
+                          "  (+ 2 (+ 2 (+ 2 1)))\n"
+                          "  (+ 2 (+ 1 (+ 2 1))))"))
+#|
+(traces ->%₃ (term (+ (+ 2 (+ 2 1)) (+ 2 (+ 1 2)))))
 (traces ->%₃ (term (+ (+ 2 (+ 2 (+ 2 1))) (+ 2 (+ 1 (+ 2 1))))))
+;|#
+
+
+;;------------------------------------------------------ Exercise 11.5
+(newline)
+;; Evaluation context for leftmost-outermost reduction strategy.
+(define-language eval-add-lang
+  ;; Addition of number
+  [A 0         ;; [a]
+     1         ;; [b]
+     2         ;; [c]
+     (+ A A)]  ;; [d]
+  [E hole      ;; [e]
+     (+ E A)]) ;; [f]
+
+(define ->%₃e
+  (reduction-relation
+   eval-add-lang
+   (--> (in-hole E (+ 0 A))
+        (in-hole E A)
+        "[a]")
+   (--> (in-hole E (+ A 0))
+        (in-hole E A)
+        "[b]")
+   (--> (in-hole E (+ 1 1))
+        (in-hole E 2)
+        "[c]")
+   (--> (in-hole E (+ 1 2))
+        (in-hole E 0)
+        "[d]")
+   (--> (in-hole E (+ 1 (+ 1 A)))
+        (in-hole E (+ 2 A))
+        "[e]")
+   (--> (in-hole E (+ 1 (+ 2 A)))
+        (in-hole E A)
+        "[f]")
+   (--> (in-hole E (+ 2 1))
+        (in-hole E 0)
+        "[g]")
+   (--> (in-hole E (+ 2 2))
+        (in-hole E 1)
+        "[h]")
+   (--> (in-hole E (+ 2 (+ 1 A)))
+        (in-hole E A)
+        "[i]")
+   (--> (in-hole E (+ 2 (+ 2 A)))
+        (in-hole E (+ 1 A))
+        "[j]")))
+
+(displayln (string-append "Uncomment block to see traces of leftmost-"
+                          "outermost reduction strategy for:\n"
+                          "(+ (+ 2 (+ 2 1)) (+ 2 (+ 1 2))) and\n"
+                          "(+ \n"
+                          "  (+ 2 (+ 2 (+ 2 1)))\n"
+                          "  (+ 2 (+ 1 (+ 2 1))))"))
+#|
+(traces ->%₃e (term (+ (+ 2 (+ 2 1)) (+ 2 (+ 1 2)))))
+(traces ->%₃e (term (+ (+ 2 (+ 2 (+ 2 1))) (+ 2 (+ 1 (+ 2 1))))))
+;|#

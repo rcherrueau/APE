@@ -1,6 +1,7 @@
 #lang racket
 
-(require redex)
+(require redex
+         "utils.rkt")
 
 (define-language bool-any-lang
   ;; Boolean
@@ -8,9 +9,9 @@
      false     ;; False      [b]
      (• B B)]  ;; Logical Or [c]
   ;; Context
-  [C hole      ;; [d]
-     (• C B)   ;; [e]
-     (• B C)]) ;; [f]
+  [C hole      ;;            [d]
+     (• C B)   ;;            [e]
+     (• B C)]) ;;            [f]
 
 (define B1 (term true))
 (define B2 (term false))
@@ -41,10 +42,10 @@
     (printf "~a ∉ B~n" t)]))
 (newline)
 
+
 ;; A pattern may match an expression in several different ways.
 ;; Consider the example of matching a filled context with an
 ;; expression.
-
 (displayln (string-append "* Redex (• true (• true false)) matching "
                           "while context is filling with "
                           "(• true B): "))
@@ -76,36 +77,6 @@
 (newline)
 
 
-;; Reduction sequence printer.
-;;
-;; /Note/ this function print one reduction. To see all availbale
-;; possibilities, see `traces`.
-(define (reduction-sequence r r-name)
-  (define (_red-seq term [nest 0])
-    (define rts (apply-reduction-relation r term))
-    (cond
-     [(null? rts)
-      (cond
-       [(equal? nest 0)
-        (printf "No reduction for ~a~n" term)]
-       [else
-        (void)])]
-     [else
-      (cond
-       [(equal? nest 0)
-        (define red-term (car rts))
-        (define new-nest (string-length (format "~a" term)))
-        (printf "~a ~a ~a~n" term r-name red-term)
-        (_red-seq red-term new-nest)]
-       [else
-        (define red-term (car rts))
-        (printf "~a ~a ~a~n"
-                (make-string nest #\space)
-                r-name
-                red-term)
-        (_red-seq red-term nest)])]))
-  _red-seq)
-
 ;; Specification of the single step reduction with *no context*.
 (displayln "* Reduction sequence based on the r one-step relation:")
 (define r
@@ -119,6 +90,7 @@
   (printf "Reduction of ~a:~n" t)
   (r-red-seq t))
 (newline)
+
 
 ;; The r relation doesn't reduce expression like `(• (• true false)
 ;; false))`. If we wish to reduce (• (• f t) f) we must extend r to
@@ -149,8 +121,37 @@
          (in-hole C B) "[a]")
    (-->  (in-hole C (• true B))
          (in-hole C true) "[b]")))
+
 (define ->r-red-seq (reduction-sequence ->r "->r"))
 (for ([t (list (term (• false (• false (• true false)))) B5)])
   (printf "Reduction of ~a:~n" t)
   (->r-red-seq t))
 (newline)
+
+
+;; The reduction sequence only prints one from many reduction
+;; sequences. To see all reduction sequences, Redex provides a tool
+;; called traces.
+; (traces ->r (term (• (• true false) (• true true))))
+
+
+;; Evaluation context for leftmost-outermost reduction strategy.
+(define-language bool-standard-lang
+  ;; Boolean
+  [B true      ;; True       [a]
+     false     ;; False      [b]
+     (• B B)]  ;; Logical Or [c]
+  ;; Evaluation context
+  [E (• E B)   ;;            [d]
+     hole])    ;;            [e]
+
+(define ->re
+  (reduction-relation
+   bool-standard-lang
+   (-->  (in-hole E (• true B))
+         (in-hole E true) "[b]")
+   (-->  (in-hole E (• false B))
+         (in-hole E B) "[a]")))
+
+(define ->re-red-seq (reduction-sequence ->re "->re"))
+(traces ->re (term (• (• true false) (• true true))))
