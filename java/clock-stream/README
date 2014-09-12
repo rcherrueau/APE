@@ -1,12 +1,12 @@
 == About ==
-Simple app stream clock time using websocket.
+Simple app streams clock time using websocket.
 
 == How To ==
 git clone https://code.google.com/p/rol3x-place/java/clock-stream/
 mvn jetty:run
 
 With your browser open http://localhost:8080/clock-webapp/clock_client.html
-Open console to view console.log
+Open console and look at console.log
 Enjoy :)
 
 Ronan-Alexandre Cherrueau
