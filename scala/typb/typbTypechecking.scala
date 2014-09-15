@@ -71,8 +71,10 @@ object Cloud {
   def read(key: Key): Option[key.Nature] =
     database.get(key).asInstanceOf[Option[key.Nature]]
 
-  def store(key: Key)(data: Nature): Unit =
+  def store(data: Nature)(key: Key): Unit = {
     database.update(key, data)
+  }
+
 }
 
 sealed abstract class Nature
@@ -109,12 +111,12 @@ object TYPB_TypeChecking {
   def main(args: Array[String]) {
     import Cloud.Key
 
-    val rawKey = new Key(10000) { type Nature = Raw }
-    Cloud.store(rawKey)(Raw())
+    val rawKey = new Key(Random.nextLong()) { type Nature = Raw }
+    Cloud.store(Raw())(rawKey)
     val rawData: Option[Raw] = Cloud.read(rawKey)
 
-    val encKey = new Key(10000) { type Nature = Encrypted }
-    Cloud.store(encKey)(Encrypted())
+    val encKey = new Key(Random.nextLong()) { type Nature = Encrypted }
+    Cloud.store(Encrypted())(encKey)
     val encData: Option[Encrypted] = Cloud.read(encKey)
 
     // println(key.asInstanceOf[AnyRef].getClass.getSimpleName)
