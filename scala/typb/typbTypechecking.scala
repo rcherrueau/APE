@@ -61,30 +61,25 @@ import scala.util.Random
 
 
 
-
-
 object Cloud {
   abstract class Key(id: Long) { type Nature }
+
   import collection.mutable.Map
 
   val database = Map.empty[Key, Any]
-  def get(key: Key): Option[key.Nature] =
+
+  def read(key: Key): Option[key.Nature] =
     database.get(key).asInstanceOf[Option[key.Nature]]
-  def set(key: Key)(data: key.Nature): Unit =
+
+  def store(key: Key)(data: Nature): Unit =
     database.update(key, data)
 }
-
 
 sealed abstract class Nature
 case class Raw extends Nature
 case class Encrypted extends Nature
 
-import Cloud.Key
-trait RawKey extends Key { type Nature = Raw }
-trait EncryptedKey extends Key { type Nature = Double }
-
 object TYPB_TypeChecking {
-
   // def scenario1 {
   //   val data = Alice getPrivate ;
   //   Cloud store data
@@ -112,9 +107,15 @@ object TYPB_TypeChecking {
   // }
 
   def main(args: Array[String]) {
-    val key = new Key(10000) with RawKey
-    Cloud.set(key)(Raw())
-    val data: Option[Raw] = Cloud.get(key)
+    import Cloud.Key
+
+    val rawKey = new Key(10000) { type Nature = Raw }
+    Cloud.store(rawKey)(Raw())
+    val rawData: Option[Raw] = Cloud.read(rawKey)
+
+    val encKey = new Key(10000) { type Nature = Encrypted }
+    Cloud.store(encKey)(Encrypted())
+    val encData: Option[Encrypted] = Cloud.read(encKey)
 
     // println(key.asInstanceOf[AnyRef].getClass.getSimpleName)
     // val cloudData = new CloudData
@@ -122,7 +123,6 @@ object TYPB_TypeChecking {
     // cloudData.store(Raw("Bob"))(Encrypted())
   }
 }
-
 
 // Constraint on Data
 // sealed abstract class Label
