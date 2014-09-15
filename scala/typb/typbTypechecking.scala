@@ -2,27 +2,86 @@
 // http://stackoverflow.com/a/12937819
 // https://github.com/milessabin/shapeless
 
-sealed abstract class Id
-sealed abstract class Data
-case class RawData extends Data
-case class EncryptedData extends Data
+// sealed abstract class Id
+// sealed abstract class Data
+// case class RawData extends Data
+// case class EncryptedData extends Data
 
 
-object CloudData {
-  abstract class Key { type DataType; val name: String}
-}
+// object CloudData {
+//   abstract class Key { type DataType; val name: String}
+// }
 
-import CloudData.Key
+// import CloudData.Key
 
-class CloudData {
+// class CloudData {
+//   import collection.mutable.Map
+//   val data = Map.empty[Key, Any]
+//   def query(key: Key): key.DataType = data.get(key).asInstanceOf[key.DataType]
+//   def store(key: Key)(value: key.DataType): Unit = data.update(key, value)
+// }
+
+// case class Raw(name: String) extends Key {
+//   type DataType = RawData
+// }
+// case class Encrypted(name: String) extends Key {
+//   type DataType = EncryptedData
+// }
+import scala.util.Random
+
+
+// abstract class Data
+// case class RawData extends Data
+// case class EncryptedData extends Data
+
+// abstract class Key(name: Long) {
+//   type Nature
+// }
+
+// object Cloud {
+//   import collection.mutable.Map
+
+//   val database = Map.empty[Key, Any]
+
+//   def store(data: Data)(key: Key): Key = {
+//     // val key = new Key(Random.nextLong()) { type Nature = data.type }
+//     database.put(key, data)
+//     key
+//   }
+
+//   def read(key: Key): Option[key.Nature] =
+//     database.get(key).asInstanceOf[Option[key.Nature]]
+
+//   // def doSomeStuffWithEncrypted(data: Data[Encrypted]) =
+//   //   println("toSomeStuffWithEncrypted")
+
+//   // def doSomeStuffWithRaw(data: Data[Raw]) =
+//   //   println("toSomeStuffWithRaw")
+// }
+
+
+
+
+
+object Cloud {
+  abstract class Key(id: Long) { type Nature }
   import collection.mutable.Map
-  val data = Map.empty[Key, Any]
-  def query(key: Key): key.DataType = data.get(key).asInstanceOf[key.DataType]
-  def store(key: Key)(value: key.DataType): Unit = data.update(key, value)
+
+  val database = Map.empty[Key, Any]
+  def get(key: Key): Option[key.Nature] =
+    database.get(key).asInstanceOf[Option[key.Nature]]
+  def set(key: Key)(data: key.Nature): Unit =
+    database.update(key, data)
 }
 
-case class Raw(name: String) extends Key { type DataType = RawData }
-case class Encrypted(name: String) extends Key { type DataType = EncryptedData }
+
+sealed abstract class Nature
+case class Raw extends Nature
+case class Encrypted extends Nature
+
+import Cloud.Key
+trait RawKey extends Key { type Nature = Raw }
+trait EncryptedKey extends Key { type Nature = Double }
 
 object TYPB_TypeChecking {
 
@@ -53,9 +112,14 @@ object TYPB_TypeChecking {
   // }
 
   def main(args: Array[String]) {
-    val cloudData = new CloudData
-    cloudData.store(Raw("Alice"))(RawData())
-    cloudData.store(Raw("Bob"))(Encrypted())
+    val key = new Key(10000) with RawKey
+    Cloud.set(key)(Raw())
+    val data: Option[Raw] = Cloud.get(key)
+
+    // println(key.asInstanceOf[AnyRef].getClass.getSimpleName)
+    // val cloudData = new CloudData
+    // cloudData.store(Raw("Alice"))(RawData())
+    // cloudData.store(Raw("Bob"))(Encrypted())
   }
 }
 
