@@ -3,29 +3,29 @@
 // https://github.com/milessabin/shapeless
 
 // The program enventualy type checks! Next step is in store, try make
-// the key implicit: there is no way to do that!
+// the view implicit: there is no way to do that!
 
 object Cloud {
   import collection.mutable.Map
-  object KeyMaker {
+  object ViewMaker {
     import scala.util.Random
     object Raw {
-      def apply() = new Key(Random.nextLong()) { type Nature = Raw }
+      def apply() = new View(Random.nextLong()) { type Nature = Raw }
     }
     object Encrypted {
-      def apply() = new Key(Random.nextLong()) { type Nature = Encrypted }
+      def apply() = new View(Random.nextLong()) { type Nature = Encrypted }
     }
   }
 
-  abstract class Key(id: Long) { type Nature }
+  abstract class View(id: Long) { type Nature }
 
-  val database = Map.empty[Key, Any]
+  val database = Map.empty[View, Any]
 
-  def read(key: Key): Option[key.Nature] =
-    database.get(key).asInstanceOf[Option[key.Nature]]
+  def read(view: View): Option[view.Nature] =
+    database.get(view).asInstanceOf[Option[view.Nature]]
 
-  def store(data: Nature)(key: Key): Unit =
-    database.update(key, data)
+  def store(view: View)(data: view.Nature): Unit =
+    database.update(view, data)
 }
 
 sealed abstract class Nature
@@ -34,19 +34,17 @@ case class Encrypted extends Nature
 
 object TYPB_TypeChecking {
   def main(args: Array[String]) {
-    import Cloud.KeyMaker
+    import Cloud.ViewMaker
 
-    val rawKey = KeyMaker.Raw()
-    Cloud.store(Raw())(rawKey)
-    val rawData: Option[Raw] = Cloud.read(rawKey)
+    val rawView = ViewMaker.Raw()
+    Cloud.store(rawView)(Raw())
+    val rawData: Option[Raw] = Cloud.read(rawView)
 
-    val encKey1 = KeyMaker.Encrypted()
-    Cloud.store(Encrypted())(encKey1)
-    val encData1: Option[Encrypted] = Cloud.read(encKey1)
-
-    val encKey2 = KeyMaker.Encrypted()
-    Cloud.store(Encrypted())(encKey2)
-    val encData2: Option[Encrypted] = Cloud.read(encKey2)
+    val encView = ViewMaker.Encrypted()
+    // Cloud.store(encView)(Raw()) // Doesn't compile
+    Cloud.store(encView)(Encrypted())
+    // val rawData: Option[Raw] = Cloud.read(encView) // Doesn't compile
+    val rawData: Option[Encrypted] = Cloud.read(encView)
   }
 
   // def scenario1 {
