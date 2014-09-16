@@ -25,6 +25,7 @@ trait Id {
 }
 
 case object Alice extends Id {
+  def getPrivate: IdData[Nature] = IdData(Raw("test"))
   def encrypt(data: Data[Nature]): IdData[Encrypted] = null
   def decrypt(data: IdData[Encrypted]): Data[Nature] = null
 }
@@ -52,11 +53,21 @@ object Cloud {
 
   // Should accept all Nature except Encrypted
   def genChart[T](data: T)
-    (implicit an: GenChartAcceptNature[T]): Unit = {}
+    /*(implicit an: GenChartAcceptNature[T])*/: Unit = {}
   @implicitNotFound("Type mismatch ${T} is forbidden")
   case class GenChartAcceptNature[T]
   implicit object AcceptRaw extends GenChartAcceptNature[Alice.IdData[Raw[String]]]
   implicit object AcceptPull extends GenChartAcceptNature[Alice.IdData[Pull]]
+
+  def getCals1[T <: Nature](id: Id)(key: Key[id.IdData[T]]): Unit =
+    genChart(read(id)(key).get)
+
+  def getCals2[T <: Nature](id: Id)(key: Key[id.IdData[T]]): Unit = {
+    val encData: id.IdData[Encrypted] = read(id)(key).get
+    val data = id.decrypt(encData)
+    genChart(data)
+  }
+
 }
 
 object TYPB_TypeChecking {
@@ -88,48 +99,36 @@ object TYPB_TypeChecking {
     // val badData2: Option[Alice.IdData[Pull]] = Cloud.read(Alice)(key)
   }
 
-  // def testDependentData {
-  //   val rawView: RawView = RawView(Alice)
-  //   Cloud.store(rawView)(Alice.Raw())
-  //   val rawData: Option[Raw] = Cloud.read(rawView)
-
-  //   val encView = EncryptedView()
-  //   // Cloud.store(encView)(Raw()) // Doesn't compile
-  //   Cloud.store(encView)(Encrypted())
-  //   // val rawData: Option[Raw] = Cloud.read(encView) // Doesn't compile
-  //   val encData: Option[Encrypted] = Cloud.read(encView)
-  // }
-
-  // // Everithing is raw data: The program type checks
-  // def scenario1 {
-  //   val data = Alice getPrivate ;
-  //   Cloud store data
-  //   Cloud getCals1 Alice
-  // }
+  // Everithing is raw data: The program type checks
+  def scenario1 {
+    val data = Alice.getPrivate
+    val key = Cloud.store(Alice)(data)
+    Cloud.getCals1(Alice)(key)
+  }
 
   // // The Cloud.genChart doesn't accept encrypted data: The program
   // // doesn't type check arround getCals1
   // def scenario2 {
-  //   val data = Alice encrypt (Alice getPrivate)
-  //   Cloud store data
-  //   Cloud getCals1 Alice
+  //   val data = Alice.encrypt(Alice.getPrivate)
+  //   val key = Cloud.store(Alice)(data)
+  //   Cloud.getCals1(Alice)(key)
   // }
 
   // // In Cloud.getCals2 Alice tries to decrypt Bob encrypted data: The
   // // program doesn't type check.
   // def scenario3 {
-  //   val data = Bob encrypt (Alice getPrivate)
-  //   Cloud store data
-  //   Cloud getCals2 Alice
+  //   val data = Bob.encrypt(Alice.getPrivate)
+  //   val key = Cloud.store(Bob)(data)
+  //   Cloud.getCals2(Alice)(key)
   // }
 
-  // // In Cloud.getCals2 Alice decrypts her data before calling
-  // // Cloud.genChart: The program type checks.
-  // def scenario4 {
-  //   val data = Alice encrypt (Alice getPrivate)
-  //   Cloud store data
-  //   Cloud getCals2 Alice
-  // }
+  // In Cloud.getCals2 Alice decrypts her data before calling
+  // Cloud.genChart: The program type checks.
+  def scenario4 {
+    val data = Alice.encrypt(Alice.getPrivate)
+    val key = Cloud.store(Alice)(data)
+    Cloud.getCals2(Alice)(key)
+  }
 
   def main(args: Array[String]) {
   }
