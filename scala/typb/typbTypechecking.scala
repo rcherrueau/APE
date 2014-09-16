@@ -5,26 +5,33 @@
 // With, dependate data I have to find a new way to do the read and
 // store.
 abstract class Nature
+case class Raw[+T](value: T) extends Nature
+case class Encrypted extends Nature
+case class Pull extends Nature
+
+trait Data[+T <: Nature] { def get: T }
+
+abstract class Key[T](id: Long) { type DataType }
 
 trait Id {
-  case class Raw extends Nature
-  case class Encrypted extends Nature
-  case class Pull extends Nature
+  import scala.util.Random
 
-  def encrypt(data: Nature): Encrypted
-  def decrypt(data: Encrypted): Nature
+  case class IdData[+T <: Nature](get: T) extends Data[T]
+
+  def makeKey[T <: Nature](data: Data[T]): Key[IdData[T]] =
+    new Key[IdData[T]](Random.nextLong()) { type DataType = IdData[T] }
+  def encrypt(data: Data[Nature]): IdData[Encrypted]
+  def decrypt(data: IdData[Encrypted]): Data[Nature]
 }
 
 case object Alice extends Id {
-  def getPrivate: Nature = Raw()
-  def encrypt(data: Nature): Encrypted = Encrypted()
-  def decrypt(data: Encrypted): Nature = Raw()
+  def encrypt(data: Data[Nature]): IdData[Encrypted] = null
+  def decrypt(data: IdData[Encrypted]): Data[Nature] = null
 }
 
 case object Bob extends Id {
-  def getPrivate: Nature = Raw()
-  def encrypt(data: Nature): Encrypted = Encrypted()
-  def decrypt(data: Encrypted): Nature = Raw()
+  def encrypt(data: Data[Nature]): IdData[Encrypted] = null
+  def decrypt(data: IdData[Encrypted]): Data[Nature] = null
 }
 
 object Cloud {
@@ -32,55 +39,53 @@ object Cloud {
   import scala.util.Random
   import collection.mutable.Map
 
-  // abstract class View {type Nature; def id: Long; def owner: Id}
-  // case class RawView(id: Long, owner: Id) extends View {
-  //   type Nature = owner.Raw
-  // }
-  // case class EncryptedView(id: Long, owner: Id) extends View {
-  //   type Nature = owner.Encrypted
-  // }
-  // case class PullView(id: Long, owner: Id) extends View {
-  //   type Nature = owner.Pull
-  // }
+  val database = Map.empty[Any, Any]
 
-  // object RawView {
-  //   def apply(owner: Id) = new RawView(Random.nextLong(), owner)
-  // }
-  // object EncryptedView {
-  //   def apply(owner: Id) = new EncryptedView(Random.nextLong(), owner)
-  // }
-  // object PullView {
-  //   def apply(owner: Id) = new PullView(Random.nextLong(), owner)
-  // }
-
-  val database = Map.empty[View, Any]
-
-  def read(view: View): Option[view.Nature] =
-    database.get(view).asInstanceOf[Option[view.Nature]]
-
-  def store(view: View)(data: view.Nature): view.type = {
-    database.update(view, data)
-    view
+  def store[T <: Nature](id: Id)(data: Data[T]): Key[id.IdData[T]] = {
+    val key = id.makeKey(data)
+    database.update(key, data)
+    key
   }
+
+  def read[T <: Nature](id: Id)(key: Key[id.IdData[T]]): Option[id.IdData[T]] =
+    database.get(key).asInstanceOf[Option[id.IdData[T]]]
 
   // Should accept all Nature except Encrypted
   def genChart[T](data: T)
     (implicit an: GenChartAcceptNature[T]): Unit = {}
-  @implicitNotFound("Type mismatch: ${T} is forbidden")
+  @implicitNotFound("Type mismatch ${T} is forbidden")
   case class GenChartAcceptNature[T]
-  implicit object AcceptRaw extends GenChartAcceptNature[Alice.Raw]
-  implicit object AcceptPull extends GenChartAcceptNature[Alice.Pull]
+  implicit object AcceptRaw extends GenChartAcceptNature[Alice.IdData[Raw[String]]]
+  implicit object AcceptPull extends GenChartAcceptNature[Alice.IdData[Pull]]
 }
-
 
 object TYPB_TypeChecking {
   // import Cloud.RawView
   // import Cloud.EncryptedView
 
   def testDecryptNotYours {
-    Alice.decrypt(Alice.encrypt(Alice.Raw()))
-    Alice.decrypt(Alice.encrypt(Bob.Raw()))
-    // Bob.decrypt(Alice.encrypt(Bob.Raw())) // Doesn't compile
+    Alice.decrypt(Alice.encrypt(new Alice.IdData(Raw("test"))))
+    Alice.decrypt(Alice.encrypt(new Bob.IdData(Raw("test"))))
+    // Doesn't compile: Bob couldn't decrypt Alice ecrypted data
+    // Bob.decrypt(Alice.encrypt(new Bob.IdData(Raw("test"))))
+  }
+
+  def testAllExceptEncrypted {
+    Cloud.genChart(new Alice.IdData(Raw("test")))
+    Cloud.genChart(new Alice.IdData(Pull()))
+    // Doesn't compile: Encrypted is forbidden in genChart
+    // Cloud.genChart(new Alice.IdData(Encrypted()))
+  }
+
+  def testReturnGoodType {
+    val key = Cloud.store(Alice)(new Alice.IdData(Raw("test")))
+    val data: Option[Alice.IdData[Raw[String]]] = Cloud.read(Alice)(key)
+
+    // Doesn't compile: Bob couldn't get Alice data
+    // val badData1: Option[Bob.IdData[Raw[String]]] = Cloud.read(Bob)(key)
+
+    // Doesn't compile: the type of badData is not good
+    // val badData2: Option[Alice.IdData[Pull]] = Cloud.read(Alice)(key)
   }
 
   // def testDependentData {
@@ -94,12 +99,6 @@ object TYPB_TypeChecking {
   //   // val rawData: Option[Raw] = Cloud.read(encView) // Doesn't compile
   //   val encData: Option[Encrypted] = Cloud.read(encView)
   // }
-
-  def testAllExceptEncrypted {
-    Cloud.genChart(Alice.Raw())
-    Cloud.genChart(Alice.Pull())
-    // Cloud.genChart(Alice.Encrypted()) // Doesn't compile
-  }
 
   // // Everithing is raw data: The program type checks
   // def scenario1 {
@@ -131,6 +130,7 @@ object TYPB_TypeChecking {
   //   Cloud store data
   //   Cloud getCals2 Alice
   // }
+
   def main(args: Array[String]) {
   }
 }
