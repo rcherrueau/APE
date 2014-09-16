@@ -2,26 +2,56 @@
 // http://stackoverflow.com/a/12937819
 // https://github.com/milessabin/shapeless
 
-// The view implicit! Next step, pass the view implicitely: No way!
+// With, dependate data I have to find a new way to do the read and
+// store.
+abstract class Nature
 
-sealed abstract class Nature
-case class Raw extends Nature
-case class Encrypted extends Nature
-case class Pull extends Nature
+trait Id {
+  case class Raw extends Nature
+  case class Encrypted extends Nature
+  case class Pull extends Nature
+
+  def encrypt(data: Nature): Encrypted
+  def decrypt(data: Encrypted): Nature
+}
+
+case object Alice extends Id {
+  def getPrivate: Nature = Raw()
+  def encrypt(data: Nature): Encrypted = Encrypted()
+  def decrypt(data: Encrypted): Nature = Raw()
+}
+
+case object Bob extends Id {
+  def getPrivate: Nature = Raw()
+  def encrypt(data: Nature): Encrypted = Encrypted()
+  def decrypt(data: Encrypted): Nature = Raw()
+}
 
 object Cloud {
   import annotation.implicitNotFound
   import scala.util.Random
   import collection.mutable.Map
 
-  abstract class View {type Nature; def id: Long}
-  case class RawView(id: Long) extends View { type Nature = Raw }
-  case class EncryptedView(id: Long) extends View { type Nature = Encrypted }
-  case class PullView(id: Long) extends View { type Nature = Pull }
+  // abstract class View {type Nature; def id: Long; def owner: Id}
+  // case class RawView(id: Long, owner: Id) extends View {
+  //   type Nature = owner.Raw
+  // }
+  // case class EncryptedView(id: Long, owner: Id) extends View {
+  //   type Nature = owner.Encrypted
+  // }
+  // case class PullView(id: Long, owner: Id) extends View {
+  //   type Nature = owner.Pull
+  // }
 
-  object RawView { def apply() = new RawView(Random.nextLong()) }
-  object EncryptedView { def apply() = new EncryptedView(Random.nextLong()) }
-  object PullView { def apply() = new PullView(Random.nextLong()) }
+  // object RawView {
+  //   def apply(owner: Id) = new RawView(Random.nextLong(), owner)
+  // }
+  // object EncryptedView {
+  //   def apply(owner: Id) = new EncryptedView(Random.nextLong(), owner)
+  // }
+  // object PullView {
+  //   def apply(owner: Id) = new PullView(Random.nextLong(), owner)
+  // }
 
   val database = Map.empty[View, Any]
 
@@ -34,34 +64,41 @@ object Cloud {
   }
 
   // Should accept all Nature except Encrypted
-  def genChart[T <: Nature](data: T)
+  def genChart[T](data: T)
     (implicit an: GenChartAcceptNature[T]): Unit = {}
   @implicitNotFound("Type mismatch: ${T} is forbidden")
   case class GenChartAcceptNature[T]
-  implicit object AcceptRaw extends GenChartAcceptNature[Raw]
-  implicit object AcceptPull extends GenChartAcceptNature[Pull]
+  implicit object AcceptRaw extends GenChartAcceptNature[Alice.Raw]
+  implicit object AcceptPull extends GenChartAcceptNature[Alice.Pull]
 }
 
+
 object TYPB_TypeChecking {
-  import Cloud.RawView
-  import Cloud.EncryptedView
+  // import Cloud.RawView
+  // import Cloud.EncryptedView
 
-  def testDependentData {
-    val rawView: RawView = RawView()
-    Cloud.store(rawView)(Raw())
-    val rawData: Option[Raw] = Cloud.read(rawView)
-
-    val encView = EncryptedView()
-    // Cloud.store(encView)(Raw()) // Doesn't compile
-    Cloud.store(encView)(Encrypted())
-    // val rawData: Option[Raw] = Cloud.read(encView) // Doesn't compile
-    val encData: Option[Encrypted] = Cloud.read(encView)
+  def testDecryptNotYours {
+    Alice.decrypt(Alice.encrypt(Alice.Raw()))
+    Alice.decrypt(Alice.encrypt(Bob.Raw()))
+    // Bob.decrypt(Alice.encrypt(Bob.Raw())) // Doesn't compile
   }
 
+  // def testDependentData {
+  //   val rawView: RawView = RawView(Alice)
+  //   Cloud.store(rawView)(Alice.Raw())
+  //   val rawData: Option[Raw] = Cloud.read(rawView)
+
+  //   val encView = EncryptedView()
+  //   // Cloud.store(encView)(Raw()) // Doesn't compile
+  //   Cloud.store(encView)(Encrypted())
+  //   // val rawData: Option[Raw] = Cloud.read(encView) // Doesn't compile
+  //   val encData: Option[Encrypted] = Cloud.read(encView)
+  // }
+
   def testAllExceptEncrypted {
-    Cloud.genChart(Raw())
-    Cloud.genChart(Pull())
-    // Cloud.genChart(Encrypted()) // Doesn't compile
+    Cloud.genChart(Alice.Raw())
+    Cloud.genChart(Alice.Pull())
+    // Cloud.genChart(Alice.Encrypted()) // Doesn't compile
   }
 
   // // Everithing is raw data: The program type checks
