@@ -4,132 +4,111 @@
 
 // With, dependate data I have to find a new way to do the read and
 // store.
-abstract class Nature
-case class Raw[+T](value: T) extends Nature
-case class Encrypted extends Nature
-case class Pull extends Nature
 
-trait Data[+T <: Nature] { def get: T }
+import shapeless.{Data => ShapelessData, _}
 
-abstract class Key[T](id: Long) { type DataType }
+sealed abstract class Data
 
 trait Id {
-  import scala.util.Random
+  sealed abstract class IdData extends Data
+  case class Raw() extends IdData
+  case class Encrypted[+T <: Data](data: T) extends IdData
+  case class Pull() extends IdData
+  case class Chart() extends IdData
 
-  case class IdData[+T <: Nature](get: T) extends Data[T]
-
-  def makeKey[T <: Nature](data: Data[T]): Key[IdData[T]] =
-    new Key[IdData[T]](Random.nextLong()) { type DataType = IdData[T] }
-  def encrypt(data: Data[Nature]): IdData[Encrypted]
-  def decrypt(data: IdData[Encrypted]): Data[Nature]
+  def genData: IdData = Raw()
+  def encrypt[T <: Data](d: T): Encrypted[T] = Encrypted(d)
+  def decrypt[T <: Data](d: Encrypted[T]): T = d.data
 }
 
-case object Alice extends Id {
-  def getPrivate: IdData[Nature] = IdData(Raw("test"))
-  def encrypt(data: Data[Nature]): IdData[Encrypted] = null
-  def decrypt(data: IdData[Encrypted]): Data[Nature] = null
-}
+case object Alice extends Id
+case object Bob extends Id
 
-case object Bob extends Id {
-  def encrypt(data: Data[Nature]): IdData[Encrypted] = null
-  def decrypt(data: IdData[Encrypted]): Data[Nature] = null
-}
-
-object Cloud {
-  import annotation.implicitNotFound
-  import scala.util.Random
+object Cloud extends Id {
   import collection.mutable.Map
+  import scala.util.Random
+  import annotation.implicitNotFound
+
+  // T is the type of the corresponding Data
+  class Key[T] {
+    val id = Random.nextLong()
+  }
 
   val database = Map.empty[Any, Any]
 
-  def store[T <: Nature](id: Id)(data: Data[T]): Key[id.IdData[T]] = {
-    val key = id.makeKey(data)
-    database.update(key, data)
+  def store[T <: Data](d: T): Key[T] = {
+    val key = new Key[T]()
+
+    database.update(key, d)
     key
   }
 
-  def read[T <: Nature](id: Id)(key: Key[id.IdData[T]]): Option[id.IdData[T]] =
-    database.get(key).asInstanceOf[Option[id.IdData[T]]]
+  def read[T](k: Key[T]): Option[T] = null
 
-  // Should accept all Nature except Encrypted
-  def genChart[T](data: T)
-    /*(implicit an: GenChartAcceptNature[T])*/: Unit = {}
+  // database.get(k) match {
+  //   case Some(d) => d match {
+  //     case r: Raw => r
+  //     case e: Encrypted[_] => e.data
+  //     case p: Pull => p
+  //   }
+  //   case None => o.Raw()
+  // }
+
+  def genChart[T](o: Id)(d: T)(implicit T: Is[T]): o.Chart = o.Chart()
   @implicitNotFound("Type mismatch ${T} is forbidden")
-  case class GenChartAcceptNature[T]
-  implicit object AcceptRaw extends GenChartAcceptNature[Alice.IdData[Raw[String]]]
-  implicit object AcceptPull extends GenChartAcceptNature[Alice.IdData[Pull]]
+  case class Is[+T]()
+  implicit object AliceIsRaw extends Is[Alice.Raw]
 
-  def getCals1[T <: Nature](id: Id)(key: Key[id.IdData[T]]): Unit =
-    genChart(read(id)(key).get)
+  // def getCals[T <: Data](o: Id)(k: Key[T]): o.Chart = {
+  //   val data = read(k).get
 
-  def getCals2[T <: Nature](id: Id)(key: Key[id.IdData[T]]): Unit = {
-    val encData: id.IdData[Encrypted] = read(id)(key).get
-    val data = id.decrypt(encData)
-    genChart(data)
-  }
-
+  //   genChart(o)(data)
+  // }
 }
 
-object TYPB_TypeChecking {
-  // import Cloud.RawView
-  // import Cloud.EncryptedView
-
-  def testDecryptNotYours {
-    Alice.decrypt(Alice.encrypt(new Alice.IdData(Raw("test"))))
-    Alice.decrypt(Alice.encrypt(new Bob.IdData(Raw("test"))))
-    // Doesn't compile: Bob couldn't decrypt Alice ecrypted data
-    // Bob.decrypt(Alice.encrypt(new Bob.IdData(Raw("test"))))
-  }
-
-  def testAllExceptEncrypted {
-    Cloud.genChart(new Alice.IdData(Raw("test")))
-    Cloud.genChart(new Alice.IdData(Pull()))
-    // Doesn't compile: Encrypted is forbidden in genChart
-    // Cloud.genChart(new Alice.IdData(Encrypted()))
-  }
-
-  def testReturnGoodType {
-    val key = Cloud.store(Alice)(new Alice.IdData(Raw("test")))
-    val data: Option[Alice.IdData[Raw[String]]] = Cloud.read(Alice)(key)
-
-    // Doesn't compile: Bob couldn't get Alice data
-    // val badData1: Option[Bob.IdData[Raw[String]]] = Cloud.read(Bob)(key)
-
-    // Doesn't compile: the type of badData is not good
-    // val badData2: Option[Alice.IdData[Pull]] = Cloud.read(Alice)(key)
-  }
-
+object Test {
   // Everithing is raw data: The program type checks
   def scenario1 {
-    val data = Alice.getPrivate
-    val key = Cloud.store(Alice)(data)
-    Cloud.getCals1(Alice)(key)
+    val data = Alice.genData
+    val key = Cloud.store(data)
+
+    val readedData = Cloud.read(key)
+    Cloud.genChart(Alice)(readedData.get)
   }
 
   // // The Cloud.genChart doesn't accept encrypted data: The program
   // // doesn't type check arround getCals1
   // def scenario2 {
-  //   val data = Alice.encrypt(Alice.getPrivate)
-  //   val key = Cloud.store(Alice)(data)
-  //   Cloud.getCals1(Alice)(key)
+  //   val data = Alice.encrypt(Alice.genData)
+  //   val key = Cloud.store(data)
+
+  //   val readedData = Cloud.read(key).get
+  //   Cloud.genChart(Alice)(readedData)
   // }
 
   // // In Cloud.getCals2 Alice tries to decrypt Bob encrypted data: The
   // // program doesn't type check.
   // def scenario3 {
-  //   val data = Bob.encrypt(Alice.getPrivate)
-  //   val key = Cloud.store(Bob)(data)
-  //   Cloud.getCals2(Alice)(key)
+  //   val data = Bob.encrypt(Bob.genData)
+  //   val key = Cloud.store(data)
+
+  //   val readedData = Cloud.read(key).get
+  //   val decryptedData = Alice.decrypt(readedData)
+  //   Cloud.genChart(Alice)(decryptedData)
   // }
 
   // In Cloud.getCals2 Alice decrypts her data before calling
   // Cloud.genChart: The program type checks.
   def scenario4 {
-    val data = Alice.encrypt(Alice.getPrivate)
-    val key = Cloud.store(Alice)(data)
-    Cloud.getCals2(Alice)(key)
+    val data = Alice.encrypt(Alice.genData)
+    val key = Cloud.store(data)
+
+    val readedData = Cloud.read(key).get
+    val decryptedData = Alice.decrypt(readedData)
+    Cloud.genChart(Alice)(decryptedData)
   }
 
   def main(args: Array[String]) {
+
   }
 }
