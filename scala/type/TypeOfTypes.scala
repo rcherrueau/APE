@@ -495,8 +495,8 @@ object StructuralType {
   // French saying: "Il ne faut pas mélanger les Torchons et les
   // Serviettes" So in OOP there is no common supertype between
   // `Torchon' and `Serviette'.
-  class Torchon { def wipe: Unit = {} }
-  class Serviette { def wipe: Unit = {} }
+  class Torchon { def wipe: Unit = ??? }
+  class Serviette { def wipe: Unit = ??? }
   // But both of them have a wipe methode and we should use one or the
   // other to clean the `Table'. Because there is no common supertype
   // between `Torchon' and `Serviette', let's use Structural Type to
@@ -509,13 +509,52 @@ object StructuralType {
   Table.clean(new Serviette())
   // Another fact to keep in mind when using Structural Typing is that
   // it actually *has huge (negative) runtime performance*
-  // implications, as it is actually implemented using reflection.
+  // implications, as it is actually implemented using reflection. Use
+  // javap to see it:
   /** {{{
     * Scala> :javap StructuralType$Table$
     * public void clean(java.lang.Object);
-    * // ...
+    *   ...
     * 3: invokevirtual #75                 // Method java/lang/Object.getClass:()Ljava/lang/Class;
     * 6: invokestatic  #77                 // Method reflMethod$Method1:(Ljava/lang/Class;)Ljava/lang/reflect/Method;
     * }}}
     */
+}
+
+/** Path Dependent Type
+  *
+  * A type of a inner class is dependent on the instance of the outer
+  * class.
+  *
+  * [[http://ktoso.github.io/scala-types-of-types/#path-dependent-type]]
+  */
+object PathDependentType {
+  class Outer { class Inner }
+
+  val out1 = new Outer
+  // scala> :type PathDependentType.out1
+  // PathDependentType.Outer
+
+  val out2 = new Outer
+  // scala> :type PathDependentType.out2
+  // PathDependentType.Outer
+
+  val out1in = new out1.Inner
+  // scala> :type PathDependentType.out1in
+  // PathDependentType.out1.Inner
+
+  val out2in = new out2.Inner
+  // scala> :type PathDependentType.out2in
+  // PathDependentType.out2.Inner
+
+  // Using the path dependent type we now encode in the type system,
+  // the logic, that the container should only contain children of
+  // this parent - and not "any parent". Notice the `val' in the
+  // constructor which mades the atrribute `p' public. This is
+  // required when we fixe the abstract type `ChildOfThisParent'.
+  class Parent { class Child }
+  class ChildrenContainer(val p: Parent) {
+    type ChildOfThisParent = p.Child
+    def add(c: ChildOfThisParent) = ???
+  }
 }
