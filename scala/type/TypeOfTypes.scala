@@ -6,10 +6,13 @@
   * [[http://ktoso.github.io/scala-types-of-types/]]
   */
 
-// 4. Unified Type System -- Any, AnyRef, AnyVal
-// $ scala
-// > :load TypeOfTypes.scala
-// > :javap Test4
+/** 4. Unified Type System -- Any, AnyRef, AnyVal
+  *
+  * {{{
+  * scala> :load TypeOfTypes.scala
+  * scala> :javap Test4
+  * }}}
+  */
 object Test4 {
   import scala.collection.mutable.ArrayBuffer
 
@@ -20,24 +23,24 @@ object Test4 {
 
   allThings += myInt
   allThings += new Person()
+  // 35: invokevirtual #47                 // Method myInt:()I
+  // 38: invokestatic  #53                 // Method scala/runtime/BoxesRunTime.boxToInteger:(I)Ljava/lang/Integer;
+  // 41: invokevirtual #57                 // Method scala/collection/mutable/ArrayBuffer.$plus$eq:(Ljava/lang/Object;)Lscala/collection/mutable/ArrayBuffer;
+  //
+  // You’ll notice that myInt is still carrying the value of a int
+  // primitive (this is visible as `I' at the end of the `myInt:()I'
+  // invokevirtual call). Then, right before adding it to the
+  // ArrayBuffer (41), scalac inserted a call to
+  // BoxesRunTime.boxToInteger:(I)Ljava/lang/Integer (a small hint for
+  // not frequent bytecode readers, the method it calls is: public
+  // Integer boxToInteger(i: int)) (38). This way, by having a smart
+  // compiler and treating everything as an object in this common
+  // hierarchy we’re able to get away from the "but primitives are
+  // different" edge-cases, at least at the level of our Scala source
+  // code.
 }
-// 35: invokevirtual #47                 // Method myInt:()I
-// 38: invokestatic  #53                 // Method scala/runtime/BoxesRunTime.boxToInteger:(I)Ljava/lang/Integer;
-// 41: invokevirtual #57                 // Method scala/collection/mutable/ArrayBuffer.$plus$eq:(Ljava/lang/Object;)Lscala/collection/mutable/ArrayBuffer;
-//
-// You’ll notice that myInt is still carrying the value of a int
-// primitive (this is visible as `I' at the end of the `myInt:()I'
-// invokevirtual call). Then, right before adding it to the
-// ArrayBuffer (41), scalac inserted a call to
-// BoxesRunTime.boxToInteger:(I)Ljava/lang/Integer (a small hint for
-// not frequent bytecode readers, the method it calls is: public
-// Integer boxToInteger(i: int)) (38). This way, by having a smart
-// compiler and treating everything as an object in this common
-// hierarchy we’re able to get away from the "but primitives are
-// different" edge-cases, at least at the level of our Scala source
-// code.
 
-// 5. The Bottom Types -- Nothing an Null
+/** 5. The Bottom Types -- Nothing and Null */
 object Test5 {
   // `thing' is type Int but how type inferencer can still work, and
   // infer sound types when working with "weird" situation like
@@ -82,16 +85,20 @@ object Test5 {
   // TypeRef(TypeSymbol(final abstract class Null extends AnyRef))
 }
 
-// 7. Type Variance in Scala
-// Variance can be explained as "type compatible-ness" between types:
-//   Name            Description     Scala syntax
-//  ---------------+---------------+--------------
-//   Invariant       C[T'] ≠ C[T]    C[T]
-//   Covariant       C[T'] <: C[T]   C[+T]
-//   Contravariant   C[T'] :> C[T]   C[-T]
-//
-// In general, immutable collections are covariant and mutaboe
-// collections are invariant.
+/** 7. Type Variance in Scala
+  *
+  * Variance can be explained as "type compatible-ness" between types:
+  * {{{
+  * Name            Description     Scala syntax
+  * --------------+---------------+--------------
+  * Invariant       C[T'] ≠ C[T]    C[T]
+  * Covariant       C[T'] <: C[T]   C[+T]
+  * Contravariant   C[T'] :> C[T]   C[-T]
+  * }}}
+  *
+  * In general, immutable collections are covariant and mutaboe
+  * collections are invariant.
+  */
 object Test7 {
   class Fruit
   case class Apple() extends Fruit
@@ -108,8 +115,10 @@ object Test7 {
   // val a: Array[Any] = Array[Int](1,2,3) // won't type check
 }
 
-// 8. Refined Types (refinements)
-// Subclassing without naming the subclass.
+/** 8. Refined Types (refinements)
+  *
+  * Subclassing without naming the subclass.
+  */
 object Test8 {
   class Entity {
     def persistForReal() = {}
@@ -127,7 +136,7 @@ object Test8 {
   }
 }
 
-// 9. Package Object
+/** 9. Package Object */
 //
 // Package Object provide a useful pattern for "importing a bunch of
 // stuff together" as well as being one of the places to look for
@@ -159,7 +168,7 @@ object Test8 {
 // import com.garden.apples._
 // redApples foreach println
 
-// 10. Types Alias
+/** 10. Types Alias */
 object Test10 {
   // It's a trick we can use to make our code more readable.
   type User = String
@@ -170,7 +179,7 @@ object Test10 {
   val data: Map[User, Age] = Map.empty
 }
 
-// 11. Abstract Type Member
+/** 11. Abstract Type Member */
 object Test11 {
   // For Java folks, following may seem very similar to the
   // `SimplestContainer<A>' syntax. But, it's a bit more powerful.
@@ -214,22 +223,21 @@ object Test11 {
   // }
 }
 
-// 12. F-Bounded Type
-//
-// It enables a sort of "self-referential" type constraint using to
-// solve how to define a polymorphic function that, though defined in
-// toems of a supertype, will when passed a value of some subtype will
-// always return a value of the same subtype as its argument.
+/** 12. F-Bounded Type
+  *
+  * It enables a sort of "self-referential" type constraint using to
+  * solve how to define a polymorphic function that when it's called
+  * at a subtype level, the polymorphic function *retains* the type of
+  * the subtype.
+  */
 object Test12 {
+  /** F-Bounded for parameters
+    *
+    * Use F-Bounded Type to add constraint on a polymorphic function.
+    * In this case the polymorphic function only accepts as parameter
+    * subtypes of the concrete instance.
+    */
   object Test1 {
-    // TODO:
-    // http://logji.blogspot.se/2012/11/f-bounded-type-polymorphism-give-up-now.html
-  }
-
-  // In the second case we use F-Bounded Type to add constraint on a
-  // polymorphic function. In this case the polymorphic function only
-  // accepts as parameter subtypes of the concrete instance.
-  object Test2 {
     trait Fruit[T <: Fruit[T]] {
       final def compareTo(other: T): Boolean =
         // implem doesn't matter in our example but the method should
@@ -243,7 +251,66 @@ object Test12 {
     val apple = new Apple
     val orange = new Orange
 
-    //apple compareTo orange // won't type check
-    // found Orange, required Apple
+    // apple compareTo orange // won't type check
+                              // > found: Orange, required: Apple
+  }
+
+  /** F-Bounded for return type
+    *
+    * Use F-Bounded Type to add constraint on a polymorphic function.
+    * In this case the polymorphic function, when passed a value of
+    * some subtype will always return a value of the same subtype as
+    * its parameter.
+    *
+    * [[http://logji.blogspot.se/2012/11/f-bounded-type-polymorphism-give-up-now.html]]
+    */
+  object Test2 {
+    trait Account[T <: Account[T]] {
+      // Always returns a value of the same subtype as its concrete
+      // instance.
+      def addFunds(amount: Double): T
+    }
+
+    class BrokerageAccount(total: Double) extends Account[BrokerageAccount] {
+      override def addFunds(amount: Double) =
+        new BrokerageAccount(total + amount)
+    }
+
+    class SavingsAccount(total: Double) extends Account[SavingsAccount] {
+      override def addFunds(amount: Double) =
+        new SavingsAccount(total + amount)
+    }
+
+    object Account {
+      // Always returns a value of the same subtype as its parameter.
+      // When you pass a `SavingsAccount', the methods returns
+      // something with the type `SavingAccount'. It works with one
+      // account at a time.
+      def deposit[T <: Account[T]](amount: Double, account: T): T =
+        account.addFunds(amount)
+
+      // Pending Questions:
+      //
+      // 1. How to properly refer to the abstract supertype?
+      def debpositAll(amount: Double,
+                      // We *existentially bounded the type of each
+                      // member* of the List with the `forSome'
+                      // keyword instead of *existentially bounded the
+                      // type of List* as a whole.
+                      accounts: List[T forSome { type T <: Account[T] }]):
+                      List[T forSome { type T <: Account[T] }] =
+        accounts map { deposit(amount, _) }
+    }
+
+    // 2. Am I sure that the type bound is "self-referential"? Nop!
+    // The following type checks because F-Bounded parameter states
+    // that a subtype must be parameterized by *some potentially
+    // other subtype*.
+    class MalignantAccount(total: Double) extends Account[SavingsAccount] {
+      override def addFunds(amount: Double) =
+        new SavingsAccount(total + amount)
+    }
+    // Fortunately, calling deposit on it won't type checks:
+    // Account.deposit(100, new MalignantAccount(100))
   }
 }
