@@ -534,27 +534,156 @@ object PathDependentType {
   val out1 = new Outer
   // scala> :type PathDependentType.out1
   // PathDependentType.Outer
-
   val out2 = new Outer
   // scala> :type PathDependentType.out2
   // PathDependentType.Outer
-
   val out1in = new out1.Inner
   // scala> :type PathDependentType.out1in
   // PathDependentType.out1.Inner
-
   val out2in = new out2.Inner
   // scala> :type PathDependentType.out2in
   // PathDependentType.out2.Inner
 
-  // Using the path dependent type we now encode in the type system,
-  // the logic, that the container should only contain children of
-  // this parent - and not "any parent". Notice the `val' in the
-  // constructor which mades the atrribute `p' public. This is
-  // required when we fixe the abstract type `ChildOfThisParent'.
   class Parent { class Child }
-  class ChildrenContainer(val p: Parent) {
+  class ChildrenNursery(val p: Parent) {
+    // Using the path dependent type we now encode in the type system,
+    // the logic, that the container should only contain children of
+    // this parent - and not "any parent". Notice the `val' in the
+    // constructor which mades the atrribute `p' public. This is
+    // required when we fixe the abstract type `ChildOfThisParent'.
     type ChildOfThisParent = p.Child
-    def add(c: ChildOfThisParent) = ???
+    def punish(c: ChildOfThisParent) = ???
+
+    // If we want to refer to child of any parent we should use `#'
+    // instead of `.'
+    type ChildOfAnyParent = Parent#Child
+    def cuddle(c: ChildOfAnyParent) = ???
   }
+  val p1 = new Parent
+  val nursery = new ChildrenNursery(p1)
+  val p1child = new nursery.p.Child
+  val p2 = new Parent
+  val p2child = new p2.Child
+
+  nursery.punish(p1child)
+  // nursery.punish(p2child) // won't type checks
+  nursery.cuddle(p1child)
+  nursery.cuddle(p2child)
+
+}
+
+// Definition Universal vs Existential type
+//
+// TL;DR Si le type paramtétrique est important pour ta fonction,
+// alors tu paramètres avec le type `T' => C'est de la quantification
+// universelle. Si tu sais que tu travails sur une structure
+// parmamétrée mais que tu te fiches de son type, alors tu paramètres
+// avec le `_' => C'est la quantification existentielle. Over those
+// two, you could add some constraint, i.e.: `>: <: =:='
+//
+// - Universal type: You can plug in whatever type *you want*, I don't
+//   need to know anything about the type to do my job, I'll only
+//   refer to it opaquely as `X'.
+// - Existential type: I'll use whatever type *I want* here; you wont
+//   know anything about the type, so you can only refer to it
+//   opaquely as `X'
+//
+//  In Scala, `List[+A]' is universally quantified. A list takes
+//  anything and this is not a problem because it only does storage.
+//  In contrast, the method `to[Col[_]]: Col[A]' in
+//  `DoubleLinkedList[+A]' is existentially quantified. This method
+//  converts the `DoubleLinkedList[A]' to a collection `Col[A]'. To
+//  define the form of the collection (e.g.: `Vector', `List', `Set',
+//  ...) the method `to' takes in parameter the collection where the
+//  type of the collection doesn't matter `Col[_]' because this the
+//  method which is in charge of giving a type: I'll use whatever
+//  type *I want* here;.
+//
+//  scala> import scala.collection.mutable.DoubleLinkedList
+//  import scala.collection.mutable.DoubleLinkedList
+//
+//  scala> DoubleLinkedList(1,2)
+//  res1: DoubleLinkedList[Int] = DoubleLinkedList(1, 2)
+//
+//  scala> res1.to[Vector]
+//  res3: Vector[Int] = Vector(1, 2)
+//
+//  scala> res1.to[List]
+//  res4: List[Int] = List(1, 2)
+//
+//  scala> res1.to[Set]
+//  res2: Set[Int] = Set(1, 2)
+
+/** Existential Type
+  *
+  * Scala use the forSome keyword to define existential types.
+  * Existential Types are especially useful when we want to take in
+  * parameter Non-Variant-Parametric-Class without fixing the type
+  * parameter. See Map example.
+  *
+  * [[http://www.drmaciver.com/2008/03/existential-types-in-scala/]]
+  */
+object ExistentialType {
+  import scala.collection.mutable.Map
+  // Abstract Types `AbsType1' and `AbsType2' are equivalent. Every
+  // expr considered as an `AbsType1' or `AbsType2' should ba
+  // treated as an `Any'
+  type AbsType1 = T forSome { type T }
+  type AbsType2 = T forSome { type T <: Any }
+  type AbsType3 = T forSome { type T <: AnyRef }
+
+  // `forSome' keyword enables the definition of existential types.
+  // See the difference between `f' and `g'. They look almost
+  // identical but they're not. In `f', `T' is the type of all List,
+  // whatever their type parameter. `g' is `List[Any]'.
+  def f(l: List[T] forSome { type T }) = ???
+  def g(l: List[T forSome { type T }]) = ???
+
+  // def i(l: List[T <: AnyRef]) = ??? // Not a valid expr
+  def i(l: List[T forSome { type T <: AnyRef }]) = ???
+  // def j: T <: AnyRef = ??? // Not a valid expr
+  def j: T forSome { type T <: AnyRef} = ???
+
+  // Example, we want a map that maps classes to a
+  // string.`java.lang.Class<T>' is a parametric class with `T' the
+  // type of the class modeled by this Class object.
+  //
+  // Here are some propositions:
+  val map1: Map[Class[T forSome { type T }], String] = Map.empty
+  val map2: Map[Class[T] forSome { type T }, String] = Map.empty
+  val map3: Map[Class[T], String] forSome { type T } = Map.empty
+  //
+  // And some tests:
+  //
+  // _map1_:
+  // Type of map1 is equivalent to Map[Class[Any], String] and
+  // Class[T] is invariant in its type parameter `T'. Thus, the
+  // mapper only maps classOf[Any]
+  map1.put(classOf[Any], "Any")
+  // The following won't type checks because `Class[T]' is invariant
+  // on `T'. This could be a good solution if `Class[T]' wasn't
+  // invariant, because here we don't care of T we only want to
+  // store it (just like what we do with existential quantification)
+  // *but it doesn't type checks*.
+  // mapper.map1.put(classOf[Int], "Int") // won't type checks
+  //
+  // _map3_:
+  // It's the opposit of map1. map3 is the supertype of all map types
+  // such that there is some T such that they are a Map[Class[T],
+  // String]. So again, we've got some fixed class type for keys in
+  // the map - it's just that this time we don't know what type it is.
+  // _MON-INTUITION_: map3 fixe le `T' par `T' or le `T' n'est pas
+  // connu. Par exemple si on pouvait fixer le `T' à `Int', on
+  // pourrait y metrre que des `Int'.
+  // mapper.map3.put(classOf[Int], "Int")} // Required Class[T]
+  //
+  // _map2_:
+  // map2 has keys of type Class[T] forSome { type T }. That is, its
+  // keys are classes which are allowed to have any value they want
+  // for their type parameter. So this is what we actually wanted.
+  map2.put(classOf[Any], "Any")
+  map2.put(classOf[Int], "Int")
+  map2.put(classOf[String], "String")
+  // map2 could also be defined as Map[Class[_], String] that is the
+  // existential quatifiaction.
 }
