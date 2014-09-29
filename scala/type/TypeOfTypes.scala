@@ -687,3 +687,13 @@ object ExistentialType {
   // map2 could also be defined as Map[Class[_], String] that is the
   // existential quatifiaction.
 }
+
+/** View Bound
+  *
+  * [[http://stackoverflow.com/a/4467012]]
+  */
+
+/** Context Bound
+  *
+  * [[http://stackoverflow.com/a/4467012]]
+  */
