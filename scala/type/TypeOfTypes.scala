@@ -690,10 +690,90 @@ object ExistentialType {
 
 /** View Bound
   *
-  * [[http://stackoverflow.com/a/4467012]]
-  */
-
-/** Context Bound
+  * Use some type `A' *as if it were* some type `B'. In other words,
+  * `A' should have an implicit conversion to `B' available, so that
+  * one can call `B' methods on an object of type `A'. The most common
+  * usage of view bounds in the standard library is with
+  * [[scala.math.Ordered[A]]].
+  *
+  * Notice that view bounds are deprecated
+  * [[https://github.com/scala/scala/pull/2909]]
   *
   * [[http://stackoverflow.com/a/4467012]]
   */
+object ViewBound {
+  // Because one can convert `A' into an `Ordered[A]', and because
+  // `Ordered[A]' defines the method `<(other: A): Boolean', I can use
+  // the expression `a < b'.
+  def f[A <% Ordered[A]](a: A, b: A): A = if (a < b) a else b
+
+  // View bounds are mostly used in the "pimp my library pattern" that
+  // decorates classes with additional methods and properties, in
+  // situation where you want to return the original type somehow. The
+  // previous example needs a view bound because it returns the
+  // non-converted type.
+  //
+  // However, if I were to return another type, then I don't need a
+  // view bound anymore:
+  def g[A](a: Ordered[A], b: A): Boolean = a < b
+
+  // In the scala implementation, view bound is syntatic sugare for
+  // some implicit conversion function.
+  def fUnsugared[A](a: A, b: A)(implicit ev: A => Ordered[A]) =
+    if (a < b) a else b
+}
+
+/** Context Bound
+  *
+  * Declares that for some type `A', *there is an implicit value of*
+  * type `B[A]'.Context bound are typically used with the "type class
+  * pattern" (see [[TypeClass]]). While a view bound can be used with
+  * a simple types (e.g.: `A <% String', a context bound required a
+  * *parameterized type*, such as [[scala.math.Ordering[A]]]. A
+  * context bound describes an implicit value, instead of view bound's
+  * implicit conversion.
+  *
+  * [[http://stackoverflow.com/a/4467012]]
+  */
+object ContextBound {
+  // We use `implicitely' to retrieve the implicit value we want, one
+  // of type `Ordering[A]', which class defines the methode
+  // `compare(a: A, b: A): Int'
+  def g[A](value: A, ord: Ordering[A]) = ???
+  def f[A : Ordering](a: A) = g(a, implicitly[Ordering[A]])
+
+  // In the scala implementation, countext bound is syntatic sugare for
+  // some implicit value.
+  def fUnsugared[A](a: A)(implicit ev: Ordering[A]) = g(a, ev)
+
+  // Context bounds are mainly used in what has becom know as
+  // *typeclass pattern* (see [[TypeClass]]). In the following, we
+  // rewrite the [[TypeClass]] example using context bound instead of
+  // implicite value.
+  import TypeClass.Math
+  object StatisticsTypeClass {
+    // We put into StatisticsTypeClass's scope implicite rules of
+    // Math.NumberLike
+    import Math.NumberLike
+
+    // We use Context Bound instead of implicit. To get the
+    // `NumberLike[T]' value, we use the key word
+    // `implicitly[NumberLike[T]]'.
+    def mean[T : NumberLike](xs: Vector[T]): T = {
+      val ev = implicitly[NumberLike[T]]
+      ev.divide(xs.reduce(ev.plus(_, _)), xs.size)
+    }
+
+    def median[T](xs: Vector[T]): T = xs(xs.size / 2)
+
+    def quartiles[T](xs: Vector[T]): (T, T, T) =
+      (xs(xs.size / 4), median(xs), xs(xs.size / 4 * 3))
+
+    def iqr[T : NumberLike](xs: Vector[T]): T =
+      quartiles(xs) match {
+        case (lowerQuartile, _, upperQuartile) =>
+          implicitly[NumberLike[T]].minus(upperQuartile,
+            lowerQuartile)
+      }
+  }
+}
