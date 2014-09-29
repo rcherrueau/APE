@@ -1,7 +1,3 @@
-// TODO: Check the not type parameter
-// https://groups.google.com/d/msg/scala-language/4SQt-n1l9Zk/jIgzYrJiMNMJ
-
-
 // http://danielwestheide.com/blog/2013/02/13/the-neophytes-guide-to-scala-part-13-path-dependent-types.html
 // http://stackoverflow.com/a/12937819
 // https://github.com/milessabin/shapeless
@@ -9,7 +5,7 @@
 // With, dependate data I have to find a new way to do the read and
 // store.
 
-// import shapeless.{Data => ShapelessData, _}
+import shapeless.{Data => ShapelessData, _}
 
 sealed abstract class Data
 
@@ -113,5 +109,6 @@ object Test {
   }
 
   def main(args: Array[String]) {
+
   }
 }
