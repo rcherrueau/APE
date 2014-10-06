@@ -210,7 +210,6 @@ object AbstractTypeMember {
     def value = 12
   }
 
-
   // Or we can add constraint later in the class hierarchy, for
   // instance by mixing in a trait that states "only Numbers".
   //
@@ -569,7 +568,6 @@ object PathDependentType {
   // nursery.punish(p2child) // won't type checks
   nursery.cuddle(p1child)
   nursery.cuddle(p2child)
-
 }
 
 // Definition Universal vs Existential type
@@ -776,4 +774,5 @@ object ContextBound {
             lowerQuartile)
       }
   }
+  // A more complex example is the collection usage of `CanBuildFrom'.
 }
