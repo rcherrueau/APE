@@ -1,58 +1,53 @@
-// TODO: Check the not type parameter
-// https://groups.google.com/d/msg/scala-language/4SQt-n1l9Zk/jIgzYrJiMNMJ
+package object privacysafer {
+  // A way to encode each technques in the types system is with
+  // labels. For each technique we define two traits that specifie if the
+  // data was transformed with or without the tecnhique.
+  sealed trait NotEncrypted
+  sealed trait Encrypted
 
-trait Id {
-  sealed abstract class IdData
-  sealed abstract class Encrypted extends IdData
-  final case class Raw() extends IdData
-  final case class Sany() extends IdData
-  final case class AES_ECS[+T <: Data](data: T) extends Encrypted
+  trait Id {
+    sealed abstract class IdData
+    final case class Raw() extends IdData with NotEncrypted
+    final case class AESECS[+T <: Data](data: T) extends IdData with Encrypted
 
+    // Refer all kind of Data without considering path dependency.
+    type Data = Id#IdData
 
-  // Refer all kind of Data without considering path dependant.
-  type Data = Id#IdData
-
-  // // Encoding for "A is not a subtype of B"
-  // trait <:!<[A, B]
-
-
-  // // Uses ambiguity to rule out the cases we're trying to exclude
-  // implicit def nsub[A, B] : A <:!< B = null
-  // implicit def nsubAmbig1[A, B >: A] : A <:!< B = null
-  // implicit def nsubAmbig2[A, B >: A] : A <:!< B = null
-
-  // // Type alias for context bound
-  // type ¬[T] = {
-  //   type λ[α] = α <:!< T
-  // }
-
-  @implicitNotFound(msg = "Cannot ${T}.")
-  class NotEncrypted[T <: Data](d: T)
-  implicit def notEncRaw[T <: Id#Raw]: NotEncrypted[T] = null
-  implicit def notEncSany[T <: Id#Sany]: NotEncrypted[T] = null
-
-  def encrypt[T <: Data](d: T): AES_ECS[T] = AES_ECS(d)
-  def decrypt[T <: Data](d: AES_ECS[T]): T = d.data
+    def encrypt[T <: Data](d: T): AESECS[T] = AESECS(d)
+    def decrypt[T <: Data](d: AESECS[T]): T = d.data
+  }
 }
+
+import privacysafer._
 
 object Alice extends Id
 
 object Bob extends Id
 
+/** Encryption tests from Alice and Bob */
 object AliceAndBobTests extends App {
-  val aliceRaw: Alice.Raw = new Alice.Raw()
-  val aliceEncrypted: Alice.AES_ECS[Alice.Raw] = Alice.encrypt(aliceRaw)
-  val aliceDecrypted: Alice.Raw = Alice.decrypt(aliceEncrypted)
+  // Alice generates data, then encrypt and decrypt it
+  val aliceRaw = Alice.Raw()
+  Alice.decrypt(Alice.encrypt(aliceRaw))
 
-  val bobRaw: Bob.Raw = new Bob.Raw()
-  val bobEncrypted: Bob.AES_ECS[Bob.Raw] = Bob.encrypt(bobRaw)
-  val bobDecrypted: Bob.Raw = Bob.decrypt(bobEncrypted)
+  // Bob generates data, then encrypt and decrypt it
+  val bobRaw = Bob.Raw()
+  Bob.decrypt(Bob.encrypt(bobRaw))
 
+  // Bob encrypt alice data
   Bob.encrypt(aliceRaw)
   // Won't type checks: Bob cannot decrypt a data encrypted by Alice.
   // Bob.decrypt(aliceEncrypted)
 }
 
+/** DummyCloud
+  *
+  * DummyCloud is a Cloud which offers three services:
+  * 1. Storing data in the Cloud.
+  * 2. Reading data from the Cloud.
+  * 3. Process data to generate a Chart. This service use an internal
+  *    service called `genChart'.
+  */
 object DummyCloud extends Id {
   case class Key()
   case class Chart() extends IdData
@@ -63,78 +58,114 @@ object DummyCloud extends Id {
   // Takes a data accessor and returns a data.
   def read(k: Key): Data = ???
 
-  // Chart generator that takes any kind of Data.
-  def genChart(d: Data): Chart = ???
+  // Chart generator that takes any kind of Data. This method is
+  // private and should be call from `processData'.
+  private def genChart(d: Data): Chart = ???
 
   // Returns a chart from a data accessor.
   def processData(k: Key): Chart = genChart(read(k))
 }
 
+/** DummyCloud tests
+  *
+  * The test stores Alice's raw and encrypted data and then tries to
+  * process it. The process type checks with raw and encrypted data
+  * which is not exactly what we want. We want that genChart only
+  * processes non encrypted data and thus, type checks only in th
+  * presene of non encypted data.
+  */
 object DummyCloudTests extends App {
   import DummyCloud.Key
 
-  val rawdataKey: Key =
-    DummyCloud.store(Alice.Raw())
-  val encdataKey: Key =
-    DummyCloud.store(Alice.encrypt(Alice.Raw()))
+  // Storing of Raw and Encrypted data
+  val rawdataKey = DummyCloud.store(Alice.Raw())
+  val encdataKey = DummyCloud.store(Alice.encrypt(Alice.Raw()))
 
-  // Works with raw data - Great!
+  // Type checks with raw data -- Great!
   DummyCloud.processData(rawdataKey)
 
-  // Works with encrypted data - D'oh!
+  // Type checks with encrypted data -- D'oh!
   DummyCloud.processData(encdataKey)
 }
 
-// T encode the type of the stored data
+/** SmartCloud
+  *
+  * SmartCloud is a Cloud which offers three services:
+  * 1. Storing data in the Cloud.
+  * 2. Reading data from the Cloud.
+  * 3. Process data to generate a Chart. This service use an internal
+  *    service called `genChart'.
+  */
 object SmarterCloud extends Id {
-  case class Key[T <: Data]()
+  // T encode the type of the stored data
+  case class Key[T]()
   case class Chart() extends IdData
 
-  // Stores a data and returns an accessor.
+  // Stores a data and returns a parametric accessor. The parametric
+  // accessor is parametred with the type of the data.
   def store[T <: Data](d: T): Key[T] = ???
 
-  // Takes a data accessor and returns a data.
+  // Takes a data accessor and returns a data of types of the
+  // accessor's parameters.
   def read[T <: Data](k: Key[T]): T = ???
 
   // Chart generator that takes any kind of Data.
-  def genChart[T <: Data : NotEncrypted](d: T): Chart = Chart()
+  private def genChart[T <: Data with NotEncrypted](d: T): Chart = ???
 
-  // Returns a chart from a data accessor.
-  def processData[T <: Data](id: Id)(k: Key[T]): Chart = {
-    // read(k) match {
-    //   case d: id.Raw => genChart(d)
-    //   // case d: id.Encrypted => genChart(id.Raw())
-    // }
+  // Doesn't type checks: the `T' should be a `NotEncrypted'
+  // def processData[T <: Data](k: Key[T]): Chart = genChart(read(k))
+
+  // Returns a chart from a data accessor. Here the notation `with
+  // NotEncrypted' is mandatory by the type system.
+  def processData[T <: Data with NotEncrypted](k: Key[T]): Chart =
     genChart(read(k))
-  }
 }
 
+/** SmarterCloud tests
+  *
+  * The test stores Alice's raw and encrypted data and then tries to
+  * process it. The process type checks only with raw data.
+  */
 object SmarterCloudTests {
   import SmarterCloud.Key
-  val Cloud = SmarterCloud
 
-  val data: Alice.Raw = Alice.Raw()
-  val encData: Alice.AES_ECS[Alice.Raw] = Alice.encrypt(data)
+  // Storing of Raw and Encrypted data
+  val rawdataKey = SmarterCloud.store(Alice.Raw())
+  val encdataKey = SmarterCloud.store(Alice.encrypt(Alice.Raw()))
 
-  Cloud.genChart(data)
-  // Cloud.genChart(encData) // Doesn't compile
+  // Type checkss with raw data - Great!
+  SmarterCloud.processData(rawdataKey)
 
-  val key1 = Cloud.store(data)
-  val key2 = Cloud.store(encData)
-  val res = Cloud.read(key1)
-  val encRes = Cloud.read(key2)
-
-  Cloud.genChart(res)
-  // Cloud.genChart(encRes) // Doesn't compile
-
-  Cloud.processData(Alice)(key1)
-  Cloud.processData(Alice)(key2)
+  // Doesn't type check with encrypted data - Great!
+  // SmarterCloud.processData(encdataKey)
 }
-// // genChart that takes any kind of Data except Encrypted ones
-// def genChart2[T >: Id#Encrypted[_] <: Data](d: T): Chart = ???
 
-// getCals that uses genChart1
-// def getCals1[T] = {
-//   val readedData: key. = read(key)
+// object SmartestCloud extends Id {
+//   // T encode the type of the stored data
+//   case class Key[T]()
+//   case class Chart() extends IdData
 
+//   // Stores a data and returns a parametric accessor. The parametric
+//   // accessor is parametred with the type of the data.
+//   def store[T <: Data](d: T): Key[T] = ???
+
+//   // Takes a data accessor and returns a data of types of the
+//   // accessor's parameters.
+//   def read[T <: Data](k: Key[T]): T = ???
+
+//   // Chart generator that takes any kind of Data.
+//   private def genChart[T <: Data with NotEncrypted](d: T): Chart = ???
+
+//   // Doesn't type checks: the `T' should be a `NotEncrypted'
+//   // def processData[T <: Data](k: Key[T]): Chart = genChart(read(k))
+
+//   // Returns a chart from a data accessor. Here the notation `with
+//   // NotEncrypted' is mandatory by the type system.
+//   def processData[T <: Data, U](id: Id)(k: Key[T]): Chart = read(k) match {
+//     case e: Data with Encrypted => e match {
+//       case d: id.AESECS[U forSome { type U <: Data }] => genChart(id.decrypt(d))
+//       case _ => genChart(id.Raw())
+//     }
+//     case d: Data with NotEncrypted => genChart(d)
+//   }
 // }
