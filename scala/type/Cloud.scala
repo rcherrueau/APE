@@ -8,13 +8,14 @@ package object privacysafer {
   trait Id {
     sealed abstract class IdData
     final case class Raw() extends IdData with NotEncrypted
-    final case class AESECS[+T <: Data](data: T) extends IdData with Encrypted
+    final case class AESECS[+T <: Data with NotEncrypted](data: T)
+        extends IdData with Encrypted
 
     // Refer all kind of Data without considering path dependency.
     type Data = Id#IdData
 
-    def encrypt[T <: Data](d: T): AESECS[T] = AESECS(d)
-    def decrypt[T <: Data](d: AESECS[T]): T = d.data
+    def encrypt[T <: Data with NotEncrypted](d: T): AESECS[T] = AESECS(d)
+    def decrypt[T <: Data with NotEncrypted](d: AESECS[T]): T = d.data
   }
 }
 
@@ -140,32 +141,32 @@ object SmarterCloudTests {
   // SmarterCloud.processData(encdataKey)
 }
 
-// object SmartestCloud extends Id {
-//   // T encode the type of the stored data
-//   case class Key[T]()
-//   case class Chart() extends IdData
 
-//   // Stores a data and returns a parametric accessor. The parametric
-//   // accessor is parametred with the type of the data.
-//   def store[T <: Data](d: T): Key[T] = ???
+object PullableCloud extends Id {
+  // T encode the type of the stored data
+  case class Key[T]()
+  case class Chart() extends IdData
 
-//   // Takes a data accessor and returns a data of types of the
-//   // accessor's parameters.
-//   def read[T <: Data](k: Key[T]): T = ???
+  // Stores a data and returns a parametric accessor. The parametric
+  // accessor is parametred with the type of the data.
+  def store[T <: Data](d: T): Key[T] = ???
 
-//   // Chart generator that takes any kind of Data.
-//   private def genChart[T <: Data with NotEncrypted](d: T): Chart = ???
+  // Takes a data accessor and returns a data of types of the
+  // accessor's parameters.
+  def read[T <: Data](k: Key[T]): T = ???
 
-//   // Doesn't type checks: the `T' should be a `NotEncrypted'
-//   // def processData[T <: Data](k: Key[T]): Chart = genChart(read(k))
+  // Chart generator that takes any kind of Data.
+  def genChart[T <: Data with NotEncrypted](d: T): Chart = ???
+}
 
-//   // Returns a chart from a data accessor. Here the notation `with
-//   // NotEncrypted' is mandatory by the type system.
-//   def processData[T <: Data, U](id: Id)(k: Key[T]): Chart = read(k) match {
-//     case e: Data with Encrypted => e match {
-//       case d: id.AESECS[U forSome { type U <: Data }] => genChart(id.decrypt(d))
-//       case _ => genChart(id.Raw())
-//     }
-//     case d: Data with NotEncrypted => genChart(d)
-//   }
-// }
+object PullerAlice extends Id {
+  import PullableCloud._
+
+  def processData[T <: IdData](k: Key[T]): Chart =
+    PullableCloud.read(k) match {
+      case d: IdData with NotEncrypted =>
+        PullableCloud.genChart(d)
+      // case e: AESECS[IdData with NotEncrypted] =>
+      //   PullableCloud.genChart(decrypt(e))
+    }
+}
