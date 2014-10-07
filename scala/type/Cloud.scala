@@ -1,3 +1,12 @@
+import shapeless.test.illTyped
+
+// object testutil {
+//   def typeMismatch(found: String, required: String) =
+//     "type mismatch;\n  found   : " + found + "\nrequired: " + required
+// }
+
+// import testutil._
+
 package object privacysafer {
   // A way to encode each technques in the types system is with
   // labels. For each technique we define two traits that specifie if the
@@ -5,7 +14,7 @@ package object privacysafer {
   sealed trait NotEncrypted
   sealed trait Encrypted
 
-  trait Id {
+  class Id {
     sealed abstract class IdData
     final case class Raw() extends IdData with NotEncrypted
     final case class AESECS[+T <: Data with NotEncrypted](data: T)
@@ -26,19 +35,41 @@ object Alice extends Id
 object Bob extends Id
 
 /** Encryption tests from Alice and Bob */
-object AliceAndBobTests extends App {
-  // Alice generates data, then encrypt and decrypt it
-  val aliceRaw = Alice.Raw()
-  Alice.decrypt(Alice.encrypt(aliceRaw))
+object EncryptionTests {
+  def run {
+    // Alice is the owner of the Data
+    val aliceData: Alice.IdData = Alice.Raw()
+    val aliceRawData: Alice.Raw = Alice.Raw()
+    val aliceEncData: Alice.AESECS[Alice.Raw] = Alice.encrypt(aliceRawData)
+    val aliceDecData: Alice.Raw = Alice.decrypt(aliceEncData)
 
-  // Bob generates data, then encrypt and decrypt it
-  val bobRaw = Bob.Raw()
-  Bob.decrypt(Bob.encrypt(bobRaw))
+    // Bob cannot be the owner of the Data
+    illTyped("""
+    val bobData: Bob.IdData = Alice.Raw()
+    """)
+    illTyped("""
+    val bobRawData: Bob.Raw = Alice.Raw()
+    """)
+    illTyped("""
+    val bobEncData: Bob.AESECS[Alice.Raw] = Alice.encrypt(aliceRawData)
+    """)
+    illTyped("""
+    val encBobData: Alice.AESECS[Bob.Raw] = Alice.encrypt(aliceRawData)
+    """)
+    illTyped("""
+    val bobDecData: Bob.Raw = Alice.decrypt(aliceEncData)
+    """)
 
-  // Bob encrypt alice data
-  Bob.encrypt(aliceRaw)
-  // Won't type checks: Bob cannot decrypt a data encrypted by Alice.
-  // Bob.decrypt(aliceEncrypted)
+    // `Id' cannot encrypt already encrypted data
+    illTyped("""
+    (new Id).encrypt(aliceEncData)
+    """)
+
+    // `Id' cannot decrypt others Ids encrypted data
+    illTyped("""
+    (new Id).decrypt(aliceEncData)
+    """)
+  }
 }
 
 /** DummyCloud
@@ -75,7 +106,7 @@ object DummyCloud extends Id {
   * processes non encrypted data and thus, type checks only in th
   * presene of non encypted data.
   */
-object DummyCloudTests extends App {
+object DummyCloudTests {
   import DummyCloud.Key
 
   // Storing of Raw and Encrypted data
@@ -169,4 +200,8 @@ object PullerAlice extends Id {
       // case e: AESECS[IdData with NotEncrypted] =>
       //   PullableCloud.genChart(decrypt(e))
     }
+}
+
+object TestRunner extends App {
+  EncryptionTests.run
 }
