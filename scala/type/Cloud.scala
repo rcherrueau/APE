@@ -119,14 +119,14 @@ object SmarterCloud extends Id {
   case class Chart() extends IdData
 
   // Stores a data and returns a parametric accessor. The parametric
-  // accessor is parametred with the type of the data.
+  // accessor is parameterized with the type of the data.
   def store[T <: Data](d: T): Key[T] = ???
 
   // Takes a data accessor and returns a data of types of the
   // accessor's parameters.
   def read[T <: Data](k: Key[T]): T = ???
 
-  // Chart generator that takes any kind of Data.
+  // Chart generator that takes only non encrypted data.
   private def genChart[T <: Data with NotEncrypted](d: T): Chart = ???
 
   // Doesn't type checks: the `T' should be a `NotEncrypted'
@@ -174,29 +174,67 @@ object SmarterCloud extends Id {
   }
 }
 
+// The previous version is OK but rejects program that calls
+// `processData' with encrypted data, even if the data owner decrypts
+// the data.
+//
+// In the last version, we organize the program in the way of *pulled
+// functionalities*. The `genChart' method is now public but still
+// cannot take encrypted data. The `processData' method is now
+// executaed at Alice's side where she decrypts her data befor calling
+// the `genChart' method.
 object PullableCloud extends Id {
   // T encode the type of the stored data
   case class Key[T]()
   case class Chart() extends IdData
 
-  // Stores a data and returns a parametric accessor. The parametric
-  // accessor is parametred with the type of the data.
-  def store[T <: Data](d: T): Key[T] = ???
+   def store[T <: Data](d: T): Key[T] = ???
 
-  // Takes a data accessor and returns a data of types of the
-  // accessor's parameters.
-  def read[T <: Data](k: Key[T]): T = ???
+   def read[T <: Data](k: Key[T]): T = ???
 
-  // Chart generator that takes any kind of Data.
+  // Chart generator that takes only non encrypted data is now public.
   def genChart[T <: Data with NotEncrypted](d: T): Chart = ???
 
+  // Alice pulls the `processData' functionality. If the data is
+  // encrypted, first Alice decrypts it and then calls `genChart'.
   object PullerAlice extends Id {
-    def processData[T <: IdData](k: Key[T]): Chart =
+    import scala.reflect.runtime.universe._
+
+    def processData[T <: IdData : TypeTag](k: Key[T]): Chart =
       PullableCloud.read(k) match {
         case d: IdData with NotEncrypted =>
           PullableCloud.genChart(d)
-        // case e: AESECS[IdData with NotEncrypted] =>
-        //   PullableCloud.genChart(decrypt(e))
-    }
+        case e: AESECS[IdData with NotEncrypted] @unchecked
+            if typeOf[T] =:= typeOf[IdData with NotEncrypted] =>
+          PullableCloud.genChart(decrypt(e))
+      }
+  }
+
+  // The test stores Alice's and Bob's raw and encrypted data and then
+  // processes it. The program type checks with Alice's raw and
+  // encrypted data.
+  object PullerTests {
+    val aliceRawDataKey =
+      PullableCloud.store(PullerAlice.Raw())
+    val aliceEncDataKey =
+      PullableCloud.store(PullerAlice.encrypt(PullerAlice.Raw()))
+
+
+    // Alice can process raw and encrypted data
+    PullerAlice.processData(aliceRawDataKey)
+    PullerAlice.processData(aliceEncDataKey)
+
+    // Alice cannot process Bob data.
+    val bobRawDataKey =
+      PullableCloud.store(Bob.Raw())
+    val bobEncDataKey =
+      PullableCloud.store(Bob.encrypt(PullerAlice.Raw()))
+
+    illTyped("""
+    PullerAlice.processData(bobRawDataKey)
+    """)
+    illTyped("""
+    PullerAlice.processData(bobEncDataKey)
+    """)
   }
 }

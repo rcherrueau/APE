@@ -11,6 +11,8 @@ scalaVersion := "2.11.2-typelevel"
 
 // libraryDependencies += "org.scala-lang" % "scala-typelevel" % scalaVersion.value
 
+libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
+
 resolvers += Resolver.mavenLocal
 
 unmanagedJars in Compile ++=
