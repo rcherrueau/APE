@@ -37,30 +37,39 @@ object EncryptionTests {
 
   // Bob cannot be the owner of the Data
   illTyped("""
-  val bobData: Bob.IdData = Alice.Raw()
-  """)
+    val bobData: Bob.IdData = Alice.Raw()
+    """, mismatch("Alice.Raw", "Bob.IdData"))
+
   illTyped("""
-  val bobRawData: Bob.Raw = Alice.Raw()
-  """)
+    val bobRawData: Bob.Raw = Alice.Raw()
+    """, mismatch("Alice.Raw", "Bob.Raw"))
+
   illTyped("""
-  val bobEncData: Bob.AESECS[Alice.Raw] = Alice.encrypt(aliceRawData)
-  """)
+    val bobEncData: Bob.AESECS[Alice.Raw] = Alice.encrypt(aliceRawData)
+    """, mismatch("Alice.AESECS[Alice.Raw]", "Bob.AESECS[Alice.Raw]"))
+
   illTyped("""
-  val encBobData: Alice.AESECS[Bob.Raw] = Alice.encrypt(aliceRawData)
-  """)
+    val encBobData: Alice.AESECS[Bob.Raw] = Alice.encrypt(aliceRawData)
+    """, mismatch("Alice.Raw", "Bob.Raw"))
+
   illTyped("""
-  val bobDecData: Bob.Raw = Alice.decrypt(aliceEncData)
-  """)
+    val bobDecData: Bob.Raw = Alice.decrypt(aliceEncData)
+    """, mismatch("Alice.AESECS[Alice.Raw]", "Alice.AESECS[Bob.Raw]"))
 
   // `Id' cannot encrypt already encrypted data
   illTyped("""
-  (new Id).encrypt(aliceEncData)
-  """)
+    (new Id).encrypt(aliceEncData)
+    """, inferred(
+      "Alice.AESECS[Alice.Raw]",
+      "encrypt",
+      "T <: privacysafer.Id#IdData with privacysafer.NotEncrypted"))
 
   // `Id' cannot decrypt data encrypted by another Id.
   illTyped("""
-  (new Id).decrypt(aliceEncData)
-  """)
+    (new Id).decrypt(aliceEncData)
+    """, mismatch(
+      "Alice.AESECS[Alice.Raw]",
+      "_6.AESECS[?] where val _6: privacysafer.Id"))
 }
 
 // Now we construct a Cloud which offers three services: (1) storing
@@ -133,8 +142,11 @@ object SmarterCloud extends Id {
 
   // Doesn't type checks: the `T' should be a `NotEncrypted'
   illTyped("""
-  def processData[T <: Data](k: Key[T]): Chart = genChart(read(k))
-  """)
+    def processData[T <: Data](k: Key[T]): Chart = genChart(read(k))
+    """, inferred(
+      "T",
+      "genChart",
+      "T <: SmarterCloud.Data with privacysafer.NotEncrypted"))
 
   // Returns a chart from a data accessor. Here the notation `with
   // NotEncrypted' is mandatory by the type system.
@@ -153,17 +165,21 @@ object SmarterCloud extends Id {
     // Thus, Bob couldn't claim to be the owner of a Alice stored
     // information.
     illTyped("""
-    val bobRawDataKey: Key[Bob.Raw] =
-    SmarterCloud.store(Alice.Raw())
-    """)
+      val bobRawDataKey: Key[Bob.Raw] =
+        SmarterCloud.store(Alice.Raw())
+      """, mismatch("Alice.Raw", "Bob.Raw"))
+
     illTyped("""
-    val bobEncDataKey: Key[Bob.AESECS[Alice.Raw]] =
-    SmarterCloud.store(Alice.encrypt(Alice.Raw()))
-    """)
+      val bobEncDataKey: Key[Bob.AESECS[Alice.Raw]] =
+        SmarterCloud.store(Alice.encrypt(Alice.Raw()))
+      """, mismatch(
+        "Alice.AESECS[Alice.Raw]",
+        "Bob.AESECS[Alice.Raw]"))
+
     illTyped("""
-    val encBobDataKey: Key[Alice.AESECS[Bob.Raw]] =
-    SmarterCloud.store(Alice.encrypt(Alice.Raw()))
-    """)
+      val encBobDataKey: Key[Alice.AESECS[Bob.Raw]] =
+        SmarterCloud.store(Alice.encrypt(Alice.Raw()))
+      """, mismatch("Alice.Raw", "Bob.Raw"))
 
     // Calling `processData' with raw data type checks - Great!
     SmarterCloud.processData(aliceRawDataKey)
@@ -171,8 +187,11 @@ object SmarterCloud extends Id {
     // Calling `processData' with encrypted data doesn't type check -
     // Great!
     illTyped("""
-    SmarterCloud.processData(aliceEncDataKey)
-    """)
+      SmarterCloud.processData(aliceEncDataKey)
+     """, inferred(
+       "Alice.AESECS[Alice.Raw]",
+       "processData",
+       "T <: SmarterCloud.Data with privacysafer.NotEncrypted"))
   }
 }
 
@@ -231,10 +250,17 @@ object PullableCloud extends Id {
       PullableCloud.store(Bob.encrypt(PullerAlice.Raw()))
 
     illTyped("""
-    PullerAlice.processData(bobRawDataKey)
-    """)
+      PullerAlice.processData(bobRawDataKey)
+      """, inferred(
+        "Bob.Raw",
+        "processData",
+        "T <: PullableCloud.PullerAlice.IdData"))
+
     illTyped("""
-    PullerAlice.processData(bobEncDataKey)
-    """)
+      PullerAlice.processData(bobEncDataKey)
+      """, inferred(
+        "Bob.AESECS[PullableCloud.PullerAlice.Raw]",
+        "processData",
+        "T <: PullableCloud.PullerAlice.IdData"))
   }
 }
