@@ -1,9 +1,9 @@
 import utils._
 
 package object privacysafer {
-  // A way to encode each technques in the types system is with
-  // labels. For each technique we define two traits that specifie if the
-  // data was transformed with or without the tecnhique.
+  // A way to encode each techniques in the types system is with
+  // labels. For each technique we define two traits that specify if the
+  // data was transformed with or without the technique.
   sealed trait NotEncrypted
   sealed trait Encrypted
 
@@ -57,7 +57,7 @@ object EncryptionTests {
   (new Id).encrypt(aliceEncData)
   """)
 
-  // `Id' cannot decrypt others Ids encrypted data
+  // `Id' cannot decrypt data encrypted by another Id.
   illTyped("""
   (new Id).decrypt(aliceEncData)
   """)
@@ -65,12 +65,12 @@ object EncryptionTests {
 
 // Now we construct a Cloud which offers three services: (1) storing
 // data in the Cloud, (2) Reading data from the Cloud and (3)
-// Processing data to generate a Chart. The third service uses an
+// Processing data and generate a Chart. The third service uses an
 // internal service called `genChart' and `genChart' cannot process
 // encrypted data.
 //
 // In a first version, called `DummyCloud', we don't add specific
-// consrtaint on the type system. We show that this leads to an
+// constraint on the type system. We show that this leads to an
 // undesirable program that type checks.
 object DummyCloud extends Id {
   case class Key()
@@ -90,10 +90,11 @@ object DummyCloud extends Id {
   def processData(k: Key): Chart = genChart(read(k))
 
   // Test that stores Alice's raw and encrypted data and processes it.
+  //
   // The process type checks with raw and encrypted data which is not
   // exactly what we want. We want that `genChart' only processes non
-  // encrypted data and thus, type checks only in th presene of non
-  // encypted data.
+  // encrypted data and thus, type checks only in the presence of non
+  // encrypted data.
   object DummyCloudTests {
     // Storing of Raw and Encrypted data
     val rawDataKey = DummyCloud.store(Alice.Raw())
@@ -126,7 +127,8 @@ object SmarterCloud extends Id {
   // accessor's parameters.
   def read[T <: Data](k: Key[T]): T = ???
 
-  // Chart generator that takes only non encrypted data.
+  // Chart generator that takes only non encrypted data. See the
+  // `NotEncrypted' in the data declaration.
   private def genChart[T <: Data with NotEncrypted](d: T): Chart = ???
 
   // Doesn't type checks: the `T' should be a `NotEncrypted'
@@ -142,7 +144,7 @@ object SmarterCloud extends Id {
   // The test stores Alice's raw and encrypted data and then processes
   // it. The program type checks only with raw data.
   object SmarterCloudTests {
-    // The key identifies the form and the owner of stored data
+    // The key identifies the shape and the owner of stored data
     val aliceRawDataKey: Key[Alice.Raw] =
       SmarterCloud.store(Alice.Raw())
     val aliceEncDataKey: Key[Alice.AESECS[Alice.Raw]] =
@@ -175,21 +177,19 @@ object SmarterCloud extends Id {
 }
 
 // The previous version is OK but rejects program that calls
-// `processData' with encrypted data, even if the data owner decrypts
+// `processData' with encrypted data even if the data owner decrypts
 // the data.
 //
 // In the last version, we organize the program in the way of *pulled
 // functionalities*. The `genChart' method is now public but still
 // cannot take encrypted data. The `processData' method is now
-// executaed at Alice's side where she decrypts her data befor calling
-// the `genChart' method.
+// executed at Alice's side where she decrypts her data before
+// calling the `genChart' method.
 object PullableCloud extends Id {
-  // T encode the type of the stored data
   case class Key[T]()
   case class Chart() extends IdData
 
    def store[T <: Data](d: T): Key[T] = ???
-
    def read[T <: Data](k: Key[T]): T = ???
 
   // Chart generator that takes only non encrypted data is now public.
@@ -212,13 +212,13 @@ object PullableCloud extends Id {
 
   // The test stores Alice's and Bob's raw and encrypted data and then
   // processes it. The program type checks with Alice's raw and
-  // encrypted data.
+  // encrypted data. It doesn't type checks if Alice tries to generate
+  // a chart from Bob data.
   object PullerTests {
     val aliceRawDataKey =
       PullableCloud.store(PullerAlice.Raw())
     val aliceEncDataKey =
       PullableCloud.store(PullerAlice.encrypt(PullerAlice.Raw()))
-
 
     // Alice can process raw and encrypted data
     PullerAlice.processData(aliceRawDataKey)
