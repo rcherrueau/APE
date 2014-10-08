@@ -4,8 +4,8 @@ package object privacysafer {
   // A way to encode each techniques in the types system is with
   // labels. For each technique we define two traits that specify if the
   // data was transformed with or without the technique.
-  sealed trait NotEncrypted
   sealed trait Encrypted
+  sealed trait NotEncrypted
 
   // `Id' is an agent of our system. An `Id' can create data and
   // `encrypt' and `decrypt' it. Here is the class diagram with
