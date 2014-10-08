@@ -60,7 +60,7 @@ object illTyped {
 }
 
 
-object mismatch {
+object typeMismatch {
   def apply(found: String, required: String): String = macro impl
 
   def impl(c: whitebox.Context)(found: c.Expr[String], required: c.Expr[String]) = {
@@ -74,7 +74,7 @@ object mismatch {
   }
 }
 
-object inferred {
+object badInference {
   def apply(found: String, method: String, required: String): String =
     macro impl
 
