@@ -7,6 +7,7 @@ package object privacysafer {
   sealed trait NotEncrypted
   sealed trait Encrypted
 
+  // Id is an agent of our system.
   class Id {
     sealed abstract class IdData
     final case class Raw() extends IdData with NotEncrypted
