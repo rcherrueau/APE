@@ -1,24 +1,7 @@
 import com.github.nscala_time.time.Imports._
 
 object MeetingsApp extends App {
-  implicit def toTuple1[V](value: V): Tuple1[V] = Tuple1(value)
-  case class Pipeable[V](value: V) {
-    def |>[R](f: V => R) = f(value)
-  }
-  case class PipeableT3[V,W,X](value: Tuple3[V,W,X]) {
-    def |>[R](f: (V,W,X) => R) = Function.tupled(f)(value)
-  }
-  case class PipeableT4[V,W,X,Y](value: Tuple4[V,W,X,Y]) {
-    def |>[R](f: (V,W,X,Y) => R) = Function.tupled(f)(value)
-  }
-  implicit def toPiped[V](value: V) = Pipeable(value)
-  implicit def toPiped[V,W,X](value: Tuple3[V,W,X]) = PipeableT3(value)
-  implicit def toPiped[V,W,X,Y](value: Tuple4[V,W,X,Y]) = PipeableT4(value)
-
-
-  case class Meeting (name: String,
-                      date: DateTime,
-                      address: String)
+  case class Meeting(date: DateTime, name: String, address: String)
 
   object Calendar {
     def meetings(db: List[Meeting],
@@ -46,18 +29,19 @@ object MeetingsApp extends App {
   }
 
   val db =
-    Meeting("Bob",   new DateTime(2014, 1, 1, 0, 0), "a") ::
-    Meeting("Chuck", new DateTime(2014, 1, 2, 0, 0), "b") ::
-    Meeting("Bob",   new DateTime(2014, 1, 3, 0, 0), "c") ::
-    Meeting("Chuck", new DateTime(2014, 1, 4, 0, 0), "d") ::
-    Meeting("Bob",   new DateTime(2014, 1, 5, 0, 0), "e") ::
-    Meeting("Bob",   new DateTime(2014, 1, 6, 0, 0), "e") ::
-    Meeting("Bob",   new DateTime(2014, 1, 7, 0, 0), "e") ::
-    Meeting("Bob",   new DateTime(2014, 1, 8, 0, 0), "f") ::
-    Meeting("Chuck", new DateTime(2014, 1, 9, 0, 0), "b") ::
-    Meeting("Chuck", new DateTime(2014, 1, 10, 0, 0), "g") :: Nil
+    Meeting(new DateTime(2014, 1, 1, 0, 0),  "Bob",   "a") ::
+    Meeting(new DateTime(2014, 1, 2, 0, 0),  "Chuck", "b") ::
+    Meeting(new DateTime(2014, 1, 3, 0, 0),  "Bob",   "c") ::
+    Meeting(new DateTime(2014, 1, 4, 0, 0),  "Chuck", "d") ::
+    Meeting(new DateTime(2014, 1, 5, 0, 0),  "Bob",   "e") ::
+    Meeting(new DateTime(2014, 1, 6, 0, 0),  "Bob",   "e") ::
+    Meeting(new DateTime(2014, 1, 7, 0, 0),  "Bob",   "e") ::
+    Meeting(new DateTime(2014, 1, 8, 0, 0),  "Bob",   "f") ::
+    Meeting(new DateTime(2014, 1, 9, 0, 0),  "Chuck", "b") ::
+    Meeting(new DateTime(2014, 1, 10, 0, 0), "Chuck", "g") :: Nil
 
-  def printCalendar(db: List[Meeting]) = println(db.toString().replaceAll(", ", "\n     "))
+  def printCalendar(db: List[Meeting]) =
+    println(db.toString().replaceAll(", ", "\n     "))
 
   val res1 = Calendar.meetings(db, "Bob", new DateTime(2014, 1, 6, 0, 0))
   printCalendar(res1)
