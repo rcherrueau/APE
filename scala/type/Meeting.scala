@@ -1,52 +1,55 @@
 import com.github.nscala_time.time.Imports._
 
+trait Stats {
+  def count[A: Equiv](l: List[A]): List[(A, Int)] = l match {
+    case Nil => Nil
+    case hd :: tl =>
+      (hd, 1 + tl.filter(implicitly[Equiv[A]].equiv(hd, _)).length) ::
+      count(tl.filter(!implicitly[Equiv[A]].equiv(hd, _)))
+  }
+}
+
 object MeetingsApp extends App {
   type Ord[T] = T => Ordered[T]
-  sealed abstract class HEnc[A](data: A)
-  case class HEq[A: Equiv](data: A) extends HEnc(data)
+
+  sealed abstract class Hphic[A](data: A)
+  case class HEnc[A](data: A) extends Hphic(data)
+  case class HEq[A: Equiv](data: A) extends Hphic(data)
   implicit def heqEquiv[A]: Equiv[HEq[A]] = new Equiv[HEq[A]] {
     override def equiv(x: HEq[A], y: HEq[A]) =
       implicitly[Equiv[A]].equiv(x.data, y.data)
   }
-  case class HOrd[A: Ord](data: A) extends HEnc(data) with Ordered[HOrd[A]] {
+  case class HOrd[A: Ord](data: A) extends Hphic(data) with Ordered[HOrd[A]] {
     override def compare(that: HOrd[A]): Int =
       if (data < that.data) -1
       else if (data == that.data) 0
       else 1
   }
-  object MakeH {
-    def enc[A: Equiv](a: A): HEq[A] = HEq(a)
-    def enc[A: Ord](a: A): HOrd[A] = HOrd(a)
-  }
-
+  implicit def hphicEq[A: Equiv](hphic: HEnc[A]): HEq[A] =
+    HEq(hphic.data)
+  implicit def hphicOrd[A: Ord](hphic: HEnc[A]): HOrd[A] =
+    HOrd(hphic.data)
 
   object Calendar {
-    def meetings[D: Ord, N: Equiv](ts: List[(D,N,_)], name: N, date: D) =
+    def meetings[D: Ord, N: Equiv]
+        (ts: List[(D,N,_)], name: N, date: D): List[(D,N,_)] =
       for ((d,n,a) <- ts
         if implicitly[Equiv[N]].equiv(n, name);
         if d >= date) yield (d,n,a)
   }
 
-  object Stats1 {
-    def mostVisitedClient[N](ts: List[(_,N,_)]) =
-      (ts.foldLeft(Map.empty[N, Int])(
-        (visit: Map[N, Int], t: (_,N,_)) => {
-          val client = t._2
-          visit + (client -> (visit.getOrElse(client, 1) + 1))
-        })).maxBy(_._2)._1
+  object Stats1 extends Stats {
+    def mostVisitedClient[N](ts: List[(_,N,_)]): N =
+      count(ts.map(_._2)).maxBy(_._2)._1
   }
 
-  object Stats2 {
+  object Stats2 extends Stats {
     def mostVisitedPlaces[A](ts: List[(_,_,A)]) =
-      ts.foldLeft(Map.empty[A, Int])(
-        (visit: Map[A, Int], t: (_,_,A)) => {
-          val place = t._3
-          visit + (place -> (visit.getOrElse(place, 0) + 1))
-        })
+      count(ts.map(_._3))
   }
 
   def meeting(date: DateTime, name: String, address: String) =
-    (MakeH.enc(date), MakeH.enc(name), address)
+    (HEnc(date), HEnc(name), address)
 
   val ts =
     meeting(new DateTime(2014, 1, 1, 0, 0),  "Bob",   "a") ::
@@ -63,10 +66,12 @@ object MeetingsApp extends App {
   def printCalendar(ts: List[_]) =
     println(ts.toString().replaceAll(", ", "\n     "))
 
-  val res1 = Calendar.meetings(ts, MakeH.enc("Bob"), MakeH.enc(new DateTime(2014, 1, 6, 0, 0)))
+  println(Stats1.mostVisitedClient(ts))
+
+  val res1 = Calendar.meetings(ts, HEnc("Bob"), HEnc(new DateTime(2014, 1, 6, 0, 0)))
   printCalendar(res1)
-  val res2 = Stats2.mostVisitedPlaces(res1)
+
+  val res2 = Stats2.mostVisitedPlaces(ts)
   println(res2)
-  val res3 = Stats1.mostVisitedClient(ts)
-  println(res3)
+
 }
