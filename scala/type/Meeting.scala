@@ -10,24 +10,52 @@ trait Stats {
 }
 
 object MeetingsApp extends App {
-  sealed abstract class Hphic[A](data: A)
-  case class HEnc[A](data: A) extends Hphic(data)
-  case class HEq[A: Equiv](data: A) extends Hphic(data)
-  implicit def heqEquiv[A] = new Equiv[HEq[A]] {
-    override def equiv(x: HEq[A], y: HEq[A]) =
-      implicitly[Equiv[A]].equiv(x.data, y.data)
+  // Homomorphic  Encryption Scheme (HES)
+  trait HES[T] { def data: T }
+
+  class HESenc[T](val data: T) extends HES[T]
+
+//  type HESEquiv[T] = HESenc[T] => HESeq[T]
+  type Eq[T] = T => Equiv[T]
+  class HESeq[T](val data: T) extends HES[T] with Equiv[HESenc[T]] {
+    def equiv(x: HESenc[T], y: HESenc[T]) = {
+      println("============= in equiv ::::::::::::::::::")
+      implicitly[Equiv[T]].equiv(x.data, y.data)
+    }
   }
-  case class HOrd[A: Ordering](data: A) extends Hphic(data)
-  implicit def heqOrd[A: Ordering] = new Ordering[HOrd[A]] {
-    override def compare(x: HOrd[A], y: HOrd[A]): Int =
-      if (implicitly[Ordering[A]].lt(x.data,y.data)) -1
-      else if (implicitly[Ordering[A]].equiv(x.data,y.data)) 0
-      else 1
+
+  type Ord[T] = T => Ordering[T]
+  class HESord[T: Ordering](val data: T) extends HES[T]
+                                         with Ordering[HESenc[T]] {
+    def compare(x: HESenc[T], y: HESenc[T]) = {
+      println("============= in ord  ::::::::::::::::::::")
+      implicitly[Ordering[T]].compare(x.data, y.data)
+    }
   }
-  implicit def hphicEq[A: Equiv](hphic: HEnc[A]): HEq[A] =
-    HEq(hphic.data)
-  implicit def hphicOrd[A: Ordering](hphic: HEnc[A]): HOrd[A] =
-    HOrd(hphic.data)
+
+  implicit def HESStringWithEq[T: Equiv](hesenc: HESenc[T]): HESeq[T] =
+    new HESeq(hesenc.data)
+
+  implicit def HESStringWithOrd[T: Ordering](hesenc: HESenc[T]): HESord[T] =
+    new HESord(hesenc.data)
+
+
+  // sealed abstract class Hphic[A](data: A)
+  // case class HEnc[A](data: A) extends Hphic(data)
+  // case class HEq[A: Equiv](data: A) extends Hphic(data)
+  // implicit def heqEquiv[A] = new Equiv[HEq[A]] {
+  //   override def equiv(x: HEq[A], y: HEq[A]) =
+  //     implicitly[Equiv[A]].equiv(x.data, y.data)
+  // }
+  // case class HOrd[A: Ordering](data: A) extends Hphic(data)
+  // implicit def heqOrd[A: Ordering] = new Ordering[HOrd[A]] {
+  //   override def compare(x: HOrd[A], y: HOrd[A]): Int =
+  //     implicitly[Ordering[A]].compare(x.data, y.data)
+  // }
+  // implicit def hphicEq[A: Equiv](hphic: HEnc[A]): HEq[A] =
+  //   HEq(hphic.data)
+  // implicit def hphicOrd[A](hphic: HEnc[A])(implicit cmp: Ordering[A]):
+  //     HOrd[A] = HOrd(hphic.data)(cmp)
 
   object Calendar {
     def meetings[D: Ordering, N: Equiv]
@@ -65,10 +93,14 @@ object MeetingsApp extends App {
   def printCalendar(ts: List[_]) =
     println(ts.toString().replaceAll(", ", "\n     "))
 
-  def test[N: Ordering](n1: N, n2: N) =
-    implicitly[Ordering[N]].gt(n1,n2)
+  def testEquiv[T: Eq](n1: T, n2: T) =
+    n1.equiv(n1,n2)
 
-  println(test(HEnc("b"),HEnc("a")))
+  def testOrd[N: Ord](n1: N, n2: N) =
+    n1.gt(n1,n2)
+
+  println(testEquiv(new HESenc("a"), new HESenc("a")))
+  println(testOrd(new HESenc("a"), new HESenc("a")))
 
   // println(Stats1.mostVisitedClient(ts))
   // val res1 = Calendar.meetings(ts, "Bob", new DateTime(2014, 1, 6, 0, 0))
