@@ -10,32 +10,31 @@ trait Stats {
 }
 
 object MeetingsApp extends App {
-  type Ord[T] = T => Ordered[T]
-
   sealed abstract class Hphic[A](data: A)
   case class HEnc[A](data: A) extends Hphic(data)
   case class HEq[A: Equiv](data: A) extends Hphic(data)
-  implicit def heqEquiv[A]: Equiv[HEq[A]] = new Equiv[HEq[A]] {
+  implicit def heqEquiv[A] = new Equiv[HEq[A]] {
     override def equiv(x: HEq[A], y: HEq[A]) =
       implicitly[Equiv[A]].equiv(x.data, y.data)
   }
-  case class HOrd[A: Ord](data: A) extends Hphic(data) with Ordered[HOrd[A]] {
-    override def compare(that: HOrd[A]): Int =
-      if (data < that.data) -1
-      else if (data == that.data) 0
+  case class HOrd[A: Ordering](data: A) extends Hphic(data)
+  implicit def heqOrd[A: Ordering] = new Ordering[HOrd[A]] {
+    override def compare(x: HOrd[A], y: HOrd[A]): Int =
+      if (implicitly[Ordering[A]].lt(x.data,y.data)) -1
+      else if (implicitly[Ordering[A]].equiv(x.data,y.data)) 0
       else 1
   }
   implicit def hphicEq[A: Equiv](hphic: HEnc[A]): HEq[A] =
     HEq(hphic.data)
-  implicit def hphicOrd[A: Ord](hphic: HEnc[A]): HOrd[A] =
+  implicit def hphicOrd[A: Ordering](hphic: HEnc[A]): HOrd[A] =
     HOrd(hphic.data)
 
   object Calendar {
-    def meetings[D: Ord, N: Equiv]
+    def meetings[D: Ordering, N: Equiv]
         (ts: List[(D,N,_)], name: N, date: D): List[(D,N,_)] =
       for ((d,n,a) <- ts
         if implicitly[Equiv[N]].equiv(n, name);
-        if d >= date) yield (d,n,a)
+        if implicitly[Ordering[D]].gteq(d,date)) yield (d,n,a)
   }
 
   object Stats1 extends Stats {
@@ -49,7 +48,7 @@ object MeetingsApp extends App {
   }
 
   def meeting(date: DateTime, name: String, address: String) =
-    (HEnc(date), HEnc(name), address)
+    (date, name, address)
 
   val ts =
     meeting(new DateTime(2014, 1, 1, 0, 0),  "Bob",   "a") ::
@@ -66,12 +65,15 @@ object MeetingsApp extends App {
   def printCalendar(ts: List[_]) =
     println(ts.toString().replaceAll(", ", "\n     "))
 
-  println(Stats1.mostVisitedClient(ts))
+  def test[N: Ordering](n1: N, n2: N) =
+    implicitly[Ordering[N]].gt(n1,n2)
 
-  val res1 = Calendar.meetings(ts, HEnc("Bob"), HEnc(new DateTime(2014, 1, 6, 0, 0)))
-  printCalendar(res1)
+  println(test(HEnc("b"),HEnc("a")))
 
-  val res2 = Stats2.mostVisitedPlaces(ts)
-  println(res2)
+  // println(Stats1.mostVisitedClient(ts))
+  // val res1 = Calendar.meetings(ts, "Bob", new DateTime(2014, 1, 6, 0, 0))
+  // printCalendar(res1)
+  // val res2 = Stats2.mostVisitedPlaces(ts)
+  // println(res2)
 
 }
