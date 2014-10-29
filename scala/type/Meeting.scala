@@ -3,33 +3,63 @@ import scalaz._, Scalaz._
 // [[http://eed3si9n.com/learning-scalaz/]]
 
 object cypher {
-  sealed trait Cypher[A] { def data: A }
+  sealed trait Cypher[F] { def data: F }
+  sealed trait CypherEq[CC[X] <: Cypher[X], F] extends Cypher[F] {
+    def F: Equal[F]
+    implicit def heseq: Equal[CC[F]] = new Equal[CC[F]] {
+      override def equal(x: CC[F], y: CC[F]) = F.equal(x.data,y.data)
+    }
+  }
+  sealed trait CypherOrd[CC[X] <: Cypher[X], F] extends Cypher[F] {
+    def F: Order[F]
+    implicit def hesord: Order[CC[F]] = new Order[CC[F]] {
+      override def order(x: CC[F], y: CC[F]) =
+        F.order(x.data,y.data)
+    }
+  }
 
   object hes {
     sealed trait HES[A] extends Cypher[A]
-    object HES {
-      def enc[A: Equal](data: A): HES_eq[A] = HES_eq[A](data)
-      def enc[A: Order](data: A): HES_ord[A] = HES_ord[A](data)
+    // object HES {
+    //   def enc[A: Equal](data: A): HES_eq[A] = HES_eq[A](data)
+    //   def enc[A: Order](data: A): HES_ord[A] = HES_ord[A](data)
+    // }
+
+    class HES_eq[F: Equal](val data: F)
+        extends HES[F] with CypherEq[HES_eq, F] {
+      override def F = implicitly[Equal[F]]
+    }
+    object HES_eq {
+      def apply[F: Equal](data: F) = {
+        val v = new HES_eq(data)
+        import v._
+        v
+      }
     }
 
-    case class HES_eq[F: Equal](val data: F) extends HES[F]
-    implicit def heseq[F: Equal] = new Equal[HES_eq[F]] {
-      override def equal(x: HES_eq[F], y: HES_eq[F]) = x.data === y.data
-    }
+    def f[A: Equal](a: A) = a
+    f(HES_eq("a"))
+    // implicit def heseq[F: Equal] = new Equal[HES_eq[F]] {
+    //   override def equal(x: HES_eq[F], y: HES_eq[F]) = x.data === y.data
+    // }
 
-    case class HES_ord[F: Order](val data: F) extends HES[F]
-    implicit def hesord[F: Order] = new Order[HES_ord[F]] {
-      override def order(x: HES_ord[F], y: HES_ord[F]) = x.data cmp y.data
+    case class HES_ord[F: Order](val data: F)
+        extends HES[F] with CypherOrd[HES_ord, F] {
+      override def F = implicitly[Order[F]]
     }
+    // implicit def hesord[F: Order] = new Order[HES_ord[F]] {
+    //   override def order(x: HES_ord[F], y: HES_ord[F]) = x.data cmp y.data
+    // }
   }
 
   import hes._
 
   def f[A: Equal](x: A) = implicitly[Equal[A]].equal(x,x)
   // See if with macro I can fix the enc call to enc_eq
-  f(HES.enc("q"))
+  // f(HES.enc("q"))
 
-  HES_ord("a") >= HES_ord("a")
+  // HES_ord("a") >= HES_ord("a")
+  // HES_eq("a") === HES_eq("a")
 }
 
 object MeetingsApp extends App {
@@ -106,8 +136,6 @@ object MeetingsApp extends App {
   println(App1(ts, date, name))
   println(App2(ts))
   println(App3(ts))
-  println(HES_eq("a") === HES_eq("a"))
-
 }
   // // Homomorphic  Encryption Scheme (HES)
   // trait HES[T] { def data: T }
