@@ -1,43 +1,53 @@
-import scalaz._
-import Scalaz._
+import scalaz._, Scalaz._
 
 // [[http://eed3si9n.com/learning-scalaz/]]
 
 object cypher {
   sealed trait Cypher[A] { def data: A }
-}
 
-object hes {
-  import cypher.Cypher
+  object hes {
+    sealed trait HES[A] extends Cypher[A]
+    object HES {
+      def enc[A: Equal](data: A): HES_eq[A] = HES_eq[A](data)
+      def enc[A: Order](data: A): HES_ord[A] = HES_ord[A](data)
+    }
 
-  sealed trait HES[A] extends Cypher[A]
-  case class HES_enc[A](val data: A) extends HES[A]
-  case class HES_eq[A: Equal](val data: A)
-      extends HES[A] with Equal[HES[A]] {
-    override def equal(x: HES[A], y: HES[A]) = x.data === y.data
-  }
-  case class HES_ord[A: Order](val data: A)
-      extends HES[A] with Order[HES[A]] {
-    override def order(x: HES[A], y: HES[A]) = x.data cmp y.data
-  }
-}
+    case class HES_eq[F: Equal](val data: F) extends HES[F]
+    implicit def heseq[F: Equal] = new Equal[HES_eq[F]] {
+      override def equal(x: HES_eq[F], y: HES_eq[F]) = x.data === y.data
+    }
 
-object MeetingsApp extends App {
-  import hes._
-  import utils._
-
-  object utils {
-  trait Stats {
-    def count[A: Equal](l: List[A]): List[(A, Int)] = l match {
-      case Nil => Nil
-      case hd :: tl =>
-        (hd, 1 + tl.filter(hd === _).length) ::
-        count(tl.filter(hd =/= _))
+    case class HES_ord[F: Order](val data: F) extends HES[F]
+    implicit def hesord[F: Order] = new Order[HES_ord[F]] {
+      override def order(x: HES_ord[F], y: HES_ord[F]) = x.data cmp y.data
     }
   }
 
-  def meeting(date: String, name: String, address: String) =
-    (date, name, address)
+  import hes._
+
+  def f[A: Equal](x: A) = implicitly[Equal[A]].equal(x,x)
+  // See if with macro I can fix the enc call to enc_eq
+  f(HES.enc("q"))
+
+  HES_ord("a") >= HES_ord("a")
+}
+
+object MeetingsApp extends App {
+  import cypher.hes._
+  import utils._
+
+  object utils {
+    trait Stats {
+      def count[A: Equal](l: List[A]): List[(A, Int)] = l match {
+        case Nil => Nil
+        case hd :: tl =>
+          (hd, 1 + tl.filter(hd === _).length) ::
+          count(tl.filter(hd =/= _))
+      }
+    }
+
+    def meeting(date: String, name: String, address: String) =
+      (date, name, address)
   }
 
   object Calendar {
@@ -96,6 +106,8 @@ object MeetingsApp extends App {
   println(App1(ts, date, name))
   println(App2(ts))
   println(App3(ts))
+  println(HES_eq("a") === HES_eq("a"))
+
 }
   // // Homomorphic  Encryption Scheme (HES)
   // trait HES[T] { def data: T }
