@@ -2,6 +2,7 @@ import spire.algebra._
 import spire.implicits._
 import spire.syntax._
 import scala.runtime._
+import utils._
 
 // [[http://eed3si9n.com/learning-scalaz/]]
 
@@ -24,65 +25,18 @@ object cypher {
     implicit def heseq[F: Eq]: Eq[HesEq[F]] = HesEq[F]()
     case class HesOrd[F: Order] (val data: F = ???) extends CypherOrd[HesOrd, F]
     implicit def hesord[F: Order]: Order[HesOrd[F]] = HesOrd[F]()
-
-    // case class HesEnc[F](val data: F) extends Hes[F]
-    // object implicits {
-    //   object eq {
-    //     implicit def enc2eq[F: Eq](enc: HesEnc[F]): Eq[HesEq[F]] =
-    //       HesEq(enc.data)
-    //   }
-    //   object ord {
-    //     implicit def enc2ord[F: Order](enc: HesEnc[F]): HesOrd[F] =
-    //       HesOrd(enc.data)
-    //   }
-    // }
-    // import hes.implicits.eq._
-
-    def test[A: Eq](a: A, b: A) = a === b
-    test(HesEq("a"), HesEq("b"))
-    // object HES {
-    //   def enc[A: Equal](data: A): HES_eq[A] = HES_eq[A](data)
-    //   def enc[A: Order](data: A): HES_ord[A] = HES_ord[A](data)
-    // }
-
-    // class HES_eq[F: Equal](val data: F)
-    //     extends HES[F] with CypherEq[HES_eq, F] {
-    //   override def F = implicitly[Equal[F]]
-    // }
-    // object HES_eq {
-    //   def apply[F: Equal](data: F) = {
-    //     val v = new HES_eq(data)
-    //     import v._
-    //     v
-    //   }
-    // }
-
-    // // def f[A: Equal](a: A) = a
-    // // f(HES_eq("a"))
-    // // implicit def heseq[F: Equal] = new Equal[HES_eq[F]] {
-    // //   override def equal(x: HES_eq[F], y: HES_eq[F]) = x.data === y.data
-    // // }
-
-    // case class HES_ord[F: Order](val data: F)
-    //     extends HES[F] with CypherOrd[HES_ord, F] {
-    //   override def F = implicitly[Order[F]]
-    // }
-    // // implicit def hesord[F: Order] = new Order[HES_ord[F]] {
-    // //   override def order(x: HES_ord[F], y: HES_ord[F]) = x.data cmp y.data
-    // // }
+    case class HesEnc[F](val data: F) extends Hes[F]
   }
 
-  import hes._
-
-  // See if with macro I can fix the enc call to enc_eq
-  // f(HES.enc("q"))
-
-  // HES_ord("a") >= HES_ord("a")
-  // HES_eq("a") === HES_eq("a")
+  object aes {
+    sealed trait Aes[F] extends Cypher[F]
+    case class AesEnc[F](val data: F) extends Aes[F]
+  }
 }
 
 object MeetingsApp extends App {
-//  import cypher.hes._
+  import cypher.hes._
+  import cypher.aes._
   import utils._
 
   object utils {
@@ -152,65 +106,36 @@ object MeetingsApp extends App {
 
   val name = "Bob"
 
+  // Raw data:
   println(App1(ts, date, name))
   println(App2(ts))
   println(App3(ts))
+
+  // HES data:
+  println(App1(ts.map(t => (HesOrd(t._1), HesEq(t._2), HesEq(t._3))),
+    HesOrd(date), HesEq(name)))
+  // Databe elements and reference to these elements must use the same
+  // encryption scheme
+  illTyped("""
+  println(App1(ts.map(t => (HesOrd(t._1), HesEq(t._2), HesEq(t._3))),
+    date, name))
+  """)
+    // You could not encrypt date with HesEq. Date requies an Hes
+    // encryption scheme with order.
+  illTyped("""
+  println(App1(ts.map(t => (HesEq(t._1), HesEq(t._2), HesEq(t._3))),
+    HesEq(date), HesEq(name)))
+  """)
+  println(App2(ts.map(t => (t._1, HesEq(t._2), t._3))))
+  println(App3(ts.map(t => (t._1, t._2, HesEq(t._3)))))
+
+  // AES data:
+  // AES has no definition for Eq of Order class type.
+  illTyped("""
+  println(App1(ts.map(t => (AesEnc(t._1), AesEnc(t._2), AesEnc(t._3))),
+    AesEnc(date), AesEnc(name)))
+  """)
+  // For data with no constraint on it, you could use AES.
+  println(App2(ts.map(t => (AesEnc(t._1), t._2, AesEnc(t._3)))))
+  println(App3(ts.map(t => (AesEnc(t._1), AesEnc(t._2), t._3))))
 }
-  // // Homomorphic  Encryption Scheme (HES)
-  // trait HES[T] { def data: T }
-
-  // class HESenc[T](val data: T) extends HES[T]
-
-  // //  type HESEquiv[T] = HESenc[T] => HESeq[T]
-  // type Eq[T] = T => Equiv[T]
-  // class HESeq[T](val data: T) extends HES[T] with Equiv[HESenc[T]] {
-  //   def equiv(x: HESenc[T], y: HESenc[T]) = {
-  //     println("============= in equiv ::::::::::::::::::")
-  //     implicitly[Equiv[T]].equiv(x.data, y.data)
-  //   }
-  // }
-
-  // type Ord[T] = T => Ordering[T]
-  // class HESord[T: Ordering](val data: T) extends HES[T]
-  //                                        with Ordering[HESenc[T]] {
-  //   def compare(x: HESenc[T], y: HESenc[T]) = {
-  //     println("============= in ord  ::::::::::::::::::::")
-  //     implicitly[Ordering[T]].compare(x.data, y.data)
-  //   }
-  // }
-
-  // implicit def HESStringWithEq[T: Equiv](hesenc: HESenc[T]): HESeq[T] =
-  //   new HESeq(hesenc.data)
-
-  // implicit def HESStringWithOrd[T: Ordering](hesenc: HESenc[T]): HESord[T] =
-  //   new HESord(hesenc.data)
-
-
-  // // sealed abstract class Hphic[A](data: A)
-  // // case class HEnc[A](data: A) extends Hphic(data)
-  // // case class HEq[A: Equiv](data: A) extends Hphic(data)
-  // // implicit def heqEquiv[A] = new Equiv[HEq[A]] {
-  // //   override def equiv(x: HEq[A], y: HEq[A]) =
-  // //     implicitly[Equiv[A]].equiv(x.data, y.data)
-  // // }
-  // // case class HOrd[A: Ordering](data: A) extends Hphic(data)
-  // // implicit def heqOrd[A: Ordering] = new Ordering[HOrd[A]] {
-  // //   override def compare(x: HOrd[A], y: HOrd[A]): Int =
-  // //     implicitly[Ordering[A]].compare(x.data, y.data)
-  // // }
-  // // implicit def hphicEq[A: Equiv](hphic: HEnc[A]): HEq[A] =
-  // //   HEq(hphic.data)
-  // // implicit def hphicOrd[A](hphic: HEnc[A])(implicit cmp: Ordering[A]):
-  // //     HOrd[A] = HOrd(hphic.data)(cmp)
-
-  // def printCalendar(ts: List[_]) =
-  //   println(ts.toString().replaceAll(", ", "\n     "))
-
-  // def testEquiv[T: Eq](n1: T, n2: T) =
-  //   n1.equiv(n1,n2)
-
-  // def testOrd[N: Ord](n1: N, n2: N) =
-  //   n1.gt(n1,n2)
-
-  // println(testEquiv(new HESenc("a"), new HESenc("a")))
-  // println(testOrd(new HESenc("a"), new HESenc("a")))
