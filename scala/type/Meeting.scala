@@ -130,7 +130,7 @@ object MeetingsApp extends App {
   println(App3(ts.map(t => (t._1, t._2, HesEq(t._3)))))
 
   // AES data:
-  // AES has no definition for Eq of Order class type.
+  // AES has no definition for Eq or Order class type.
   illTyped("""
   println(App1(ts.map(t => (AesEnc(t._1), AesEnc(t._2), AesEnc(t._3))),
     AesEnc(date), AesEnc(name)))
