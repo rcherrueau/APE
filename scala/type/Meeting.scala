@@ -1,60 +1,60 @@
-import scalaz._, Scalaz._
+import spire.algebra._
+import spire.implicits._
 
 // [[http://eed3si9n.com/learning-scalaz/]]
 
 object cypher {
   sealed trait Cypher[F] { def data: F }
   sealed trait CypherEq[CC[X] <: Cypher[X], F] extends Cypher[F] {
-    def F: Equal[F]
-    implicit def heseq: Equal[CC[F]] = new Equal[CC[F]] {
-      override def equal(x: CC[F], y: CC[F]) = F.equal(x.data,y.data)
-    }
+    def F: Eq[F]
   }
   sealed trait CypherOrd[CC[X] <: Cypher[X], F] extends Cypher[F] {
     def F: Order[F]
-    implicit def hesord: Order[CC[F]] = new Order[CC[F]] {
-      override def order(x: CC[F], y: CC[F]) =
-        F.order(x.data,y.data)
-    }
   }
 
   object hes {
-    sealed trait HES[A] extends Cypher[A]
+    sealed trait Hes[A] extends Cypher[A]
+    class HesEq[F: Eq] (val data: F) extends CypherEq[HesEq, F] {
+      def F = implicitly[Eq[F]]
+    }
+    class HesOrd[F: Order] (val data: F) extends CypherOrd[HesOrd, F] {
+      def F = implicitly[Order[F]]
+    }
+
     // object HES {
     //   def enc[A: Equal](data: A): HES_eq[A] = HES_eq[A](data)
     //   def enc[A: Order](data: A): HES_ord[A] = HES_ord[A](data)
     // }
 
-    class HES_eq[F: Equal](val data: F)
-        extends HES[F] with CypherEq[HES_eq, F] {
-      override def F = implicitly[Equal[F]]
-    }
-    object HES_eq {
-      def apply[F: Equal](data: F) = {
-        val v = new HES_eq(data)
-        import v._
-        v
-      }
-    }
-
-    def f[A: Equal](a: A) = a
-    f(HES_eq("a"))
-    // implicit def heseq[F: Equal] = new Equal[HES_eq[F]] {
-    //   override def equal(x: HES_eq[F], y: HES_eq[F]) = x.data === y.data
+    // class HES_eq[F: Equal](val data: F)
+    //     extends HES[F] with CypherEq[HES_eq, F] {
+    //   override def F = implicitly[Equal[F]]
+    // }
+    // object HES_eq {
+    //   def apply[F: Equal](data: F) = {
+    //     val v = new HES_eq(data)
+    //     import v._
+    //     v
+    //   }
     // }
 
-    case class HES_ord[F: Order](val data: F)
-        extends HES[F] with CypherOrd[HES_ord, F] {
-      override def F = implicitly[Order[F]]
-    }
-    // implicit def hesord[F: Order] = new Order[HES_ord[F]] {
-    //   override def order(x: HES_ord[F], y: HES_ord[F]) = x.data cmp y.data
+    // // def f[A: Equal](a: A) = a
+    // // f(HES_eq("a"))
+    // // implicit def heseq[F: Equal] = new Equal[HES_eq[F]] {
+    // //   override def equal(x: HES_eq[F], y: HES_eq[F]) = x.data === y.data
+    // // }
+
+    // case class HES_ord[F: Order](val data: F)
+    //     extends HES[F] with CypherOrd[HES_ord, F] {
+    //   override def F = implicitly[Order[F]]
     // }
+    // // implicit def hesord[F: Order] = new Order[HES_ord[F]] {
+    // //   override def order(x: HES_ord[F], y: HES_ord[F]) = x.data cmp y.data
+    // // }
   }
 
   import hes._
 
-  def f[A: Equal](x: A) = implicitly[Equal[A]].equal(x,x)
   // See if with macro I can fix the enc call to enc_eq
   // f(HES.enc("q"))
 
@@ -63,16 +63,16 @@ object cypher {
 }
 
 object MeetingsApp extends App {
-  import cypher.hes._
+//  import cypher.hes._
   import utils._
 
   object utils {
     trait Stats {
-      def count[A: Equal](l: List[A]): List[(A, Int)] = l match {
+      def count[A: Eq](l: List[A]): List[(A, Int)] = l match {
         case Nil => Nil
         case hd :: tl =>
           (hd, 1 + tl.filter(hd === _).length) ::
-          count(tl.filter(hd =/= _))
+          count(tl.filter(hd =!= _))
       }
     }
 
@@ -81,39 +81,39 @@ object MeetingsApp extends App {
   }
 
   object Calendar {
-    def meetings[D: Order, N: Equal, A](ts: List[(D,N,A)],
-                                        date: D,
-                                        name: N): List[(D,N,A)] =
+    def meetings[D: Order, N: Eq, A](ts: List[(D,N,A)],
+                                     date: D,
+                                     name: N): List[(D,N,A)] =
       for ((d,n,a) <- ts
         if n === name;
         if d >= date) yield (d,n,a)
   }
 
   object Stats1 extends Stats {
-    def mostVisitedClient[N: Equal](ts: List[(_,N,_)]): N =
+    def mostVisitedClient[N: Eq](ts: List[(_,N,_)]): N =
       count(ts.map(_._2)).maxBy(_._2)._1
   }
 
   object Stats2 extends Stats {
-    def visitedPlaces[A: Equal](ts: List[(_,_,A)]): List[(A, Int)] =
+    def visitedPlaces[A: Eq](ts: List[(_,_,A)]): List[(A, Int)] =
       count(ts.map(_._3))
   }
 
   object App1 {
-    def apply[D: Order, N: Equal, A: Equal](ts: List[(D,N,A)],
-                                            date: D,
-                                            name: N) =
+    def apply[D: Order, N: Eq, A: Eq](ts: List[(D,N,A)],
+                                      date: D,
+                                      name: N) =
       Stats2.visitedPlaces(
         Calendar.meetings(ts, date, name))
   }
 
   object App2 {
-    def apply[N: Equal](ts: List[(_,N,_)]) =
+    def apply[N: Eq](ts: List[(_,N,_)]) =
       Stats1.mostVisitedClient(ts)
   }
 
   object App3 {
-    def apply[A: Equal](ts: List[(_,_,A)]) =
+    def apply[A: Eq](ts: List[(_,_,A)]) =
       Stats2.visitedPlaces(ts)
   }
 
