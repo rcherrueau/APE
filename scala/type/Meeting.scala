@@ -1,26 +1,45 @@
 import spire.algebra._
 import spire.implicits._
+import spire.syntax._
+import scala.runtime._
 
 // [[http://eed3si9n.com/learning-scalaz/]]
 
 object cypher {
   sealed trait Cypher[F] { def data: F }
-  sealed trait CypherEq[CC[X] <: Cypher[X], F] extends Cypher[F] {
-    def F: Eq[F]
+  sealed abstract class CypherEq[CC[X] <: Cypher[X], F: Eq]
+      extends Cypher[F] with Eq[CC[F]] {
+    def F: Eq[F] = implicitly[Eq[F]]
+    override def eqv(x: CC[F], y: CC[F]): Boolean = F.eqv(x.data,y.data)
   }
-  sealed trait CypherOrd[CC[X] <: Cypher[X], F] extends Cypher[F] {
-    def F: Order[F]
+  sealed abstract class CypherOrd[CC[X] <: Cypher[X], F: Order]
+      extends Cypher[F] with Order[CC[F]] {
+    def F: Order[F] = implicitly[Order[F]]
+    override def compare(x: CC[F], y: CC[F]): Int = F.compare(x.data, y.data)
   }
 
   object hes {
     sealed trait Hes[A] extends Cypher[A]
-    class HesEq[F: Eq] (val data: F) extends CypherEq[HesEq, F] {
-      def F = implicitly[Eq[F]]
-    }
-    class HesOrd[F: Order] (val data: F) extends CypherOrd[HesOrd, F] {
-      def F = implicitly[Order[F]]
-    }
+    case class HesEq[F: Eq] (val data: F = ???) extends CypherEq[HesEq, F]
+    implicit def heseq[F: Eq]: Eq[HesEq[F]] = HesEq[F]()
+    case class HesOrd[F: Order] (val data: F = ???) extends CypherOrd[HesOrd, F]
+    implicit def hesord[F: Order]: Order[HesOrd[F]] = HesOrd[F]()
 
+    // case class HesEnc[F](val data: F) extends Hes[F]
+    // object implicits {
+    //   object eq {
+    //     implicit def enc2eq[F: Eq](enc: HesEnc[F]): Eq[HesEq[F]] =
+    //       HesEq(enc.data)
+    //   }
+    //   object ord {
+    //     implicit def enc2ord[F: Order](enc: HesEnc[F]): HesOrd[F] =
+    //       HesOrd(enc.data)
+    //   }
+    // }
+    // import hes.implicits.eq._
+
+    def test[A: Eq](a: A, b: A) = a === b
+    test(HesEq("a"), HesEq("b"))
     // object HES {
     //   def enc[A: Equal](data: A): HES_eq[A] = HES_eq[A](data)
     //   def enc[A: Order](data: A): HES_ord[A] = HES_ord[A](data)
