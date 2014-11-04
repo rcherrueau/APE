@@ -719,6 +719,17 @@ object ViewBound {
   // some implicit conversion function.
   def fUnsugared[A](a: A, b: A)(implicit ev: A => Ordered[A]) =
     if (a < b) a else b
+
+  // ViewBound are deprecated. In the next section of Scala only
+  // context bound subsists. Here is the tricks to make view bound
+  // from context bound.
+  type Ord[A] = A => Ordered[A]
+
+  def ff[A : Ord](a: A, b: A): A = if (a < b) a else b
+  def gg[A](a: Ordered[A], b: A): Boolean = a < b
+  def ffUnsugared[A](a: A, b: A)(implicit ev: Ord[A]) =
+                        /* i.e: (implicit ev: A => Ordered[A]) */
+    if (a < b) a else b
 }
 
 /** Context Bound
@@ -775,4 +786,31 @@ object ContextBound {
       }
   }
   // A more complex example is the collection usage of `CanBuildFrom'.
+}
+
+/** PimpMyLibrary Pattern
+  *
+  * Pimp My Library pattern allows you to decorate classes with
+  * additional methods and properties. The following is how you would
+  * add a method "bling" to [[java.lang.String]] which will add
+  * asterisks to either end.
+  *
+  * [[https://coderwall.com/p/k_1jzw/scala-s-pimp-my-library-pattern-example]]
+  */
+object PimpMyLibrary {
+  implicit class BlingString(string: String) {
+    def bling = "*" + string + "*"
+  }
+
+  implicit def blingYoString(string: String) =
+    new BlingString(string)
+
+  // scala> "Let's get blinged out!".bling
+  // res0: java.lang.String = *Let's get blinged out!*
+
+  // There is also a recomanded syntax based on AnyVal
+  // [[http://docs.scala-lang.org/overviews/core/value-classes.html]]
+  implicit class BlingStringRecommanded(val string: String) extends AnyVal {
+    def bling = "*" + string + "*"
+  }
 }
