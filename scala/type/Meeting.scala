@@ -54,6 +54,7 @@ object MeetingsApp extends App {
   }
 
   object Calendar {
+    // meetings^{D: Order, N: Eq}
     def meetings[D: Order, N: Eq, A](ts: List[(D,N,A)],
                                      date: D,
                                      name: N): List[(D,N,A)] =
@@ -63,11 +64,19 @@ object MeetingsApp extends App {
   }
 
   object Stats1 extends Stats {
+    // mostVisitedClient^{N: Eq}
     def mostVisitedClient[N: Eq](ts: List[(_,N,_)]): N =
       count(ts.map(_._2)).maxBy(_._2)._1
+
+    // mostBusyDay^{D: Eq, N: Raw}
+    def mostBusyDay[D: Eq, N](ts: List[(D,N,_)]): (D, List[N]) = {
+      val mostBusyDay = count(ts.map(_._1)).maxBy(_._2)._1
+      (mostBusyDay, ts.filter(_._1 === mostBusyDay).map(_._2))
+    }
   }
 
   object Stats2 extends Stats {
+    // mostVisitedClient^{A: Eq}
     def visitedPlaces[A: Eq](ts: List[(_,_,A)]): List[(A, Int)] =
       count(ts.map(_._3))
   }
@@ -120,8 +129,8 @@ object MeetingsApp extends App {
   println(App1(ts.map(t => (HesOrd(t._1), HesEq(t._2), HesEq(t._3))),
     date, name))
   """)
-    // You could not encrypt date with HesEq. Date requies an Hes
-    // encryption scheme with order.
+  // You could not encrypt date with HesEq. Date requies an Hes
+  // encryption scheme with order.
   illTyped("""
   println(App1(ts.map(t => (HesEq(t._1), HesEq(t._2), HesEq(t._3))),
     HesEq(date), HesEq(name)))
