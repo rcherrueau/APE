@@ -720,7 +720,7 @@ object ViewBound {
   def fUnsugared[A](a: A, b: A)(implicit ev: A => Ordered[A]) =
     if (a < b) a else b
 
-  // ViewBound are deprecated. In the next section of Scala only
+  // ViewBound are deprecated. In the next version of Scala only
   // context bound subsists. Here is the tricks to make view bound
   // from context bound.
   type Ord[A] = A => Ordered[A]
