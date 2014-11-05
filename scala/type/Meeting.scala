@@ -35,10 +35,12 @@ object cypher {
 }
 
 object MeetingsApp extends App {
+  import cypher._
   import cypher.hes._
   import cypher.aes._
   import utils._
 
+  //------------------------------------------------------------- Services
   object utils {
     trait Stats {
       def count[A: Eq](l: List[A]): List[(A, Int)] = l match {
@@ -81,24 +83,7 @@ object MeetingsApp extends App {
       count(ts.map(_._3))
   }
 
-  object App1 {
-    def apply[D: Order, N: Eq, A: Eq](ts: List[(D,N,A)],
-                                      date: D,
-                                      name: N) =
-      Stats2.visitedPlaces(
-        Calendar.meetings(ts, date, name))
-  }
-
-  object App2 {
-    def apply[N: Eq](ts: List[(_,N,_)]) =
-      Stats1.mostVisitedClient(ts)
-  }
-
-  object App3 {
-    def apply[A: Eq](ts: List[(_,_,A)]) =
-      Stats2.visitedPlaces(ts)
-  }
-
+  //---------------------------------------------------------------- Datas
   val ts =
     meeting("2014-01-01", "Bob",   "a") ::
     meeting("2014-01-02", "Chuck", "b") ::
@@ -114,6 +99,55 @@ object MeetingsApp extends App {
   val date = "2014-01-06"
 
   val name = "Bob"
+
+  //---------------------------------------------------------------- Tests
+  object App1 {
+    // (mostBusyDay • meetings)
+    def apply[D: Order, N: Eq, A](ts: List[(D,N,A)],
+                                  date: D,
+                                  name: N) = {
+      // val f: (List[(D,N,A)], D, N) => List[(D,N,A)] = (Calendar.meetings _)
+      // val fcurry: List[(D,N,A)] => D => N => List[(D,N,A)] = f.curried
+      // val g: List[(D,N,_)] => (D, List[N]) = (Stats1.mostBusyDay _)
+      // val h: N => (D, List[N]) = g compose (fcurry(ts)(date))
+      Stats1.mostBusyDay(Calendar.meetings(ts, date, name))
+    }
+
+    // Enc^{D: ord, N: eq}(mostBusyDay • meetings)
+    //
+    // It means that D should be CypherOrd[D] and N should be
+    // CypherEq[N]. There is two ways to achieved this. First is with
+    // constraint on subtyping relation and type classes.
+    def v1[CCD[X] <: Cypher[X], D: Order, CCN[X] <: Cypher[X],N: Eq, A]
+      (ts: List[(CCD[D],CCN[N],A)],
+       date: CCD[D],
+       name: CCN[N])
+      (implicit $ev1: Order[CCD[D]], $ev2: Eq[CCN[N]])= {
+      Stats1.mostBusyDay(Calendar.meetings(ts, date, name))
+    }
+
+    val ts_HesOrdD_HesEqN_RawA = ts.map {
+      case (d,n,a) => (HesOrd(d), HesEq(n), a)
+    }
+    v1(ts_HesOrdD_HesEqN_RawA, HesOrd(date), HesEq(name))
+    // Second is with functor:
+    // def app1v2[D: Ord
+  }
+
+
+
+
+
+  object App2 {
+    def apply[N: Eq](ts: List[(_,N,_)]) =
+      Stats1.mostVisitedClient(ts)
+  }
+
+  object App3 {
+    def apply[A: Eq](ts: List[(_,_,A)]) =
+      Stats2.visitedPlaces(ts)
+  }
+
 
   // Raw data:
   println(App1(ts, date, name))
