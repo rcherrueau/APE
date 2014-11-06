@@ -101,42 +101,65 @@ object MeetingsApp extends App {
   val name = "Bob"
 
   //---------------------------------------------------------------- Tests
+  // val f: (List[(D,N,A)], D, N) => List[(D,N,A)] = (Calendar.meetings _)
+  // val fcurry: List[(D,N,A)] => D => N => List[(D,N,A)] = f.curried
+  // val g: List[(D,N,_)] => (D, List[N]) = (Stats1.mostBusyDay _)
+  // val h: N => (D, List[N]) = g compose (fcurry(ts)(date))
   object App1 {
     // (mostBusyDay • meetings)
     def apply[D: Order, N: Eq, A](ts: List[(D,N,A)],
                                   date: D,
-                                  name: N) = {
-      // val f: (List[(D,N,A)], D, N) => List[(D,N,A)] = (Calendar.meetings _)
-      // val fcurry: List[(D,N,A)] => D => N => List[(D,N,A)] = f.curried
-      // val g: List[(D,N,_)] => (D, List[N]) = (Stats1.mostBusyDay _)
-      // val h: N => (D, List[N]) = g compose (fcurry(ts)(date))
+                                  name: N): (D, List[N]) =
       Stats1.mostBusyDay(Calendar.meetings(ts, date, name))
-    }
+    // Following is the code that return the function
+    def applyf[D: Order, N: Eq, A]: List[(D,N,A)] => D => N => (D, List[N]) =
+      (App1.apply[D,N,A] _).curried
+
 
     // Enc^{D: ord, N: eq}(mostBusyDay • meetings)
     //
     // It means that D should be CypherOrd[D] and N should be
-    // CypherEq[N]. There is two ways to achieved this. First is with
+    // CypherEq[N]. There is two ways to achieved this. First with
     // constraint on subtyping relation and type classes.
-    def v1[CCD[X] <: Cypher[X], D: Order, CCN[X] <: Cypher[X],N: Eq, A]
-      (ts: List[(CCD[D],CCN[N],A)],
-       date: CCD[D],
-       name: CCN[N])
-      (implicit $ev1: Order[CCD[D]], $ev2: Eq[CCN[N]])= {
-      Stats1.mostBusyDay(Calendar.meetings(ts, date, name))
+    def v1[CD[X] <: Cypher[X],
+           CN[X] <: Cypher[X],
+           D, N, A] (ts: List[(CD[D],CN[N],A)],
+                     date: CD[D],
+                     name: CN[N])
+                    (implicit $ev1: Order[CD[D]],
+                              $ev2: Eq[CN[N]]): (CD[D], List[CN[N]]) =
+      App1(ts, date, name)
+    // Following is the code that return the function
+    def v1f[CD[X] <: Cypher[X],
+            CN[X] <: Cypher[X],
+            D, N, A](implicit $ev1: Order[CD[D]],
+                              $ev2: Eq[CN[N]]):
+        List[(CD[D],CN[N],A)] => CD[D] => CN[N] => (CD[D], List[CN[N]]) =
+      applyf[CD[D], CN[N], A]
+    //
+    // Second with combinators.
+    // TODO: Set combinators as arguments of the function.
+    def v2[CD[X] <: Cypher[X],
+           CN[X] <: Cypher[X],
+           D: Order, N: Eq, A: Eq] (cd: _ => CD[_])(cn: _ => CN[_]):
+        List[(CD[D],CN[N],A)] => CD[D] => CN[N] => (CD[D], List[CN[N]]) = {
+      // Combinators
+      ???
+//      applyf(("a","a","a") :: Nil)("a")("a")
+//      applyf[D,N,A](_.map { case (d,n,a) => (cd(d), cn(n), a) })(cd(_))(cn(_))(
+
     }
 
-    val ts_HesOrdD_HesEqN_RawA = ts.map {
-      case (d,n,a) => (HesOrd(d), HesEq(n), a)
+    object Test {
+      apply(ts, date, name)
+      applyf(ts)(date)(name)
+      val ts_HesOrdD_HesEqN_RawA = ts.map {
+        case (d,n,a) => (HesOrd(d), HesEq(n), a)
+      }
+      v1(ts_HesOrdD_HesEqN_RawA, HesOrd(date), HesEq(name))
+ //      v1f(ts_HesOrdD_HesEqN_RawA)(HesOrd(date))(HesEq(name))
     }
-    v1(ts_HesOrdD_HesEqN_RawA, HesOrd(date), HesEq(name))
-    // Second is with functor:
-    // def app1v2[D: Ord
   }
-
-
-
-
 
   object App2 {
     def apply[N: Eq](ts: List[(_,N,_)]) =
