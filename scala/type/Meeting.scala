@@ -128,7 +128,7 @@ object MeetingsApp extends App {
                      name: CN[N])
                     (implicit $ev1: Order[CD[D]],
                               $ev2: Eq[CN[N]]): (CD[D], List[CN[N]]) =
-      App1(ts, date, name)
+      apply(ts, date, name)
     // Following is the code that return the function
     def v1f[CD[X] <: Cypher[X],
             CN[X] <: Cypher[X],
@@ -152,12 +152,15 @@ object MeetingsApp extends App {
 
     object Test {
       apply(ts, date, name)
-      applyf(ts)(date)(name)
+      val applyfi = applyf(implicitly[Order[String]], implicitly[Eq[String]])
+      applyfi(ts)(date)(name)
+
       val ts_HesOrdD_HesEqN_RawA = ts.map {
         case (d,n,a) => (HesOrd(d), HesEq(n), a)
       }
       v1(ts_HesOrdD_HesEqN_RawA, HesOrd(date), HesEq(name))
- //      v1f(ts_HesOrdD_HesEqN_RawA)(HesOrd(date))(HesEq(name))
+      val v1fi = v1f(implicitly[Order[HesOrd[String]]], implicitly[Eq[HesEq[String]]])
+      v1fi(ts_HesOrdD_HesEqN_RawA)(HesOrd(date))(HesEq(name))
     }
   }
 
