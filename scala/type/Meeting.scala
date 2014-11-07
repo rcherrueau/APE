@@ -127,10 +127,6 @@ object MeetingsApp extends App {
                                   date: D,
                                   name: N): (D, List[N]) =
       Stats1.mostBusyDay(Calendar.meetings(ts, date, name))
-    // Following is the code that return the function
-    def applyf[D: Order, N: Eq, A]: List[(D,N,A)] => D => N => (D, List[N]) =
-      (apply[D,N,A] _).curried
-
     // Enc^{D: ord, N: eq}(mostBusyDay • meetings)
     //
     // It means that D should be CypherOrd[D] and N should be
@@ -144,6 +140,19 @@ object MeetingsApp extends App {
                     (implicit $ev1: Order[CD[D]],
                               $ev2: Eq[CN[N]]): (CD[D], List[CN[N]]) =
       apply(ts, date, name)
+    // Same as v1 but with context bound.
+    def v2[CD[X] <: Cypher[X],
+           CN[X] <: Cypher[X],
+           D: COrder[CD]#λ,
+           N: CEq[CN]#λ,
+           A] (ts: List[(CD[D],CN[N],A)],
+               date: CD[D],
+               name: CN[N]): (CD[D], List[CN[N]]) =
+      apply(ts, date, name)
+
+    // Following is the code that return the function
+    def applyf[D: Order, N: Eq, A]: List[(D,N,A)] => D => N => (D, List[N]) =
+      (apply[D,N,A] _).curried
     // Following is the code that return the function
     def v1f[CD[X] <: Cypher[X],
             CN[X] <: Cypher[X],
@@ -151,15 +160,6 @@ object MeetingsApp extends App {
                               $ev2: Eq[CN[N]]):
         List[(CD[D],CN[N],A)] => CD[D] => CN[N] => (CD[D], List[CN[N]]) =
       applyf[CD[D], CN[N], A]
-    // Same as v1 but with context bound.
-    def v2[CD[X] <: Cypher[X],
-           CN[X] <: Cypher[X],
-           D: COrder[CD]#λ,
-           N: CEq[CN]#λ,
-           A] (ts: List[(CD[D],CN[N],A)],
-                     date: CD[D],
-                     name: CN[N]): (CD[D], List[CN[N]]) =
-      apply(ts, date, name)
     // Same as v1f but with context bound.
     def v2f[CD[X] <: Cypher[X],
             CN[X] <: Cypher[X],
@@ -168,6 +168,7 @@ object MeetingsApp extends App {
             A]:
         List[(CD[D],CN[N],A)] => CD[D] => CN[N] => (CD[D], List[CN[N]]) =
       applyf[CD[D],CN[N],A]
+
     // //
     // // Second with combinators.
     // // TODO: Set combinators as arguments of the function.
@@ -187,20 +188,32 @@ object MeetingsApp extends App {
     // }
 
     object Test {
+      val ts_HesOrdD_HesEqN_RawA = ts map {
+        case (d,n,a) => (HesEnc withOrd d, HesEnc withEq n, a)
+      }
+
       apply(ts, date, name)
+      apply(ts_HesOrdD_HesEqN_RawA, HesEnc withOrd date, HesEnc withEq name)
+      v1(ts_HesOrdD_HesEqN_RawA, HesEnc withOrd date, HesEnc withEq name)
+      v2(ts_HesOrdD_HesEqN_RawA, HesEnc withOrd date, HesEnc withEq name)
+
+      illTyped("""
+      v1(ts, date, name)
+      """)
+      illTyped("""
+      v2(ts, date, name)
+      """)
+
       val applyfi = applyf(implicitly[Order[String]], implicitly[Eq[String]])
       applyfi(ts)(date)(name)
 
-      val ts_HesOrdD_HesEqN_RawA = ts.map {
-        case (d,n,a) => (HesEnc withOrd d, HesEnc withEq n, a)
-      }
-      v1(ts_HesOrdD_HesEqN_RawA, HesEnc.withOrd(date), HesEnc.withEq(name))
-      val v1fi = v1f(implicitly[Order[HesOrd[String]]], implicitly[Eq[HesEq[String]]])
-      v1fi(ts_HesOrdD_HesEqN_RawA)(HesEnc.withOrd(date))(HesEnc.withEq(name))
+      val v1fi = v1f(implicitly[Order[HesOrd[String]]],
+        implicitly[Eq[HesEq[String]]])
+      v1fi(ts_HesOrdD_HesEqN_RawA)(HesEnc withOrd date)(HesEnc withEq name)
 
-      v2(ts_HesOrdD_HesEqN_RawA, HesEnc.withOrd(date), HesEnc.withEq(name))
-      val v2fi = v2f(implicitly[Order[HesOrd[String]]], implicitly[Eq[HesEq[String]]])
-      v2fi(ts_HesOrdD_HesEqN_RawA)(HesEnc.withOrd(date))(HesEnc.withEq(name))
+      val v2fi = v2f(implicitly[Order[HesOrd[String]]],
+        implicitly[Eq[HesEq[String]]])
+      v2fi(ts_HesOrdD_HesEqN_RawA)(HesEnc withOrd date)(HesEnc withEq name)
     }
   }
 
@@ -220,30 +233,42 @@ object MeetingsApp extends App {
   println(App3(ts))
 
   // HES data:
-  println(App1(ts.map(t => (HesEnc.withOrd(t._1), HesEnc.withEq(t._2), HesEnc.withEq(t._3))),
-    HesEnc.withOrd(date), HesEnc.withEq(name)))
+  println(App1(ts map { case (d,n,a) => (HesEnc withOrd d,
+                                         HesEnc withEq n,
+                                         HesEnc withEq a) },
+               HesEnc withOrd date,
+               HesEnc withEq name))
   // Databe elements and reference to these elements must use the same
   // encryption scheme
   illTyped("""
-  println(App1(ts.map(t => (HesEnc.withOrd(t._1), HesEnc.withEq(t._2), HesEnc.withEq(t._3))),
-    date, name))
+  println(App1(ts.map { case (d,n,a) => (HesEnc withOrd d,
+                                         HesEnc withEq n,
+                                         HesEnc withEq a) },
+               date,
+               name))
   """)
   // You could not encrypt date with HesEq. Date requies an Hes
   // encryption scheme with order.
   illTyped("""
-  println(App1(ts.map(t => (HesEnc.withEq(t._1), HesEnc.withEq(t._2), HesEnc.withEq(t._3))),
-    HesEnc.withEq(date), HesEnc.withEq(name)))
+  println(App1(ts.map { case (d,n,a) => (HesEnc withEq d,
+                                         HesEnc withEq n,
+                                         HesEnc withEq a) },
+               HesEnc withEq date,
+               HesEnc withEq name))
   """)
-  println(App2(ts.map(t => (t._1, HesEnc.withEq(t._2), t._3))))
-  println(App3(ts.map(t => (t._1, t._2, HesEnc.withEq(t._3)))))
+  println(App2(ts map { case (d,n,a) => (d, HesEnc withEq n, a) }))
+  println(App3(ts map { case (d,n,a) => (d, n, HesEnc withEq a) }))
 
   // AES data:
   // AES has no definition for Eq or Order class type.
   illTyped("""
-  println(App1(ts.map(t => (AesEnc(t._1), AesEnc(t._2), AesEnc(t._3))),
-    AesEnc(date), AesEnc(name)))
+  println(App1(ts map { case (d,n,a) => (AesEnc(d),
+                                         AesEnc(n),
+                                         AesEnc(a)) },
+               AesEnc(date),
+               AesEnc(name)))
   """)
   // For data with no constraint on it, you could use AES.
-  println(App2(ts.map(t => (AesEnc(t._1), t._2, AesEnc(t._3)))))
-  println(App3(ts.map(t => (AesEnc(t._1), AesEnc(t._2), t._3))))
+  println(App2(ts map { case (d,n,a) => (AesEnc(d), n, AesEnc(a)) }))
+  println(App3(ts map { case (d,n,a) => (AesEnc(d), AesEnc(n), a) }))
 }
