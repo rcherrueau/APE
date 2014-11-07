@@ -1,46 +1,60 @@
 import spire.algebra._
 import spire.implicits._
-import spire.syntax._
-import scala.runtime._
 import utils._
 
 // [[http://eed3si9n.com/learning-scalaz/]]
 
-object cypher {
+//--------------------------------------------------------- Cypher Library
+trait CypherType {
+  // Types
   sealed trait Cypher[F] { def data: F }
   sealed abstract class CypherEq[CC[X] <: Cypher[X], F: Eq]
       extends Cypher[F] with Eq[CC[F]] {
     def F: Eq[F] = implicitly[Eq[F]]
-    override def eqv(x: CC[F], y: CC[F]): Boolean = F.eqv(x.data,y.data)
+    override def eqv(x: CC[F], y: CC[F]) = F.eqv(x.data,y.data)
   }
   sealed abstract class CypherOrd[CC[X] <: Cypher[X], F: Order]
       extends Cypher[F] with Order[CC[F]] {
     def F: Order[F] = implicitly[Order[F]]
-    override def compare(x: CC[F], y: CC[F]): Int = F.compare(x.data, y.data)
+    override def compare(x: CC[F], y: CC[F]) = F.compare(x.data, y.data)
   }
 
-  object hes {
-    sealed trait Hes[A] extends Cypher[A]
-    case class HesEq[F: Eq] (val data: F = ???) extends CypherEq[HesEq, F]
-    implicit def heseq[F: Eq]: Eq[HesEq[F]] = HesEq[F]()
-    case class HesOrd[F: Order] (val data: F = ???) extends CypherOrd[HesOrd, F]
-    implicit def hesord[F: Order]: Order[HesOrd[F]] = HesOrd[F]()
-    case class HesEnc[F](val data: F) extends Hes[F]
-  }
+  // Type alias
+  type CEq[CC[X] <: CypherType#Cypher[X]] = { type λ[F] = Eq[CC[F]] }
+  type COrder[CC[X] <: CypherType#Cypher[X]] = { type λ[F] = Order[CC[F]] }
+}
 
-  object aes {
-    sealed trait Aes[F] extends Cypher[F]
-    case class AesEnc[F](val data: F) extends Aes[F]
+// Homomorphic Encryption Scheme
+trait Hes extends CypherType {
+  // Types
+  sealed trait Hes[A] extends Cypher[A]
+  sealed class HesEq[F: Eq] (val data: F = ???) extends CypherEq[HesEq, F]
+  sealed class HesOrd[F: Order] (val data: F = ???) extends CypherOrd[HesOrd, F]
+
+  // Eq and Order augmentation
+  implicit def heseq[F: Eq]: Eq[HesEq[F]] = new HesEq[F]()
+  implicit def hesord[F: Order]: Order[HesOrd[F]] = new HesOrd[F]()
+
+  // Factory
+  object HesEnc {
+    def withEq[F: Eq](data: F): HesEq[F] = new HesEq(data)
+    def withOrd[F: Order](data: F): HesOrd[F] = new HesOrd(data)
   }
 }
 
+// Advanced Encryption Stantard
+trait Aes extends CypherType {
+  // Types
+  sealed trait Aes[F] extends Cypher[F]
+  case class AesEnc[F](val data: F) extends Aes[F]
+}
+
+object cypher extends CypherType with Hes with Aes
+
 object MeetingsApp extends App {
   import cypher._
-  import cypher.hes._
-  import cypher.aes._
   import utils._
 
-  //------------------------------------------------------------- Services
   object utils {
     trait Stats {
       def count[A: Eq](l: List[A]): List[(A, Int)] = l match {
@@ -55,8 +69,9 @@ object MeetingsApp extends App {
       (date, name, address)
   }
 
+  //------------------------------------------------------------- Services
   object Calendar {
-    // meetings^{D: Order, N: Eq}
+   // meetings^{D: Order, N: Eq}
     def meetings[D: Order, N: Eq, A](ts: List[(D,N,A)],
                                      date: D,
                                      name: N): List[(D,N,A)] =
@@ -105,6 +120,7 @@ object MeetingsApp extends App {
   // val fcurry: List[(D,N,A)] => D => N => List[(D,N,A)] = f.curried
   // val g: List[(D,N,_)] => (D, List[N]) = (Stats1.mostBusyDay _)
   // val h: N => (D, List[N]) = g compose (fcurry(ts)(date))
+  // applyf(implicitly[Order[String]],implicitly[Eq[String]])(("a","a","a") :: Nil)("a")("a")
   object App1 {
     // (mostBusyDay • meetings)
     def apply[D: Order, N: Eq, A](ts: List[(D,N,A)],
@@ -113,8 +129,7 @@ object MeetingsApp extends App {
       Stats1.mostBusyDay(Calendar.meetings(ts, date, name))
     // Following is the code that return the function
     def applyf[D: Order, N: Eq, A]: List[(D,N,A)] => D => N => (D, List[N]) =
-      (App1.apply[D,N,A] _).curried
-
+      (apply[D,N,A] _).curried
 
     // Enc^{D: ord, N: eq}(mostBusyDay • meetings)
     //
@@ -136,19 +151,40 @@ object MeetingsApp extends App {
                               $ev2: Eq[CN[N]]):
         List[(CD[D],CN[N],A)] => CD[D] => CN[N] => (CD[D], List[CN[N]]) =
       applyf[CD[D], CN[N], A]
-    //
-    // Second with combinators.
-    // TODO: Set combinators as arguments of the function.
+    // Same as v1 but with context bound.
     def v2[CD[X] <: Cypher[X],
            CN[X] <: Cypher[X],
-           D: Order, N: Eq, A: Eq] (cd: _ => CD[_])(cn: _ => CN[_]):
-        List[(CD[D],CN[N],A)] => CD[D] => CN[N] => (CD[D], List[CN[N]]) = {
-      // Combinators
-      ???
-//      applyf(("a","a","a") :: Nil)("a")("a")
-//      applyf[D,N,A](_.map { case (d,n,a) => (cd(d), cn(n), a) })(cd(_))(cn(_))(
+           D: COrder[CD]#λ,
+           N: CEq[CN]#λ,
+           A] (ts: List[(CD[D],CN[N],A)],
+                     date: CD[D],
+                     name: CN[N]): (CD[D], List[CN[N]]) =
+      apply(ts, date, name)
+    // Same as v1f but with context bound.
+    def v2f[CD[X] <: Cypher[X],
+            CN[X] <: Cypher[X],
+            D: COrder[CD]#λ,
+            N: CEq[CN]#λ,
+            A]:
+        List[(CD[D],CN[N],A)] => CD[D] => CN[N] => (CD[D], List[CN[N]]) =
+      applyf[CD[D],CN[N],A]
+    // //
+    // // Second with combinators.
+    // // TODO: Set combinators as arguments of the function.
+    // def v3[CD[X] <: Cypher[X] with Order[CD[D]],
+    //        CN[X] <: Cypher[X] with Eq[CN[N]],
+    //        D: Order, N: Eq, A](cd: D => CD[D])
+    //                           (cn: N => CN[N])
+    //                           (implicit $ev1: Order[CD[D]],
+    //                                     $ev2: Eq[CN[N]]):
+    //     List[(D,N,A)] => D => N => (CD[D], List[CN[N]]) = {
+    //   // Combinators
+    //   val applyfi: List[(CD[D],CN[N],A)] => CD[D] => CN[N] => (CD[D], List[CN[N]]) =
+    //     applyf[CD[D],CN[N],A](implicitly[Order[CD[D]]], implicitly[Eq[CN[N]]])
 
-    }
+    //   (ts: List[(D,N,A)]) => (d: D) => (n: N) =>
+    //     applyfi(ts.map { case (d,n,a) => (cd(d),cn(n),a) })(cd(d))(cn(n))
+    // }
 
     object Test {
       apply(ts, date, name)
@@ -156,11 +192,15 @@ object MeetingsApp extends App {
       applyfi(ts)(date)(name)
 
       val ts_HesOrdD_HesEqN_RawA = ts.map {
-        case (d,n,a) => (HesOrd(d), HesEq(n), a)
+        case (d,n,a) => (HesEnc withOrd d, HesEnc withEq n, a)
       }
-      v1(ts_HesOrdD_HesEqN_RawA, HesOrd(date), HesEq(name))
+      v1(ts_HesOrdD_HesEqN_RawA, HesEnc.withOrd(date), HesEnc.withEq(name))
       val v1fi = v1f(implicitly[Order[HesOrd[String]]], implicitly[Eq[HesEq[String]]])
-      v1fi(ts_HesOrdD_HesEqN_RawA)(HesOrd(date))(HesEq(name))
+      v1fi(ts_HesOrdD_HesEqN_RawA)(HesEnc.withOrd(date))(HesEnc.withEq(name))
+
+      v2(ts_HesOrdD_HesEqN_RawA, HesEnc.withOrd(date), HesEnc.withEq(name))
+      val v2fi = v2f(implicitly[Order[HesOrd[String]]], implicitly[Eq[HesEq[String]]])
+      v2fi(ts_HesOrdD_HesEqN_RawA)(HesEnc.withOrd(date))(HesEnc.withEq(name))
     }
   }
 
@@ -174,29 +214,28 @@ object MeetingsApp extends App {
       Stats2.visitedPlaces(ts)
   }
 
-
   // Raw data:
   println(App1(ts, date, name))
   println(App2(ts))
   println(App3(ts))
 
   // HES data:
-  println(App1(ts.map(t => (HesOrd(t._1), HesEq(t._2), HesEq(t._3))),
-    HesOrd(date), HesEq(name)))
+  println(App1(ts.map(t => (HesEnc.withOrd(t._1), HesEnc.withEq(t._2), HesEnc.withEq(t._3))),
+    HesEnc.withOrd(date), HesEnc.withEq(name)))
   // Databe elements and reference to these elements must use the same
   // encryption scheme
   illTyped("""
-  println(App1(ts.map(t => (HesOrd(t._1), HesEq(t._2), HesEq(t._3))),
+  println(App1(ts.map(t => (HesEnc.withOrd(t._1), HesEnc.withEq(t._2), HesEnc.withEq(t._3))),
     date, name))
   """)
   // You could not encrypt date with HesEq. Date requies an Hes
   // encryption scheme with order.
   illTyped("""
-  println(App1(ts.map(t => (HesEq(t._1), HesEq(t._2), HesEq(t._3))),
-    HesEq(date), HesEq(name)))
+  println(App1(ts.map(t => (HesEnc.withEq(t._1), HesEnc.withEq(t._2), HesEnc.withEq(t._3))),
+    HesEnc.withEq(date), HesEnc.withEq(name)))
   """)
-  println(App2(ts.map(t => (t._1, HesEq(t._2), t._3))))
-  println(App3(ts.map(t => (t._1, t._2, HesEq(t._3)))))
+  println(App2(ts.map(t => (t._1, HesEnc.withEq(t._2), t._3))))
+  println(App3(ts.map(t => (t._1, t._2, HesEnc.withEq(t._3)))))
 
   // AES data:
   // AES has no definition for Eq or Order class type.
