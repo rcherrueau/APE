@@ -336,6 +336,65 @@ object FBoundedType {
 // TODO
 
 
+/** Self type
+  *
+  * A self type of a trait is the assumed type of `this', the
+  * receiver, to be used within a trait. Any concrete class that mixes
+  * in the trait must ensure that its type conforms to the trait's
+  * self type.
+  *
+  * The most common use of self types if for dependency injection
+  * [[http://youtu.be/hBVJbzAagfs]]
+  *
+  * See section 29.14 and 33.5 of Odersky's book "Progamming in
+  * Scala".
+  */
+object SelfType {
+  // Self type is used for Dependency Injection.
+  trait A { def a = "A" }
+  trait B { self: A => def b = a}
+  //
+  // new B {} // Doesn't compile
+  // <console>:10: error: illegal inheritance;
+  //  self-type B does not conform to B's selftype B with A
+  //               new B {}
+  //
+  // To compile we have to feed the B with an A:
+  new B with A {}
+  // And this is better than `trait B extends A { def b = a }' because
+  // this enable dependency injection. For instance we could define a
+  // nex trait `BetterA' which is a subtype of A and the instanciate a
+  // `B' with `BetterA' just like what we do with dependency
+  // injection.
+  trait BetterA extends A { override def a = "BetterA" }
+  new B with BetterA {} // Feed `B' with `BetterA' rather than with a
+                        // `A'.
+
+  // [[http://stackoverflow.com/q/1990948]]
+  // One can use type parameters within self types. Thus means that
+  // `A' require `Self'.
+  trait D[Self] { self: Self => }
+  // Rather `trait D[Self] extends Self' isn't legal.
+
+  // Self types also allow you to define cyclical dependencies.
+  trait E { self: F => }
+  trait F { self: E => }
+  // Inheritance using extends does not allow that. Try:
+  //
+  // trait E extends F
+  // trait F extends E
+  //  error:  illegal cyclic reference involving trait E
+  //
+  // In the Odersky book, look at section 33.5 (Creating spreadsheet
+  // UI chapter) where it mentions: In the spreadsheet example, class
+  // Model inherits from Evaluator and thus gains access to its
+  // evaluation method. To go the other way, class Evaluator defines
+  // its self type to be Model, like this:
+  //
+  // package org.stairwaybook.scells
+  // trait Evaluator { this: Model => ...
+}
+
 /** Type Class
   *
   * [[http://danielwestheide.com/blog/2013/02/06/the-neophytes-guide-to-scala-part-12-type-classes.html]]
