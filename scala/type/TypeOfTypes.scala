@@ -21,7 +21,7 @@ object UnifiedTypeSystem {
   // 38: invokestatic  #53                 // Method scala/runtime/BoxesRunTime.boxToInteger:(I)Ljava/lang/Integer;
   // 41: invokevirtual #57                 // Method scala/collection/mutable/ArrayBuffer.$plus$eq:(Ljava/lang/Object;)Lscala/collection/mutable/ArrayBuffer;
   //
-  // You’ll notice that myInt is still carrying the value of a int
+  // You'll notice that myInt is still carrying the value of a int
   // primitive (this is visible as `I' at the end of the `myInt:()I'
   // invokevirtual call). Then, right before adding it to the
   // ArrayBuffer (41), scalac inserted a call to
