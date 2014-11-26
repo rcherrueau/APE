@@ -12,13 +12,14 @@
 // }
 
 object LCH11a extends App {
-  /** Custom implementation of Hugues Arrows. */
+  /** Custom implementation of Hugues' Arrows. */
   object alaronan {
     // `F' stands for Functor
     trait Arrow[F[_,_],B,C] {
       /** Current Arrow */
       def self: F[B,C]
 
+      /** Runs an arrow. */
       def run(x: B): C
 
       /** Lifts an ordinary function.
@@ -118,6 +119,7 @@ object LCH11a extends App {
     }
 
     object Arrow {
+      /** Arrow for Function1 */
       def apply[B,C](v: Function1[B,C]): Arrow[Function1,B,C] = new Arrow[Function1,B,C] {
         def self: B => C = v
         def run(x: B): C = self(x)
@@ -222,6 +224,7 @@ object LCH11a extends App {
         compose(first[B1,B2,C1](f), second[B2,C1,C2](g))
     }
 
+    /** Wraps a value `self' and provides methods related to [[Arrow]]. */
     class ArrowOps[=>:[_, _], B, C](val self: B =>: C)(implicit val F: Arrow[=>:]) {
       final def >>>[D](k: C =>: D): B =>: D =
         F.compose(self, k)
@@ -248,8 +251,11 @@ object LCH11a extends App {
         }
       }
 
-      implicit def tof1arrowop[=>:[_, _]: Arrow, B, C](v: B =>: C): ArrowOps[=>:,B,C] =
+      implicit def f1tof1arrowop[=>:[_, _], B,C]
+                                (v: B =>: C)
+                                (implicit F: Arrow[=>:]): ArrowOps[=>:,B,C] =
         new ArrowOps[=>:,B,C](v)
+
     }
   }
 
@@ -257,6 +263,18 @@ object LCH11a extends App {
     val plus1 = (_: Int) + 1
     val times2 = (_: Int) * 2
     val rev = (_: String) reverse
+
+    sealed abstract class Tree[A]
+    case class Branch[A](val r: Tree[A], val l: Tree[A]) extends Tree
+    case class Leef[A](val a: A) extends Tree
+
+    def alaronantests = {
+      import alaronan._
+      import alaronan.Arrow._
+
+      ((Arrow(plus1) >>> Arrow(times2)) *** Arrow(rev)) >>>
+        Arrow(println _) run (7, "abc")
+    }
 
     def alascalaztests = {
       import alascalaz._
@@ -273,15 +291,8 @@ object LCH11a extends App {
       // With arrow operations
       ((plus1 >>> times2) *** rev) >>> println apply (7, "abc")
     }
-
-    def alaronantests = {
-      import alaronan._
-      import alaronan.Arrow._
-
-      ((Arrow(plus1) >>> Arrow(times2)) *** Arrow(rev)) >>> Arrow(println) run (7, "abc")
-    }
   }
 
-  ArrowTests.alascalaztests
   ArrowTests.alaronantests
+  ArrowTests.alascalaztests
 }
