@@ -1,0 +1,3 @@
+Directory for exercises of the book [[http://manning.com/bjarnason/][Functional Programming in Scala]].
+
+see, [[https://github.com/fpinscala/fpinscala]]
