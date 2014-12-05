@@ -120,6 +120,29 @@ object List {
       case _ => Nil
     }
 
+  def hasSubsequence[A](sup: List[A], sub: List[A]): Boolean =
+    sub match {
+      case Cons(h, t) =>
+        def allOccures(l: List[A], e: A): List[List[A]] = l match {
+          case Cons(h, t) if (h == e) => Cons(l, allOccures(t, e))
+          case Cons(h, t) => allOccures(t, e)
+          case Nil => Nil
+        }
+
+        def same(l: List[A], ll: List[A]): Boolean = (l,ll) match {
+          case (Cons(h, t), Cons(hh, tt)) => (h == hh) && same(t, tt)
+          case (_, Nil) => true
+          case (Nil, _) => false
+        }
+
+        def step(l: List[List[A]]): Boolean = l match {
+          case Cons(l, ll) => same(l, sub) || step(ll)
+          case Nil => false
+        }
+
+        step(allOccures(sup, h))
+      case Nil => false
+    }
 }
 
 object FPInScalaListTest extends App {
@@ -155,4 +178,12 @@ object FPInScalaListTest extends App {
   println(List.zipWith(List(1,2,3,4,5),
                        List("a","b","c","d"))(
             (i,s) => i.toString + s))
+  println(List.hasSubsequence(List(1,2,3,4), List(1,2)))
+  println(List.hasSubsequence(List(1,2,3,4), List(2,3)))
+  println(List.hasSubsequence(List(1,2,3,4), List(1)))
+  println(List.hasSubsequence(List(1,2,3,4), List(4)))
+  println(List.hasSubsequence(List(1,2,3,4), List(1,3)))
+  println(List.hasSubsequence(List(1,2,3,4), List(2,4)))
+  println(List.hasSubsequence(List(1,2,3,4), List(5,6,7)))
+  println(List.hasSubsequence(List(1,2,3,4), List()))
 }
