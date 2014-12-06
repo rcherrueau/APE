@@ -207,12 +207,10 @@ object Stream {
 
   // scala solution:
   // https://github.com/scala/scala/blob/v2.11.4/src/library/scala/collection/immutable/Stream.scala#L1177
-  class ConsWrapper[A](tl: => Stream[A]) {
-    def #::(hd: A): Stream[A] = cons(hd, tl)
+  // But this evaluate the hd
+  implicit class ConsWrapper[A](tl: => Stream[A]) {
+    def #::(hd: => A): Stream[A] = cons(hd, tl)
   }
-
-  implicit def consWrapper[A](stream: => Stream[A]): ConsWrapper[A] =
-    new ConsWrapper[A](stream)
 
   def constant[A](a: A): Stream[A] =
     cons(a, constant(a))
@@ -299,11 +297,17 @@ object FPInScalaStreamTest extends App {
          {p("Four -> "); 4})
   println()
 
+  Stream.cons({p("One -> "); 1},
+              Stream.cons({p("Two -> "); 2},
+                          Stream.empty))
+  println()
+
   {p("One -> "); 1} #:: {p("Two -> "); 2} #::
                         {p("Three -> "); 3} #::
                         {p("Four -> "); 4} #::
                         Stream.empty
   println()
+
 
   // No side-effect stream tests:
   println("\nSome tests with no side-effect stream: ")
@@ -311,10 +315,11 @@ object FPInScalaStreamTest extends App {
 
   // Side-effect stream tests:
   println("\nSome tests with side-effect stream: ")
-  test({p("One -> "); 1} #:: {p("Two -> "); 2} #::
-                             {p("Three -> "); 3} #::
-                             {p("Four -> "); 4} #::
-                             Stream.empty)
+  test(Stream.cons({p("One -> "); 1},
+         Stream.cons({p("Two -> "); 2},
+           Stream.cons({p("Three -> "); 3},
+             Stream.cons({p("Four -> "); 4},
+                         Stream.empty)))))
 
   /** Trace of that the lazy execution.
     *
