@@ -183,6 +183,20 @@ object State {
   def sequence[S,A](sas: List[State[S,A]]): State[S,List[A]] =
     sas.foldRight(unit[S,List[A]](Nil))(
       (sa, rest) => sa.map2(rest)(_ :: _))
+
+  // *State combinators*
+
+  // Combinator that modifies the state.
+  def modify[S](f: S => S): State[S, Unit] = for {
+    s <- get       // Gets the current state and assigns it to `s`
+    _ <- set(f(s)) // Sets the new state to `f` applied to `s`
+  } yield ()
+
+  // Combinator that gets the current state.
+  def get[S]: State[S,S] = State((s:S) => (s, s))
+
+  // Combinator that sets the current state.
+  def set[S](s: S): State[S, Unit] = State(_ => ((), s))
 }
 
 // Same as RNG but using State monad.
@@ -243,8 +257,6 @@ object RNG2 {
     }
 }
 
-
-
 object FPInScalaStateTest extends App {
   val rng = Simple(42)
 
@@ -271,7 +283,6 @@ object FPInScalaStateTest extends App {
   RNG.map(RNG.sequence(List.fill(10)(RNG.nonNegativeLessThan_2(10))))(println)(rng9)
   RNG.map_2(RNG.sequence(List.fill(10)(RNG.nonNegativeLessThan_2(10))))(println)(rng9)
 
-
   def rollDie: RNG.Rand[Int] =
     RNG.map(RNG.nonNegativeLessThan(6))(_ + 1)
 
@@ -297,4 +308,114 @@ object FPInScalaStateTest extends App {
     RNG2.nonNegativeLessThan(6) map { _ + 1 }
 
   println(RNG2.ns.run(rng)._1)
+
+  // *Candy Dispenser*
+  //
+  // Machine has two types of input:
+  // 1) Insert a coin
+  // 2) Turn the knob (to dispense candy)
+  //
+  // Machine can be in two states:
+  // 1) Locked
+  // 2) Unlocked
+  //
+  // Machine also tracks how many candies are left and how many coins
+  // it contains.
+
+  sealed trait Input
+  case object Coin extends Input
+  case object Turn extends Input
+
+  case class Machine(locked: Boolean, candies: Int, coins: Int)
+
+  // Machine rules:
+  // - Inserting a coin into a locked machine will cause it to unlock
+  // if there's any candy left.
+  // - Turning the knob on unlocked machine will cause it to dispense
+  // candy and become locked.
+  // - Turning the knob on locked machine or inserting a coin into an
+  // unlocked machine does nothing.
+  // - A machine that's out of candy ignores all inputs.
+  def simulateMachine(inputs: List[Input]): State[Machine,(Int, Int)] = {
+    // For each input, computes the expected state
+    val is: List[State[Machine, (Int,Int)]] = inputs.map(i =>
+      State(
+        (m: Machine) => m match {
+          case Machine(_,0,_) => ((m.coins, m.candies) -> m)
+          // Locked
+          case Machine(true, ca, co) => i match {
+            case Coin => ((co+1, ca) -> Machine(false, ca, co+1))
+            case Turn => ((m.coins, m.candies) -> m)
+          }
+          // Unlocked
+          case Machine(false, ca, co) => i match {
+            case Coin => ((m.coins, m.candies) -> m)
+            case Turn => ((co, ca-1) -> Machine(true, ca-1, co))
+          }
+        }))
+
+    // Does the sequence of all state.
+    val ms: State[Machine,List[(Int, Int)]] = State.sequence(is)
+
+    // Returns the last state.
+    ms map { _.last }
+  }
+  // Better version with `modify` that modifies the current state into
+  // a new state. Instead of keeping the whole state, we focus on the
+  // last one.
+  def simulateMachine_2(inputs: List[Input]): State[Machine,(Int, Int)] = {
+    // We modify the state until the last one
+    val lastState: State[Machine, List[Unit]] = State.sequence(
+      inputs.map(i =>
+        State.modify(
+          (m: Machine) => m match {
+            case Machine(_,0,_) => m
+            // Locked
+            case Machine(true, ca, co) => i match {
+              case Coin => Machine(false, ca, co+1)
+              case Turn => m
+            }
+            // Unlocked
+            case Machine(false, ca, co) => i match {
+              case Coin => m
+              case Turn => Machine(true, ca-1, co)
+            }
+          })))
+
+    // We get the state and we return the state with coins and candies
+    // values.
+    lastState flatMap { (_: List[Unit]) =>
+      // Get the state
+      State.get map { m => (m.coins, m.candies) } }
+  }
+  // Same as simulateMachine_2 but with for-comprehension
+  def simulateMachine_3(inputs: List[Input]): State[Machine,(Int, Int)] =
+    // Here the return type stands for (m: Machine) => ((Int, Int),
+    // Machine)
+    for {
+      _ <- State.sequence(inputs.map(
+                            i => State.modify(
+                              (s: Machine) => (i, s) match {
+                                case (_, Machine(_, 0, _)) => s
+                                case (Coin, Machine(false, _, _)) => s
+                                case (Turn, Machine(true, _, _)) => s
+                                case (Coin, Machine(true, ca, co)) =>
+                                  Machine(false, ca, co+1)
+                                case (Turn, Machine(false, ca, co)) =>
+                                  Machine(true, ca-1, co)
+                              })))
+      s <- State.get
+    } yield (s.coins, s.candies)
+
+  println(simulateMachine(
+            List(Coin, Turn, Coin, Turn, Turn, Coin, Coin, Turn)).run(
+            Machine(true, 5, 10))._1)
+
+  println(simulateMachine_2(
+            List(Coin, Turn, Coin, Turn, Turn, Coin, Coin, Turn)).run(
+            Machine(true, 5, 10))._1)
+
+  println(simulateMachine_3(
+            List(Coin, Turn, Coin, Turn, Turn, Coin, Coin, Turn)).run(
+            Machine(true, 5, 10))._1)
 }
