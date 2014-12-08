@@ -42,7 +42,7 @@ object RNG {
 
   def doubleInt(rng: RNG): ((Double, Int), RNG) = {
     val (d, rng2) = double(rng)
-    val (i, rng3) = nonNegativeInt(rng2)
+    val (i, rng3) = int(rng2)
 
     ((d, i) -> rng3)
   }
@@ -97,10 +97,10 @@ object RNG {
     map2(ra)(rb)((_, _))
 
   def intDouble_2: Rand[(Int, Double)] =
-    both(nonNegativeInt)(double)
+    both(int)(double)
 
   def doubleInt_2: Rand[(Double, Int)] =
-    both(double)(nonNegativeInt)
+    both(double)(int)
 
   def randIntDouble: Rand[(Int, Double)] =
     both(int)(double)
@@ -114,24 +114,187 @@ object RNG {
 
   def ints_2(count: Int): Rand[List[Int]] =
     sequence(List.fill(count)(int))
+
+  def nonNegativeLessThan(n: Int): Rand[Int] =
+    rng => {
+      val (i, rng2) = nonNegativeInt(rng)
+      val mod = i % n
+      if (i + (n-1) - mod >= 0) (mod, rng2)
+      else nonNegativeLessThan(n)(rng)
+    }
+
+  def flatMap[A,B,C](s: Rand[A])(f: A => Rand[B]): Rand[B] =
+    rng => {
+      val (a, rng2) = s(rng)
+      f(a)(rng2)
+    }
+
+  // Using flatMap
+  def nonNegativeLessThan_2(n: Int): Rand[Int] =
+    flatMap(nonNegativeInt) { i =>
+      val mod = i % n
+      if (i + (n-1) - mod >= 0) unit(mod)
+      else nonNegativeLessThan_2(n)
+    }
+
+  def map_2[A, B](s: Rand[A])(f: A => B): Rand[B] =
+    flatMap(s)(a => unit(f(a)))
+
+  def map2_2[A,B,C](ra: Rand[A])(rb: Rand[B])(f: (A, B) => C): Rand[C] =
+    flatMap(ra)(a => flatMap(rb)(b => unit(f(a,b))))
+
+}
+
+// // More general signature for working with state actions.
+// object State {
+//   // `S` stands for State type
+//   def map[S,A,B](a: S => (A, S))(f: A => B): S => (B, S) =
+//     state => {
+//       val (v, state2) = a(state)
+//       (f(v), state2)
+//     }
+//
+//   // More general type than `Rand`, for handling any type of state.
+//   type State[S, +A] = S => (A, S)
+// }
+//
+// // We might want to write it as its own class, wrapping the underlying
+// // function like this:
+
+// More general type than `Rand`, for handling any type of state.
+// `S` stands for State type.
+case class State[S,+A](run: S => (A, S)) {
+  def flatMap[B](f: A => State[S,B]): State[S,B] = State(
+    s => {
+      val (a, s1) = run(s)
+      f(a).run(s1)
+    })
+
+  def map[B](f: A => B): State[S,B] =
+    this flatMap(a => State.unit(f(a)))
+
+  def map2[B,C](sb: State[S,B])(f: (A,B) => C): State[S,C] =
+    this flatMap(a => sb flatMap( b => State.unit(f(a,b))))
+}
+
+object State {
+  def unit[S,A](a: A): State[S,A] = State(s => (a, s))
+
+  def sequence[S,A](sas: List[State[S,A]]): State[S,List[A]] =
+    sas.foldRight(unit[S,List[A]](Nil))(
+      (sa, rest) => sa.map2(rest)(_ :: _))
+}
+
+// Same as RNG but using State monad.
+object RNG2 {
+  type Rand[+A] = State[RNG,A]
+
+  val int: Rand[Int] = State(_.nextInt)
+  val ns: Rand[List[Int]] = for {
+     x <- nonNegativeLessThan(5)
+     y <- int
+    xs <- ints(x)
+  } yield xs.map(_ % y) // xs here is the unboxed Rand[List[Int]] xs.
+                        // Thus, map is map on the List.
+
+  def randomPair: Rand[(Int, Int)] = State(
+    s => {
+      val (i1, s1) = int.run(s)
+      val (i2, s2) = int.run(s1)
+      ((i1,i2) -> s2)
+    })
+
+  def nonNegativeInt: Rand[Int] = State(
+    s => {
+      val (i, s1) = int.run(s)
+      (if (i == Int.MinValue) Int.MaxValue
+       else Math.abs(i),
+       s1)
+    })
+
+  def double: Rand[Double] =
+    nonNegativeInt map { _ / (Int.MaxValue.toDouble + 1) }
+
+  def intDouble: Rand[(Int, Double)] =
+    int.map2(double)((_,_))
+
+  def doubleInt: Rand[(Double, Int)] =
+    double.map2(int)((_,_))
+
+  def double3: Rand[(Double, Double, Double)] =
+    double flatMap { d1 =>
+      double flatMap { d2 =>
+        double flatMap {d3 => State.unit((d1, d2, d3)) }}}
+
+  def nonNegativeEven: Rand[Int] =
+    nonNegativeInt map { i => i - i % 2 }
+
+  def both[A,B](ra: Rand[A])(rb: Rand[B]): Rand[(A, B)] =
+    ra.map2(rb)((_, _))
+
+  def ints(count: Int): Rand[List[Int]] =
+    State.sequence(List.fill(count)(int))
+
+  def nonNegativeLessThan(n: Int): Rand[Int] =
+    nonNegativeInt flatMap {i =>
+      val mod = i % n
+      if (i + (n-1) - mod >= 0) State.unit(mod)
+      else nonNegativeLessThan(n)
+    }
 }
 
 
 
 object FPInScalaStateTest extends App {
   val rng = Simple(42)
+
+  // Purely functional random number generation
+  println("Purely functional random number generation")
   val (i, rng2) = RNG.randomPair(rng); println(i)
   val (i2, rng3) = RNG.nonNegativeInt(rng2); println(i2)
   val (d, rng4) = RNG.double(rng3); println(d)
+  RNG.map(RNG.double_2)(println)(rng3)
   val (p1, rng5) = RNG.intDouble(rng4); println(p1)
+  RNG.map(RNG.intDouble_2)(println)(rng4)
+  RNG.map(RNG.randIntDouble)(println)(rng4)
+  RNG.map_2(RNG.map2_2(RNG.int)(RNG.double)((_,_)))(println)(rng4)
   val (p2, rng6) = RNG.doubleInt(rng5); println(p2)
+  RNG.map(RNG.doubleInt_2)(println)(rng5)
+  RNG.map(RNG.randDoubleInt)(println)(rng5)
+  RNG.map_2(RNG.map2_2(RNG.double)(RNG.int)((_,_)))(println)(rng5)
   val (t3, rng7) = RNG.double3(rng6); println(t3)
   val (l, rng8) = RNG.ints(5)(rng7); println(l)
-  val (i3, rng9) = RNG.nonNegativeEven(rng8); println(i3)
-  val (d2, _) = RNG.double(rng3); println(d2)
-  val (p3, _) = RNG.intDouble_2(rng4); println(p3)
-  val (p4, _) = RNG.doubleInt_2(rng5); println(p2)
-  val (p5, _) = RNG.randIntDouble(rng4); println(p5)
-  val (p6, _) = RNG.randDoubleInt(rng5); println(p6)
-  val (l2, _) = RNG.ints(5)(rng7); println(l2)
+  RNG.map(RNG.ints(5))(println)(rng7)
+  val (_, rng9) = RNG.map(RNG.nonNegativeEven)(println)(rng8)
+  val (_, rng10) =
+    RNG.map(RNG.sequence(List.fill(10)(RNG.nonNegativeLessThan(10))))(println)(rng9)
+  RNG.map(RNG.sequence(List.fill(10)(RNG.nonNegativeLessThan_2(10))))(println)(rng9)
+  RNG.map_2(RNG.sequence(List.fill(10)(RNG.nonNegativeLessThan_2(10))))(println)(rng9)
+
+
+  def rollDie: RNG.Rand[Int] =
+    RNG.map(RNG.nonNegativeLessThan(6))(_ + 1)
+
+  println(RNG.sequence(List.fill(20)(rollDie))(rng)._1)
+
+  // General state action data type
+  print("\nGeneral state action data type")
+  (for {
+     i1 <- RNG2.randomPair
+     i2 <- RNG2.nonNegativeInt
+      d <- RNG2.double
+     p1 <- RNG2.intDouble
+     p2 <- RNG2.doubleInt
+     t3 <- RNG2.double3
+      l <- RNG2.ints(5)
+    nne <- RNG2.nonNegativeEven
+    nnl <- State.sequence(List.fill(10)(RNG2.nonNegativeLessThan(10)))
+     rl <- State.sequence(List.fill(20)(rollDie2))
+   } yield println(List(i1, i2, d, p1, p2, t3, l, nne, nnl, rl).
+                     foldRight("")("\n" + _  + _))).run(rng)
+
+  def rollDie2: RNG2.Rand[Int] =
+    RNG2.nonNegativeLessThan(6) map { _ + 1 }
+
+  println(RNG2.ns.run(rng)._1)
 }
