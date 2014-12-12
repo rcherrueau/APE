@@ -336,7 +336,10 @@ object FPInScalaStateTest extends App {
   // - Turning the knob on locked machine or inserting a coin into an
   // unlocked machine does nothing.
   // - A machine that's out of candy ignores all inputs.
+  //
   def simulateMachine(inputs: List[Input]): State[Machine,(Int, Int)] = {
+    // Return type stands for (m: Machine) => ((Int, Int), Machine)
+
     // For each input, computes the expected state
     val is: List[State[Machine, (Int,Int)]] = inputs.map(i =>
       State(
@@ -354,17 +357,20 @@ object FPInScalaStateTest extends App {
           }
         }))
 
-    // Does the sequence of all state.
+    // Does the sequence of all states.
     val ms: State[Machine,List[(Int, Int)]] = State.sequence(is)
 
-    // Returns the last state.
+    // Gets the last state.
     ms map { _.last }
   }
+  //
   // Better version with `modify` that modifies the current state into
   // a new state. Instead of keeping the whole state, we focus on the
   // last one.
   def simulateMachine_2(inputs: List[Input]): State[Machine,(Int, Int)] = {
-    // We modify the state until the last one
+    // We modify the state until the last one. Here we lost the `(Int,
+    // Int)' of the first version but this is not a problem. This
+    // information is stored in the `Machine' state.
     val lastState: State[Machine, List[Unit]] = State.sequence(
       inputs.map(i =>
         State.modify(
@@ -382,16 +388,18 @@ object FPInScalaStateTest extends App {
             }
           })))
 
+    // What we have to do now is to get the `Machine' state. The only
+    // way to get the state is using the `State.get' method. While we
+    // are in a specific state. We do that with `flatMap'.
+    //
     // We get the state and we return the state with coins and candies
     // values.
     lastState flatMap { (_: List[Unit]) =>
-      // Get the state
       State.get map { m => (m.coins, m.candies) } }
   }
+  //
   // Same as simulateMachine_2 but with for-comprehension
   def simulateMachine_3(inputs: List[Input]): State[Machine,(Int, Int)] =
-    // Here the return type stands for (m: Machine) => ((Int, Int),
-    // Machine)
     for {
       _ <- State.sequence(inputs.map(
                             i => State.modify(
