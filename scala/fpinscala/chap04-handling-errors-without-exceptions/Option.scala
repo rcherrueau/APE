@@ -46,6 +46,7 @@ object Option {
   def map2[A,B,C](oa: Option[A], ob: Option[B])(f: (A,B) => C): Option[C] =
     oa flatMap (a => ob map (b => f(a,b)))
 
+  /** Combines a list of `Option` in one `Option` */
   def sequence[A](l: List[Option[A]]): Option[List[A]] =
     l.foldRight(Some(Nil:List[A]):Option[List[A]])(
       (h,rest) => h flatMap (x => rest map (x :: _)))
