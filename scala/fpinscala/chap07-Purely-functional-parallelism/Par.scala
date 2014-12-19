@@ -117,28 +117,201 @@ object Par {
   // our own low-level API but we prefere reuse the one in Java
   // Standard Library.
   // ExecutorService has a `submit' method that take a Callable value
-  // (a lazy computation) and returns a Futur
+  // (a lazy computation) and returns a Future.
   import java.util.concurrent.ExecutorService
+  import java.util.concurrent.Callable
   import java.util.concurrent.Future
+  import java.util.concurrent.TimeUnit
 
-  // Now `Par' that needs to execute asynchronous tasks, takes an
-  // ExecutorService and return a Futur
+  // Now `Par' -- that needs to execute asynchronous tasks -- takes an
+  // ExecutorService and returns a Future.
   type Par[A] = ExecutorService => Future[A]
 
   /** Promotes a constatn value to a parallel computation */
-  def unit[A](a: A): Par[A] = ???
-  /** Combines the results of two parallel computation with a binary function */
-  def map2[A,B,C](para: Par[A], parb: Par[B])(f: (A, B) => C): Par[C] = ???
-  /** Marks a computation for concurrent evaluation. The evaluation
-    * won't actually occur until forced by run */
-  def fork[A](a: => Par[A]): Par[A] = ???
+  def unit[A](a: A): Par[A] = _ => UnitFuture(a)
+
+  /** Future that just wraps a constant value. */
+  private case class UnitFuture[A](get: A) extends Future[A] {
+    def get(timeout: Long, units: TimeUnit): A = get
+    def cancel(evenIfRunning: Boolean): Boolean = false
+    def isCancelled = false
+    def isDone = true
+  }
+
+  /** Combines the results of two parallel computation. */
+  def map2[A,B,C](apar: Par[A], bpar: Par[B])(g: (A, B) => C): Par[C] =
+    (es: ExecutorService) => {
+      val af: Future[A] = apar(es)
+      val bf: Future[B] = bpar(es)
+
+      // FIXME: Respect the timeout of Future
+      UnitFuture(g(af.get, bf.get))
+    }
+
+  // FIX to respect timeouts, we'd need a new `Future' implementation
+  // that records the amount of time spent evaluating one future, then
+  // subtracts that time from the available time allocated for
+  // evaluating the other future.
+  def map2_1[A,B,C](apar: Par[A], bpar: Par[B])(g: (A, B) => C): Par[C] =
+    (es: ExecutorService) => {
+      val af: Future[A] = apar(es)
+      val bf: Future[B] = bpar(es)
+
+      MapFuture(af, bf, g)
+    }
+
+  private case class MapFuture[A,B,C](af: Future[A],
+                                      bf: Future[B],
+                                      g: (A, B) => C) extends Future[C] {
+    // We put the result of `get' in a cache value, thus if cache value
+    // is Some, then the Future `isDone'.
+    @volatile var cache: Option[C] = None
+
+    def isCancelled = af.isCancelled || bf.isCancelled
+    def isDone = cache.isDefined
+    def get: C = cache match {
+      case None => cache = Some(g(af.get, bf.get)); cache.get
+      case Some(c) => c
+    }
+    def get(timeout: Long, units: TimeUnit): C = cache match {
+      case None =>
+        val ttl = TimeUnit.MILLISECONDS.convert(timeout, units)
+
+        val start = System.currentTimeMillis
+        val ares = af.get(ttl, TimeUnit.MILLISECONDS)
+        val stop = System.currentTimeMillis; val atime = stop - start
+        val bres = bf.get(ttl - atime, TimeUnit.MILLISECONDS)
+        cache = Some(g(ares, bres))
+
+        cache.get
+      case Some(c) => c
+    }
+    def cancel(evenIfRunning: Boolean): Boolean =
+      af.cancel(evenIfRunning) || bf.cancel(evenIfRunning)
+  }
+
+
+  /** Marks a computation for concurrent evaluation.
+    *
+    * The evaluation won't actually occur until forced by run
+    */
+  def fork[A](a: => Par[A]): Par[A] = (es: ExecutorService) =>
+    // It's only after the user calls `run' and the implementation
+    // *reveive and ExecutorService* that we expose the Future
+    // machinery.
+    es.submit(new Callable[A] { def call = a(es).get })
+
   /** Wraps its unevaluated argument in a Par and marks it for
     * concurrent evaluation */
   def lazyUnit[A](a: => A): Par[A] = fork(unit(a))
+
   /** Extracts a value from a `Par' by actually performing the
     * computation */
-  def run[A](s: ExecutorService)(a: Par[A]): Future[A] = a(s)
+  def run[A](es: ExecutorService)(a: Par[A]): Future[A] = a(es)
+
+  /** Evaluates a function asynchronously. */
+  def asyncF[A,B](f: A => B): A => Par[B] =
+    (a: A) => lazyUnit(f(a))
+
+  /** Sorts the list. */
+  def sortPar(pl: Par[List[Int]]): Par[List[Int]] =
+    map2(pl, unit(())) { (l,_) => l.sorted }
+
+  /** Lifts a function */
+  def map[A,B](pa: Par[A])(f: A => B): Par[B] =
+    map2(pa, unit(())) { (a, _) => f(a) }
+
+  // Sort using map
+  def sortPar_2(pl: Par[List[Int]]): Par[List[Int]] =
+    map(pl) { _.sorted }
+
+  /** Combines a list of parallel */
+  def sequence[A](pas: List[Par[A]]): Par[List[A]] =
+    pas.foldRight[Par[List[A]]](unit(List[A]())) {
+      (pa: Par[A], prest: Par[List[A]]) =>
+      map2(pa, prest){ _ :: _ }
+    }
+
+  /** Maps over a list in parallel */
+  // We've wrapped our implementaion in a call to `fork`. With this
+  // implementation, `parMap` will return immediatly, even for a huge
+  // input list. When we later call `run`, it will fork a single
+  // asynchronous compuation which itself spawns N parallel
+  // computations, and then waits for these computations to finish,
+  // collecting their result into a list.
+  def parMap[A,B](as: List[A])(f: A => B): Par[List[B]] =
+    sequence(as.map(asyncF(f)))
+
+  /** Filters elements of a list in parallel */
+  def parFilter[A](as: List[A])(p: A => Boolean): Par[List[A]] = {
+    // First make a async filter for each item
+    val asAsync: List[Par[Option[A]]] =
+      as.map(asyncF((a:A) => if (p(a)) Some(a) else None))
+    // Then wrap all this parallel filter.
+    val asWrap: Par[List[Option[A]]] = sequence(asAsync)
+
+    // Finaly, unboxe and export `Some' elements.
+    map(asWrap)(for {
+                  oa <- _ if oa.isDefined
+                } yield oa.get)
+  }
+
+  def map3[A,B,C,D](apar: Par[A],
+                    bpar: Par[B],
+                    cpar: Par[C])(g: (A, B, C) => D): Par[D] = {
+    val cdpar: Par[C => D] = map2(apar, bpar)(g.curried(_)(_))
+    map2(cdpar, cpar)(_(_))
+  }
+
+  def map4[A,B,C,D,E](apar: Par[A],
+                      bpar: Par[B],
+                      cpar: Par[C],
+                      dpar: Par[D])(g: (A, B, C, D) => E): Par[E] = {
+    val cdepar: Par[C => D => E] = map2(apar, bpar)(g.curried(_)(_))
+    val depar: Par[D => E] = map2(cdepar, cpar)(_(_))
+    map2(depar, dpar)(_(_))
+  }
+
+  def map5[A,B,C,D,E,F](apar: Par[A],
+                        bpar: Par[B],
+                        cpar: Par[C],
+                        dpar: Par[D],
+                        epar: Par[E])(g: (A, B, C, D, E) => F): Par[F] = {
+    val efpar: Par[E => F] = map4(apar, bpar, cpar, dpar)(
+      g.curried(_)(_)(_)(_))
+    map2(efpar, epar)(_(_))
+  }
 }
 
 object FPInScalaParTest extends App {
+  import Par.Par
+  import java.util.concurrent.ForkJoinPool
+
+  Par.run(new ForkJoinPool(3))(
+    Par.sequence(
+      List(
+        // One concurent computation
+        Par.fork(Par.map(Par.unit(Thread sleep 1000)) {
+                   _ => println("Sleep 1000")
+                 }),
+        // A second concurrent computation
+        Par.fork(Par.map(Par.unit(Thread sleep 1)){
+                   _ => println("Sleep 1")
+                 }),
+        // A third concurrent computation
+        Par.fork(Par.map(Par.unit(Thread sleep 100)){
+                   _ => println("Sleep 100")
+                 }))))
+
+  /** Sums a list of int in parallel (see methodology) */
+  def sum(ints: Seq[Int]): Par[Int] =
+    if (ints.size <= 1)
+      Par.unit(ints.headOption getOrElse 0)
+    else {
+      val (l,r) = ints.splitAt(ints.length/2)
+      Par.map2(Par.fork(sum(l)), Par.fork(sum(r))) { _ + _ }
+    }
+
+  Par.run(new ForkJoinPool())(
+    Par.map(sum(List.range(1,100)))(println))
 }
