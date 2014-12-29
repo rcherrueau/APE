@@ -43,7 +43,7 @@ object FunctionalAPIMethodology {
     def get[A](par: Par_2[A]): A = ???
   }
 
-  // Let's see if we can avoit the aforementioned pitfall of combining
+  // Let's see if we can avoid the aforementioned pitfall of combining
   // `unit' and `get'.
   // If we don't call `get', that implies that our `sum' function must
   // return a `Par[Int]'.
@@ -94,7 +94,7 @@ object FunctionalAPIMethodology {
   // - If fork begins evaluating its argument immediately in parallel,
   //   this means we lose the ability to control the parallelism
   //   strategy used for different parts of our program.
-  // - If fork fork simply holds on to its unevaluated argument until
+  // - If fork simply holds on to its unevaluated argument until
   //   later, fork is more a description of a parallel computation that
   //   gets interpreted at a leter time by something kike the
   //   `Par_2.get' function.
@@ -207,7 +207,13 @@ object Par {
 
   /** Extracts a value from a `Par' by actually performing the
     * computation */
-  def run[A](es: ExecutorService)(a: Par[A]): Future[A] = a(es)
+  def run[A](es: ExecutorService)(a: Par[A]): Future[A] = {
+    val res = a(es)
+    // shutdown the ExecutorService to doesn't accept new tasks
+    es.shutdown
+
+    res
+  }
 
   /** Evaluates a function asynchronously. */
   def asyncF[A,B](f: A => B): A => Par[B] =
@@ -256,6 +262,7 @@ object Par {
                 } yield oa.get)
   }
 
+  // mapN in terms of map2
   def map3[A,B,C,D](apar: Par[A],
                     bpar: Par[B],
                     cpar: Par[C])(g: (A, B, C) => D): Par[D] = {
@@ -281,13 +288,64 @@ object Par {
       g.curried(_)(_)(_)(_))
     map2(efpar, epar)(_(_))
   }
+
+  /** Test that the result of two computation are equivalent. */
+  def equal[A](es: ExecutorService)(p1: Par[A], p2: Par[A]): Boolean = {
+    p1(es).get == p2(es).get
+  }
+
+  // Refining combinators to their most general form
+  def choice[A](cond: Par[Boolean])(t: Par[A], f: Par[A]): Par[A] =
+    es =>
+      if (cond(es).get) t(es)
+      else f(es)
+
+  def choiceN[A](n: Par[Int])(l: List[Par[A]]): Par[A] =
+    es => l(n(es).get)(es)
+
+  def choice_2[A](cond: Par[Boolean])(t: Par[A], f: Par[A]): Par[A] =
+    choiceN(es => if (cond(es).get) unit(0)(es) else unit(1)(es))(
+      List(t,f))
+
+  def choiceMap[K,V](key: Par[K])(choices: Map[K, Par[V]]): Par[V] =
+    es => choices(key(es).get)(es)
+
+  def chooser[A,B](pa: Par[A])(choices: A => Par[B]): Par[B] =
+    es => choices(pa(es).get)(es)
+
+  // Using chooser
+  def choice_3[A](cond: Par[Boolean])(t: Par[A], f: Par[A]): Par[A] =
+    es => chooser(cond)(if(_) t else f)(es)
+
+  def choiceN_2[A](n: Par[Int])(l: List[Par[A]]): Par[A] =
+    es => chooser(n)(l(_))(es)
+
+  def choiceMap_2[K,V](key: Par[K])(choices: Map[K, Par[V]]): Par[V] =
+    es => chooser(key)(choices(_))(es)
+
+  // `chooser` is a parallel computation that, when run, will run an
+  // initial computation whose result is used to determine a second
+  // computation. This function, which comes up often in functional
+  // libraries, is usually called `flatMap`.
+  def flatMap[A,B](apar: Par[A])(f: A => Par[B]): Par[B] =
+    chooser(apar)(f)
+
+  def join[A](p: Par[Par[A]]): Par[A] = es => (p(es).get())(es)
+
+  def join_2[A](p: Par[Par[A]]): Par[A] =
+    flatMap(p)(innerp => innerp)
+
+  // Using join
+  def flatMap_2[A,B](apar: Par[A])(f: A => Par[B]): Par[B] =
+    join(map(apar)(f))
+
 }
 
 object FPInScalaParTest extends App {
   import Par.Par
-  import java.util.concurrent.ForkJoinPool
+  import java.util.concurrent.Executors
 
-  Par.run(new ForkJoinPool(3))(
+  Par.run(Executors.newFixedThreadPool(3))(
     Par.sequence(
       List(
         // One concurent computation
@@ -312,6 +370,63 @@ object FPInScalaParTest extends App {
       Par.map2(Par.fork(sum(l)), Par.fork(sum(r))) { _ + _ }
     }
 
-  Par.run(new ForkJoinPool())(
+  Par.run(Executors.newCachedThreadPool)(
     Par.map(sum(List.range(1,100)))(println))
+
+  println(
+    Par.run(Executors.newCachedThreadPool)(
+      Par.sequence(
+        List(
+          Par.choice(Par.lazyUnit(true))(
+            Par.lazyUnit("true"),
+            Par.lazyUnit("false")),
+          Par.choice(Par.lazyUnit(false))(
+            Par.lazyUnit("true"),
+            Par.lazyUnit("false"))))).get)
+
+  println(
+    Par.run(Executors.newCachedThreadPool)(
+      Par.sequence(
+        List(
+          Par.choice_2(Par.lazyUnit(true))(
+            Par.lazyUnit("true"),
+            Par.lazyUnit("false")),
+          Par.choice_2(Par.lazyUnit(false))(
+            Par.lazyUnit("true"),
+            Par.lazyUnit("false"))))).get)
+
+  println(
+    Par.run(Executors.newCachedThreadPool)(
+      Par.choiceMap(
+        Par.lazyUnit("lala"))(
+        Map("lala" -> Par.lazyUnit("lalalala")))).get)
+
+  println(
+    Par.run(Executors.newCachedThreadPool)(
+      Par.chooser(Par.lazyUnit("live long"))(
+        s => Par.map(Par.lazyUnit("and prosper")){ s + " " + _ })).get)
+
+  println(
+    Par.run(Executors.newCachedThreadPool)(
+      Par.sequence(
+        List(
+          Par.choice_3(Par.lazyUnit(true))(
+            Par.lazyUnit("true"),
+            Par.lazyUnit("false")),
+          Par.choice_3(Par.lazyUnit(false))(
+            Par.lazyUnit("true"),
+            Par.lazyUnit("false"))))).get)
+
+  println(
+    Par.run(Executors.newCachedThreadPool)(
+      Par.choiceMap_2(
+        Par.lazyUnit("lala"))(
+        Map("lala" -> Par.lazyUnit("lalalala")))).get)
+
+
+  // Breaking the law of forking: `fork(x) == x`
+  /*
+  val a: Par[Int] = Par.lazyUnit(41 + 1)
+  println(Par.equal(Executors.newFixedThreadPool(1))(a, Par.fork(a)))
+  //*/
 }
