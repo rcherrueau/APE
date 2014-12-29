@@ -423,6 +423,16 @@ object FPInScalaParTest extends App {
         Par.lazyUnit("lala"))(
         Map("lala" -> Par.lazyUnit("lalalala")))).get)
 
+  val l = List.range(1,100)
+  println(
+    Par.run(Executors.newCachedThreadPool)(
+      Par.flatMap(sum(l)) {
+        r1 => Par.flatMap(sum(l)) {
+          r2 => Par.map(sum(l)) {
+            r3 => r1 + r2 + r3
+          }
+        }
+      }).get)
 
   // Breaking the law of forking: `fork(x) == x`
   /*
