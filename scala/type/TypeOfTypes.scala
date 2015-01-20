@@ -873,3 +873,323 @@ object PimpMyLibrary {
     def bling = "*" + string + "*"
   }
 }
+
+/** Type-Level Computations
+  *
+  * Motivation:
+  * - Unlike Scala's tuples: no size limit & can abstrat over arity
+  * - No runtime runtime overhead & no implicits
+  *
+  * [[http://slick.typesafe.com/talks/scalaio2014/Type-Level_Computations.pdf]]
+  */
+object TypeLevelComputation {
+  // ------------------------------ A simple boolean type (à la Smalltalk)
+  // How you do this at Term-level (General case)
+  object BooleanTermLevel {
+    sealed trait Bool {
+      def &&(b: Bool): Bool
+      def ||(b: Bool): Bool
+      def ifElse[B](t: => B, f: => B): B
+    }
+
+    lazy val True: Bool = new Bool {
+      def &&(b: Bool): Bool = b
+      def ||(b: Bool): Bool = True
+      def ifElse[B](t: => B, f: => B): B = t
+    }
+
+    lazy val False: Bool = new Bool {
+      def &&(b: Bool): Bool = False
+      def ||(b: Bool): Bool = b
+      def ifElse[B](t: => B, f: => B): B = f
+    }
+
+    object Test {
+      assert ( (False  &&  False) == False )
+      assert ( (False  &&  True)  == False )
+      assert ( (True   &&  False) == False )
+      assert ( (True   &&  True)  == True  )
+
+      assert ( (False  ||  False) == False )
+      assert ( (False  ||  True)  == True  )
+      assert ( (True   ||  False) == True  )
+      assert ( (True   ||  True)  == True  )
+
+      assert ( False.ifElse (1,2) == 2     )
+      assert ( True.ifElse  (1,2) == 1     )
+    }
+  }
+
+  // Moves from Term Level to Type Level
+  object BooleanTypeLevel {
+    sealed trait Bool {
+      // Translating Methods
+      type &&[B <: Bool] <: Bool
+      type ||[B <: Bool] <: Bool
+      type IfElse[B, T <: B, F <: B] <: B
+    }
+
+    // Implements abstract type in concrete Types
+    trait True extends Bool {
+      type &&[B <: Bool] = B
+      type ||[B <: Bool] = True
+      type IfElse[B, T <: B, F <: B] = T
+    }
+    object True extends True // Mixin trait with object avoids
+                             // `True.type`
+
+    trait False extends Bool {
+      type &&[B <: Bool] = False
+      type ||[B <: Bool] = B
+      type IfElse[B, T <: B, F <: B] = F
+    }
+    object False extends False
+
+    object Test {
+      implicitly[ (False#  &&  [False]) =:= False ]
+      implicitly[ (False#  &&  [True])  =:= False ]
+      implicitly[ (True#   &&  [False]) =:= False ]
+      implicitly[ (True#   &&  [True])  =:= True  ]
+
+      implicitly[ (False#  ||  [False]) =:= False ]
+      implicitly[ (False#  ||  [True])  =:= True  ]
+      implicitly[ (True#   ||  [False]) =:= True  ]
+      implicitly[ (True#   ||  [True])  =:= True  ]
+
+      implicitly[ False#IfElse[Any, Int, String]  =:= String ]
+      implicitly[ True# IfElse[Any, Int, String]  =:= Int    ]
+    }
+  }
+
+  //----------------------------------------------------- Natural Numbers
+  object NatTermLevel {
+    sealed trait Nat {
+      def ++ : Nat = new Succ(this)
+    }
+
+    final case object Zero extends Nat
+
+    final case class Succ(n: Nat) extends Nat
+
+    // Peano Numbers
+    val _0 = Zero
+    val _1 = _0.++
+    val _2 = _1.++
+
+    object Test {
+      import TypeLevelComputation.BooleanTermLevel._
+
+      assert ( _0    ==            Zero   )
+      assert ( _1    ==       Succ(Zero)  )
+      assert ( _1.++ ==  Succ(Succ(Zero)) )
+      assert ( _2    ==  Succ(Succ(Zero)) )
+
+      assert ( False.ifElse (_0, _1) == _0 )
+      assert ( True.ifElse  (_0, _1) == _1 )
+    }
+  }
+
+  object NatTypeLevel {
+    sealed trait Nat {
+      // For ++ operation, using `this.type` doesn't hold. `this.type`
+      // reduces Zero type to `Zero.type` and Succ[N] to `_ <:
+      // Succ[N]`. Thus, the test `implicitly[ _1 # ++ =:=
+      // Succ[Succ[Zero]] ]` doesn't hold because the type system
+      // cannot prove that `Succ[_ <: Succ[Zero.type] with Singleton]
+      // =:= Succ[Succ[Zero]]`.
+      //
+      // type ++ = Succ[this.type]
+      //
+      // We have to help the compilator giving explicit reduction
+      // rule, here using `This`.
+      type This >: this.type <: Nat
+      type ++ = Succ[This]
+    }
+
+    final object Zero extends Nat {
+      type This = Zero
+    }
+    type Zero = Zero.type // Alternative to Mixin trait with object
+
+    final class Succ[N <: Nat] extends Nat {
+      type This = Succ[N]
+    }
+
+    // Peano Numbers:
+    type _0 = Zero
+    type _1 = _0 # ++
+    type _2 = _1 # ++
+
+    object Test {
+      import TypeLevelComputation.BooleanTypeLevel._
+
+      implicitly[ _0      =:=            Zero   ]
+      implicitly[ _0 # ++ =:=       Succ[Zero]  ]
+      implicitly[ _1      =:=       Succ[Zero]  ]
+      implicitly[ _1 # ++ =:=  Succ[Succ[Zero]] ]
+      implicitly[ _2      =:=  Succ[Succ[Zero]] ]
+      implicitly[ _2      =:=  Succ[    _1    ] ]
+
+      implicitly[ False#IfElse[Nat, _0, _1]  =:= _1 ]
+      implicitly[ True# IfElse[Nat, _0, _1]  =:= _0  ]
+    }
+  }
+
+  /*----------------------------------------------------------*/
+  /* Translation Rules                                        */
+  /*                                                          */
+  /* ADT (Algebraic Data Types) Values: val => object         */
+  /* Members: def x/ val x                  => type X         */
+  /*          def f(x)                      => type F[X]      */
+  /* a.b                                    => A#B            */
+  /* x: T                                   => X <: T         */
+  /* new A(b)                               => A[B]           */
+  /*----------------------------------------------------------*/
+
+  //------------------------------------------------------------ Recursion
+  object NatTermLevelRecurs {
+    sealed trait Nat {
+      def ++ : Nat = new Succ(this)
+      def +(x: Nat): Nat
+    }
+
+    final case object Zero extends Nat {
+      def +(x: Nat): Nat = x
+    }
+
+    final case class Succ(n: Nat) extends Nat {
+      def +(x: Nat): Nat = Succ(n + x)
+    }
+
+    // Peano Numbers
+    val _0 = Zero
+    val _1 = _0.++
+    val _2 = _1.++
+    val _3 = _1 + _2
+
+    object Test {
+      assert ( _3           ==  _3 )
+      assert ( _1 + _1 + _1 ==  _3 )
+      assert ( _1.++ + _1   ==  _3 )
+    }
+  }
+
+  object NatTypeLevelRecurs {
+    sealed trait Nat {
+      type This >: this.type <: Nat
+      type ++ = Succ[This]
+      type +[_ <: Nat] <: Nat
+    }
+
+    final object Zero extends Nat {
+      type This = Zero
+      type +[X <: Nat] = X
+    }
+    type Zero = Zero.type
+
+    final class Succ[N <: Nat] extends Nat {
+      type This = Succ[N]
+      type +[X <: Nat] = Succ[N # + [X]]
+    }
+
+    // Peano Numbers
+    type _0 = Zero
+    type _1 = _0 # ++
+    type _2 = _1 # ++
+    type _3 = _1 # + [_2]
+
+    object Test {
+      implicitly[ _1 # ++ # + [_1] =:= _3 ]
+      implicitly[ _1 # + [ _1 # + [ _1 ]] =:= Succ[Succ[Succ[Zero]]] ]
+      implicitly[ _1 # + [ _1 # + [ _1 ]] =:= _3 ]
+    }
+  }
+
+  // ------------------------------------------------------ Type Functions
+  object NatTermLevelTypeFunc {
+    sealed trait Nat {
+      def ++ : Nat = new Succ(this)
+      // Fold implementation
+      def fold[U](f: U => U, z: => U): U // Church Numerals, `z` is
+                                         // our accumulator
+      // Here, we implements `+` for all instance of Nat using `fold`.
+      def +(x: Nat): Nat =
+        fold[Nat]((n: Nat) => Succ(n), x)
+    }
+
+    final case object Zero extends Nat {
+      def fold[U](f: U => U, z: => U) = z
+    }
+
+    final case class Succ(n: Nat) extends Nat {
+      def fold[U](f: U => U, z: => U) = f(n.fold(f, z))
+    }
+
+    // Peano Numbers
+    val _0 = Zero
+    val _1 = _0.++
+    val _2 = _1.++
+    val _3 = _1 + _2
+
+    object Test {
+      assert ( _3           ==  _3 )
+      assert ( _1 + _1 + _1 ==  _3 )
+      assert ( _1.++ + _1   ==  _3 )
+    }
+  }
+
+  object NatTypeLevelTypeFunc {
+    sealed trait Nat {
+      type This >: this.type <: Nat
+      type ++ = Succ[This]
+
+      /** Type Function */
+      type Fold[U, // fold[U](
+                F[_ <: U] <: U, // f: U => U
+                Z <: U // z: => U
+               ] <: U // ): U
+
+      /** Type Lamdba
+        *
+        * {{{
+        * def +(x: Nat): Nat =
+        *   fold[Nat]((n: Nat) => Succ(n), x)
+        * }}}
+        *
+        * {{{
+        * def +(x: Nat): Nat =
+        *   fold[Nat](  (new { def λ(n: Nat) = Succ(n) }).λ _ // lambda,
+        *                x   )
+        */
+      type +[X <: Nat] =
+        Fold[Nat, ({ type λ[N <: Nat] = Succ[N] })#λ, X]
+        // Fold[Nat, [N <: Nat] => Succ[N], X] // Experimental
+
+    }
+
+    final object Zero extends Nat {
+      type This = Zero
+      type Fold[U, F[_ <: U] <: U, Z <: U] = Z
+    }
+    type Zero = Zero.type
+
+    final class Succ[N <: Nat] extends Nat {
+      type This = Succ[N]
+      type Fold[U, F[_ <: U] <: U, Z <: U] = F[N#Fold[U, F, Z]]
+    }
+
+    // Peano Numbers
+    type _0 = Zero
+    type _1 = _0 # ++
+    type _2 = _1 # ++
+    type _3 = _1 # + [_2]
+
+    object Test {
+      implicitly[ _1 # ++ # + [_1] =:= _3 ]
+      implicitly[ _1 # + [ _1 # + [ _1 ]] =:= Succ[Succ[Succ[Zero]]] ]
+      implicitly[ _1 # + [ _1 # + [ _1 ]] =:= _3 ]
+    }
+  }
+
+
+}
