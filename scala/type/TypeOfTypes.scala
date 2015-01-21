@@ -1061,7 +1061,6 @@ object TypeLevelComputation {
       def +(x: Nat): Nat = Succ(n + x)
     }
 
-    // Peano Numbers
     val _0 = Zero
     val _1 = _0.++
     val _2 = _1.++
@@ -1092,7 +1091,6 @@ object TypeLevelComputation {
       type +[X <: Nat] = Succ[N # + [X]]
     }
 
-    // Peano Numbers
     type _0 = Zero
     type _1 = _0 # ++
     type _2 = _1 # ++
@@ -1125,7 +1123,6 @@ object TypeLevelComputation {
       def fold[U](f: U => U, z: => U) = f(n.fold(f, z))
     }
 
-    // Peano Numbers
     val _0 = Zero
     val _1 = _0.++
     val _2 = _1.++
@@ -1164,7 +1161,6 @@ object TypeLevelComputation {
       type +[X <: Nat] =
         Fold[Nat, ({ type λ[N <: Nat] = Succ[N] })#λ, X]
         // Fold[Nat, [N <: Nat] => Succ[N], X] // Experimental
-
     }
 
     final object Zero extends Nat {
@@ -1178,7 +1174,6 @@ object TypeLevelComputation {
       type Fold[U, F[_ <: U] <: U, Z <: U] = F[N#Fold[U, F, Z]]
     }
 
-    // Peano Numbers
     type _0 = Zero
     type _1 = _0 # ++
     type _2 = _1 # ++
@@ -1188,6 +1183,62 @@ object TypeLevelComputation {
       implicitly[ _1 # ++ # + [_1] =:= _3 ]
       implicitly[ _1 # + [ _1 # + [ _1 ]] =:= Succ[Succ[Succ[Zero]]] ]
       implicitly[ _1 # + [ _1 # + [ _1 ]] =:= _3 ]
+    }
+  }
+
+  object NatTermAndTypeLevel {
+    sealed trait Nat {
+      type This >: this.type <: Nat
+      type Fold[U, F[_ <: U] <: U, Z <: U] <: U
+      type ++ = Succ[This]
+
+      // Combining Term- and Type-Level
+      def value: Int
+
+      type +[X <: Nat] =
+        Fold[Nat, ({ type λ[N <: Nat] = Succ[N] })#λ, X]
+      // Hybrid operation: Term- & Type-level. Thus our `+` method is
+      // correctly typed.
+      def  +[X <: Nat](n: X): +[X] =
+        // Here, we have to wrap the int operation in
+        // the correct Nat.
+        Nat._unsafe[+[X]](value + n.value)
+    }
+    object Nat {
+      def _unsafe[N <: Nat](v: Int) =
+        (if (v == 0) Zero else Succ(v)).asInstanceOf[N]
+    }
+
+    final object Zero extends Nat {
+      type This = Zero
+      type Fold[U, F[_ <: U] <: U, Z <: U] = Z
+
+      def value = 0
+    }
+    type Zero = Zero.type
+
+    final case class Succ[N <: Nat](val value: Int) extends Nat {
+      type This = Succ[N]
+      type Fold[U, F[_ <: U] <: U, Z <: U] = F[N#Fold[U, F, Z]]
+    }
+
+    type _0 = Zero
+    type _1 = _0 # ++
+    type _2 = _1 # ++
+    type _3 = _1 # + [_2]
+
+    val _0: _0 = Zero
+    val _1: _1 = Succ[_0](_0.value)
+    val _2: _2 = Succ[_1](_1.value)
+    val _3: _3 = Succ[_2](_2.value)
+
+    object Test {
+      implicitly[ _1 # ++ # + [_1] =:= _3 ]
+      implicitly[ _1 # + [ _1 # + [ _1 ]] =:= Succ[Succ[Succ[Zero]]] ]
+      implicitly[ _1 # + [ _1 # + [ _1 ]] =:= _3 ]
+
+      assert ( _1 + _1 + _1 == _3 )
+      assert ( _1 + _2      == _3 )
     }
   }
 
