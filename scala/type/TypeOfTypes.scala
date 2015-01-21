@@ -1110,7 +1110,7 @@ object TypeLevelComputation {
       // Fold implementation
       def fold[U](f: U => U, z: => U): U // Church Numerals, `z` is
                                          // our accumulator
-      // Here, we implements `+` for all instance of Nat using `fold`.
+      // Here, we implement `+` for all instance of Nat using `fold`.
       def +(x: Nat): Nat =
         fold[Nat]((n: Nat) => Succ(n), x)
     }
@@ -1186,6 +1186,7 @@ object TypeLevelComputation {
     }
   }
 
+  // ------------------------------------ Term- And Type-Level Combination
   object NatTermAndTypeLevel {
     sealed trait Nat {
       type This >: this.type <: Nat
@@ -1203,6 +1204,8 @@ object TypeLevelComputation {
         // Here, we have to wrap the int operation in
         // the correct Nat.
         Nat._unsafe[+[X]](value + n.value)
+
+      def ++ : ++ = Succ(this.value)
     }
     object Nat {
       def _unsafe[N <: Nat](v: Int) =
@@ -1242,5 +1245,63 @@ object TypeLevelComputation {
     }
   }
 
+  // ------------------------------------------------- Heterogeneous Lists
+  object HeterogeneousList {
+    import NatTermAndTypeLevel._
 
+    sealed abstract class HList {
+      type This >: this.type <: HList
+      type Head
+      type Tail <: HList
+
+      def head: Head
+      def tail: Tail
+
+      // HList Length
+      def length: Length = Nat._unsafe[Length](fold((n: Int) => n + 1, 0))
+      type Length = Fold[Nat, ({ type λ[N <: Nat] = N # ++ })#λ, Zero]
+
+      // HList Span
+      def span1: Span1 = (HCons(head, HNil), tail)
+      type Span1 = (HCons[Head, HNil.type], Tail)
+
+      def span2: Span2 = (HCons(head, HCons(tail.head, HNil)), tail.tail)
+      type Span2 = (HCons[Head, HCons[Tail#Head, HNil.type]], Tail#Tail)
+
+      def spanN(n: Int): SpanN = ???
+      type SpanN = Nothing
+
+      // Utils
+      def fold[U](f: U => U, z: => U): U
+      type Fold[U, F[_ <: U] <: U, Z <: U] <: U
+    }
+
+    final case class HCons[H, T <: HList](val head: H,
+                                          val tail: T) extends HList {
+      type This = HCons[H,T]
+      type Head = H
+      type Tail = T
+
+      // Utils
+      def fold[U](f: U => U, z: => U) = f(tail.fold[U](f, z))
+      type Fold[U, F[_ <: U] <: U, Z <: U] = F[Tail#Fold[U, F, Z]]
+    }
+
+    final object HNil extends HList {
+      type This = HNil.type
+      type Head = Nothing
+      type Tail = Nothing
+
+      def head = throw new NoSuchElementException("HNil.head")
+      def tail = throw new NoSuchElementException("HNil.tail")
+
+      // Utils
+      def fold[U](f: U => U, z: => U) = z
+      type Fold[U, F[_ <: U] <: U, Z <: U] = Z
+    }
+
+    object Test {
+      assert ( HCons("a", HCons(1, HNil)).length  ==  _2 )
+    }
+  }
 }
