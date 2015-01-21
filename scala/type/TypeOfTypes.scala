@@ -1206,6 +1206,10 @@ object TypeLevelComputation {
         Nat._unsafe[+[X]](value + n.value)
 
       def ++ : ++ = Succ(this.value)
+
+      // -- For HList # Span
+      type GT_0[U, T <: U, F <: U] <: U
+      type -- <: Nat
     }
     object Nat {
       def _unsafe[N <: Nat](v: Int) =
@@ -1217,12 +1221,20 @@ object TypeLevelComputation {
       type Fold[U, F[_ <: U] <: U, Z <: U] = Z
 
       def value = 0
+
+      // -- For HList # Span
+      type GT_0[U, T <: U, F <: U] = F
+      type -- = Zero
     }
     type Zero = Zero.type
 
     final case class Succ[N <: Nat](val value: Int) extends Nat {
       type This = Succ[N]
       type Fold[U, F[_ <: U] <: U, Z <: U] = F[N#Fold[U, F, Z]]
+
+      // -- For HList # Span
+      type GT_0[U, T <: U, F <: U] = T
+      type -- = N
     }
 
     type _0 = Zero
@@ -1258,8 +1270,8 @@ object TypeLevelComputation {
       def tail: Tail
 
       // HList Length
-      def length: Length = Nat._unsafe[Length](fold((n: Int) => n + 1, 0))
-      type Length = Fold[Nat, ({ type λ[N <: Nat] = N # ++ })#λ, Zero]
+      def length: Length = Nat._unsafe[Length](fold((_, n: Int) => n + 1, 0))
+      type Length = Fold[Nat, ({ type λ[_, N <: Nat] = N # ++ })#λ, Zero]
 
       // HList Span
       def span1: Span1 = (HCons(head, HNil), tail)
@@ -1268,12 +1280,44 @@ object TypeLevelComputation {
       def span2: Span2 = (HCons(head, HCons(tail.head, HNil)), tail.tail)
       type Span2 = (HCons[Head, HCons[Tail#Head, HNil.type]], Tail#Tail)
 
-      def spanN(n: Int): SpanN = ???
-      type SpanN = Nothing
+      def spanN(n: Int) =
+        fold[T3[Int,HList,HList]](
+          { case (h, T3(n,p,s)) => if (n > 0) T3(n-1, HCons(h, p), s)
+                                   else T3(0, p, s)
+          }, T3(n, HNil, this)).res
+
+      final case class T3[T1,T2,T3](val n: T1,
+                                    val pref: T2,
+                                    val suf: T3) {
+        type N = T1
+        type P = T2
+        type S = T3
+
+        def res: (P, S) = (pref, suf)
+      }
+
+      // FIXME
+      // type SpanN[X <: Nat] = Fold[T3[Nat,HList,HList],
+      //                             ({ type λ[H, T <: T3[Nat,HList,HList]] =
+      //                                 T # N # GT_0[Nat,
+      //                                              T3[T # N # --, HCons[H, T # P], T # S],
+      //                                              T3[_0, T # P, T # S]]
+      //                              })#λ, T3[X,HNil.type,This]]
+
+      // [T3[Nat,HList,HList],
+      //  [H, T <: T3[Nat,HList,HList]]
+      //    Nat#GT_0[Nat,
+      //             T3[Nat#--,HCons[H,HList],HList],
+      //             T3[Zero.type,HList,HList]],
+      //  T3[X,HNil,HList.this.This]]
+
+      // [U,
+      //  F[_, _ <: U] <: U,
+      //  Z <: U]
 
       // Utils
-      def fold[U](f: U => U, z: => U): U
-      type Fold[U, F[_ <: U] <: U, Z <: U] <: U
+      def fold[U](f: (Any, U) => U, z: => U): U // f is Function2
+      type Fold[U, F[_, _ <: U] <: U, Z <: U] <: U
     }
 
     final case class HCons[H, T <: HList](val head: H,
@@ -1283,8 +1327,8 @@ object TypeLevelComputation {
       type Tail = T
 
       // Utils
-      def fold[U](f: U => U, z: => U) = f(tail.fold[U](f, z))
-      type Fold[U, F[_ <: U] <: U, Z <: U] = F[Tail#Fold[U, F, Z]]
+      def fold[U](f: (Any, U) => U, z: => U) = f(head, tail.fold[U](f, z))
+      type Fold[U, F[_, _ <: U] <: U, Z <: U] = F[Head, Tail#Fold[U, F, Z]]
     }
 
     final object HNil extends HList {
@@ -1296,8 +1340,8 @@ object TypeLevelComputation {
       def tail = throw new NoSuchElementException("HNil.tail")
 
       // Utils
-      def fold[U](f: U => U, z: => U) = z
-      type Fold[U, F[_ <: U] <: U, Z <: U] = Z
+      def fold[U](f: (Any, U) => U, z: => U) = z
+      type Fold[U, F[_, _ <: U] <: U, Z <: U] = Z
     }
 
     object Test {
