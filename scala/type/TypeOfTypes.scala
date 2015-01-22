@@ -1208,7 +1208,7 @@ object TypeLevelComputation {
       def ++ : ++ = Succ(this.value)
 
       // -- For HList # Span
-      type GT_0[U, T <: U, F <: U] <: U
+      type GT_0[B, T <: B, F <: B] <: B
       type -- <: Nat
     }
     object Nat {
@@ -1223,7 +1223,7 @@ object TypeLevelComputation {
       def value = 0
 
       // -- For HList # Span
-      type GT_0[U, T <: U, F <: U] = F
+      type GT_0[B, T <: B, F <: B] = F
       type -- = Zero
     }
     type Zero = Zero.type
@@ -1233,7 +1233,7 @@ object TypeLevelComputation {
       type Fold[U, F[_ <: U] <: U, Z <: U] = F[N#Fold[U, F, Z]]
 
       // -- For HList # Span
-      type GT_0[U, T <: U, F <: U] = T
+      type GT_0[B, T <: B, F <: B] = T
       type -- = N
     }
 
@@ -1280,29 +1280,50 @@ object TypeLevelComputation {
       def span2: Span2 = (HCons(head, HCons(tail.head, HNil)), tail.tail)
       type Span2 = (HCons[Head, HCons[Tail#Head, HNil.type]], Tail#Tail)
 
-      def spanN(n: Int) =
-        fold[T3[Int,HList,HList]](
-          { case (h, T3(n,p,s)) => if (n > 0) T3(n-1, HCons(h, p), s)
-                                   else T3(0, p, s)
-          }, T3(n, HNil, this)).res
+      // def spanN(n: Int) =
+      //   fold[T3[Int,HList,HList]](
+      //     { case (h, T3(n,p,s)) => if (n > 0) T3(n-1, HCons(h, p), s)
+      //                              else T3(0, p, s)
+      //     }, T3(n, HNil, this)).res
 
-      final case class T3[T1,T2,T3](val n: T1,
-                                    val pref: T2,
-                                    val suf: T3) {
-        type N = T1
-        type P = T2
-        type S = T3
+      // final case class T3[+T1,+T2,+T3](val n: T1,
+      //                                  val pref: T2,
+      //                                  val suf: T3) {
+      //   // type N =  T1
+      //   // type P = T2
+      //   // type S = T3
 
-        def res: (P, S) = (pref, suf)
+      //   def res: (T2, T3) = (pref, suf)
+      // }
+
+      trait T3 {
+        type N <: Nat
+        type P <: HList
+        type S <: HList
       }
 
-      // FIXME
-      // type SpanN[X <: Nat] = Fold[T3[Nat,HList,HList],
-      //                             ({ type λ[H, T <: T3[Nat,HList,HList]] =
-      //                                 T # N # GT_0[Nat,
-      //                                              T3[T # N # --, HCons[H, T # P], T # S],
-      //                                              T3[_0, T # P, T # S]]
-      //                              })#λ, T3[X,HNil.type,This]]
+      final class T33[+N <: Nat, +P <: HList, +S <: HList] extends T3
+
+
+      implicitly[_1 # GT_0[Nat, _1, _0] =:= _1]
+      implicitly[_0 # GT_0[Nat, _1, _0] =:= _0]
+      implicitly[_1 # GT_0[HList, HCons[Int,HNil], HNil] =:= HCons[Int,HNil]]
+      implicitly[_0 # GT_0[HList, HCons[Int,HNil], HNil] =:= HNil]
+      implicitly[_0 # GT_0[(Nat,Nat,Nat), (_1,_1,_1), (_2,_2,_2)] =:= (_2,_2,_2)]
+      // implicitly[_1 # GT_0[T3, T33[_1,_1,_1], T33[_0,_0,_0]] =:= T33[_1,_1,_1]]
+      // implicitly[_0 # GT_0[T3[Nat,Nat,Nat], T3[_1,_1,_1], T3[_0,_0,_0]] =:= T3[_0,_0,_0]]
+      implicitly[_1 # GT_0[T3, T33[_1,HNil,HNil], T33[_0,HNil,HNil]] =:= T33[_1,HNil,HNil]]
+      implicitly[_0 # GT_0[T3, T33[_1,HNil,HNil], T33[_0,HNil,HNil]] =:= T33[_0,HNil,HNil]]
+
+      // List[ _1 # GT_0[T3[Nat,Nat,Nat], T3[_1,_1,_1], T3[_1,_1,_1]] ](T3(_1,_1,_1))
+
+      // // FIXME:
+      type SpanN[X <: Nat] = Fold[T3,
+                                  ({ type λ[H, T <: T3] =
+                                      T # N # GT_0[T33[Nat,HList,HList],
+                                                   T33[T # N # --, HCons[H, T # P], T # S],
+                                                   T33[_0, T # P, T # S]]
+                                   })#λ, T33[X,HNil.type,This]]
 
       // [T3[Nat,HList,HList],
       //  [H, T <: T3[Nat,HList,HList]]
@@ -1343,6 +1364,7 @@ object TypeLevelComputation {
       def fold[U](f: (Any, U) => U, z: => U) = z
       type Fold[U, F[_, _ <: U] <: U, Z <: U] = Z
     }
+    type HNil = HNil.type
 
     object Test {
       assert ( HCons("a", HCons(1, HNil)).length  ==  _2 )
