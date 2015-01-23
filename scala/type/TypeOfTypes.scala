@@ -1224,7 +1224,7 @@ object TypeLevelComputation {
 
       // -- For HList # Span
       type GT_0[B, T <: B, F <: B] = F
-      type -- = Zero
+      type -- = Nothing
     }
     type Zero = Zero.type
 
@@ -1248,9 +1248,18 @@ object TypeLevelComputation {
     val _3: _3 = Succ[_2](_2.value)
 
     object Test {
-      implicitly[ _1 # ++ # + [_1] =:= _3 ]
+      implicitly[ _1 # ++ # + [_1]        =:= _3 ]
       implicitly[ _1 # + [ _1 # + [ _1 ]] =:= Succ[Succ[Succ[Zero]]] ]
       implicitly[ _1 # + [ _1 # + [ _1 ]] =:= _3 ]
+
+      implicitly[ _1 # GT_0[Nat, _1, _0]                           =:= _1 ]
+      implicitly[ _0 # GT_0[Nat, _1, _0]                           =:= _0 ]
+      implicitly[ _0 # GT_0[(Nat,Nat,Nat), (_1,_1,_1), (_2,_2,_2)] =:= (_2,_2,_2) ]
+
+      implicitly[ _0 # --           =:= Nothing ]
+      implicitly[ _1 # --           =:= _0 ]
+      implicitly[ _2 # -- # --      =:= _0 ]
+      implicitly[ _2 # -- # -- # -- =:= Nothing ]
 
       assert ( _1 + _1 + _1 == _3 )
       assert ( _1 + _2      == _3 )
@@ -1260,6 +1269,48 @@ object TypeLevelComputation {
   // ------------------------------------------------- Heterogeneous Lists
   object HeterogeneousList {
     import NatTermAndTypeLevel._
+
+    // REDFLAG: Always put inner used type outer!
+    trait Sp {
+      type T1
+      type T2 <: HList
+      type T3 <: HList
+
+      type Out
+
+      def _1: T1
+      def _2: T2
+      def _3: T3
+    }
+
+    trait INatSp extends Sp {
+      type T1 <: Nat
+      type Out <: (T2, T3)
+    }
+
+    trait NatSp[N <: Nat,
+                P <: HList,
+                S <: HList] extends INatSp {
+      type T1 = N
+      type T2 = P
+      type T3 = S
+
+      type Out = (T2, T3)
+    }
+
+
+    trait IIntSp extends Sp {
+      type T1 <: Int
+      def res: (T2, T3) = (_2, _3)
+    }
+
+    case class IntSp[P <: HList, S <: HList](val _1: Int,
+                                             val _2: P,
+                                             val _3: S) extends IIntSp {
+      type T1 = Int
+      type T2 = P
+      type T3 = S
+    }
 
     sealed abstract class HList {
       type This >: this.type <: HList
@@ -1280,63 +1331,77 @@ object TypeLevelComputation {
       def span2: Span2 = (HCons(head, HCons(tail.head, HNil)), tail.tail)
       type Span2 = (HCons[Head, HCons[Tail#Head, HNil.type]], Tail#Tail)
 
-      // def spanN(n: Int) =
-      //   fold[T3[Int,HList,HList]](
-      //     { case (h, T3(n,p,s)) => if (n > 0) T3(n-1, HCons(h, p), s)
-      //                              else T3(0, p, s)
-      //     }, T3(n, HNil, this)).res
+      def span3: Span3 =
+        (HCons(head, HCons(tail.head, HCons(tail.tail.head, HNil))), tail.tail.tail)
+      type Span3 =
+        (HCons[Head, HCons[Tail#Head, HCons[Tail#Tail#Head, HNil.type]]], Tail#Tail#Tail)
 
-      // final case class T3[+T1,+T2,+T3](val n: T1,
-      //                                  val pref: T2,
-      //                                  val suf: T3) {
-      //   // type N =  T1
-      //   // type P = T2
-      //   // type S = T3
-
-      //   def res: (T2, T3) = (pref, suf)
-      // }
-
-      trait T3 {
-        type N <: Nat
-        type P <: HList
-        type S <: HList
-      }
-
-      final class T33[+N <: Nat, +P <: HList, +S <: HList] extends T3
+      // FIXME
+      /*
+       import TypeLevelComputation.NatTermAndTypeLevel._
+       import TypeLevelComputation.HeterogeneousList._
+       HCons(1, HCons("1", HNil)).span(_1)
+       */
+      def span[N <: Nat](n: N)/*: SpanN[N]#Out*/ =
+        (fold[IIntSp](
+           { case (h, IntSp(n,p,s)) => if (n > 0) IntSp(n-1, HCons(h, p), s.tail)
+                                       else IntSp(0, p, s)
+           }, IntSp(n.value, HNil, this)).res)/*.asInstanceOf[SpanN[N] # Out]*/
 
 
-      implicitly[_1 # GT_0[Nat, _1, _0] =:= _1]
-      implicitly[_0 # GT_0[Nat, _1, _0] =:= _0]
-      implicitly[_1 # GT_0[HList, HCons[Int,HNil], HNil] =:= HCons[Int,HNil]]
-      implicitly[_0 # GT_0[HList, HCons[Int,HNil], HNil] =:= HNil]
-      implicitly[_0 # GT_0[(Nat,Nat,Nat), (_1,_1,_1), (_2,_2,_2)] =:= (_2,_2,_2)]
-      // implicitly[_1 # GT_0[T3, T33[_1,_1,_1], T33[_0,_0,_0]] =:= T33[_1,_1,_1]]
-      // implicitly[_0 # GT_0[T3[Nat,Nat,Nat], T3[_1,_1,_1], T3[_0,_0,_0]] =:= T3[_0,_0,_0]]
-      implicitly[_1 # GT_0[T3, T33[_1,HNil,HNil], T33[_0,HNil,HNil]] =:= T33[_1,HNil,HNil]]
-      implicitly[_0 # GT_0[T3, T33[_1,HNil,HNil], T33[_0,HNil,HNil]] =:= T33[_0,HNil,HNil]]
+      implicitly[ _1 # GT_0[HList, HCons[Int,HNil], HNil]
+                  =:= HCons[Int,HNil] ]
+      implicitly[ _0 # GT_0[HList, HCons[Int,HNil], HNil]
+                  =:= HNil ]
+      implicitly[ _1 # GT_0[INatSp, NatSp[_1,HNil,HNil], NatSp[_0,HNil,HNil]]
+                  =:= NatSp[_1,HNil,HNil] ]
+      implicitly[ _0 # GT_0[INatSp, NatSp[_1,HNil,HNil], NatSp[_0,HNil,HNil]]
+                  =:= NatSp[_0,HNil,HNil] ]
+      implicitly[ _1 # GT_0[INatSp,
+                            NatSp[_1,HCons[Int,HNil],HNil],
+                            NatSp[_0,HCons[Int,HNil],HNil]]
+                  =:=  NatSp[_1,HCons[Int,HNil],HNil] ]
+      implicitly[ _0 # GT_0[INatSp,
+                            NatSp[_1,HCons[Int,HNil],HNil],
+                            NatSp[_0,HCons[Int,HNil],HNil]]
+                  =:=  NatSp[_0,HCons[Int,HNil],HNil] ]
 
-      // List[ _1 # GT_0[T3[Nat,Nat,Nat], T3[_1,_1,_1], T3[_1,_1,_1]] ](T3(_1,_1,_1))
+      implicitly[ NatSp[_0,HCons[Int,HNil],HNil]#T1                 =:= _0 ]
+      implicitly[ NatSp[_0,HCons[Int,HNil],HNil]#T2                 =:= HCons[Int,HNil] ]
+      implicitly[ NatSp[_0,HCons[Int,HNil],HNil]#T3                 =:= HNil ]
+      implicitly[ NatSp[_0,HCons[Int,HNil],HNil]#T1#GT_0[Nat,_1,_0] =:= _0 ]
+      implicitly[ NatSp[_1,HCons[Int,HNil],HNil]#T1#GT_0[Nat,_1,_0] =:= _1 ]
+      implicitly[ NatSp[_2,HCons[Int,HNil],HNil]#T1#GT_0[Nat,_1,_0] =:= _1 ]
 
-      // // FIXME:
-      type SpanN[X <: Nat] = Fold[T3,
-                                  ({ type λ[H, T <: T3] =
-                                      T # N # GT_0[T33[Nat,HList,HList],
-                                                   T33[T # N # --, HCons[H, T # P], T # S],
-                                                   T33[_0, T # P, T # S]]
-                                   })#λ, T33[X,HNil.type,This]]
 
-      // [T3[Nat,HList,HList],
-      //  [H, T <: T3[Nat,HList,HList]]
-      //    Nat#GT_0[Nat,
-      //             T3[Nat#--,HCons[H,HList],HList],
-      //             T3[Zero.type,HList,HList]],
-      //  T3[X,HNil,HList.this.This]]
+      //* FIXME:
+      type SpanN[X <: Nat] = Fold[INatSp,
+                                  ({ type λ[H, T <: INatSp] =
+                                      T # T1 # GT_0[INatSp,
+                                                    NatSp[T # T1 # --,
+                                                          HCons[H, T # T2],
+                                                          T # T3 # Tail],
+                                                    NatSp[_0, T # T2, T # T3]]
+                                   })#λ, NatSp[X,HNil,This]]
 
-      // [U,
-      //  F[_, _ <: U] <: U,
-      //  Z <: U]
+      implicitly[ HNil # SpanN[_0] =:= NatSp[_0, HNil, HNil] ]
+      implicitly[ HNil # SpanN[_1] =:= NatSp[_1, HNil, HNil] ]
+      implicitly[ HNil # SpanN[_2] =:= NatSp[_2, HNil, HNil] ]
 
-      // Utils
+      implicitly[ HCons[Int,HNil] # SpanN[_0] =:= NatSp[_0, HNil, HCons[Int,HNil]] ]
+      implicitly[ HCons[Int,HNil] # SpanN[_1] =:= NatSp[_0, HCons[Int,HNil], HNil] ]
+      implicitly[ HCons[Int,HNil] # SpanN[_2] =:= NatSp[_1, HCons[Int,HNil], HNil] ]
+
+      implicitly[ HCons[Int,HCons[String,HNil]] # SpanN[_0]
+                   =:= NatSp[_0, HNil, HCons[Int,HCons[String,HNil]]] ]
+      // BUG: Why String, String in result?
+      implicitly[ HCons[Int,HCons[String,HNil]] # SpanN[_1]
+                   =:= NatSp[_0, HCons[String,HNil], HCons[String,HNil]] ]
+
+      // val a: HCons[Int,HCons[String,HCons[Char,HNil]]] # SpanN[_1] = "a"
+
+      // */
+
       def fold[U](f: (Any, U) => U, z: => U): U // f is Function2
       type Fold[U, F[_, _ <: U] <: U, Z <: U] <: U
     }
@@ -1349,11 +1414,11 @@ object TypeLevelComputation {
 
       // Utils
       def fold[U](f: (Any, U) => U, z: => U) = f(head, tail.fold[U](f, z))
-      type Fold[U, F[_, _ <: U] <: U, Z <: U] = F[Head, Tail#Fold[U, F, Z]]
+      type Fold[U, F[_, _ <: U] <: U, Z <: U] = F[Head, T#Fold[U, F, Z]]
     }
 
     final object HNil extends HList {
-      type This = HNil.type
+      type This = HNil
       type Head = Nothing
       type Tail = Nothing
 
@@ -1366,8 +1431,12 @@ object TypeLevelComputation {
     }
     type HNil = HNil.type
 
+    assert ( HCons("a", HCons(1, HNil)).length  ==  _2 )
+    assert ( HCons(1, HCons("1", HNil)).span(_1) == (HCons(1, HNil), HCons("1", HNil)) )
+
     object Test {
-      assert ( HCons("a", HCons(1, HNil)).length  ==  _2 )
+      // val t:  (HCons[Int, HNil], HCons[String, HNil]) =
+      //   HCons(1, HCons("1", HNil)).span(_1)
     }
   }
 }
