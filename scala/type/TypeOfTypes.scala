@@ -1208,6 +1208,10 @@ object TypeLevelComputation {
       def ++ : ++ = Succ(this.value)
 
       // -- For HList # Span
+      def --  = if (this.value == 0) throw new NoSuchElementException("_0 --")
+                else if (this.value == 1) Zero
+                else Succ(value - 1)
+
       type GT_0[B, T <: B, F <: B] <: B
       type -- <: Nat
     }
@@ -1243,9 +1247,9 @@ object TypeLevelComputation {
     type _3 = _1 # + [_2]
 
     val _0: _0 = Zero
-    val _1: _1 = Succ[_0](_0.value)
-    val _2: _2 = Succ[_1](_1.value)
-    val _3: _3 = Succ[_2](_2.value)
+    val _1: _1 = Succ[_0](1)
+    val _2: _2 = Succ[_1](2)
+    val _3: _3 = Succ[_2](3)
 
     object Test {
       implicitly[ _1 # ++ # + [_1]        =:= _3 ]
@@ -1271,46 +1275,45 @@ object TypeLevelComputation {
     import NatTermAndTypeLevel._
 
     // REDFLAG: Always put inner used type outer!
-    trait Sp {
-      type T1
-      type T2 <: HList
-      type T3 <: HList
+    // trait Sp {
+    //   type T1
+    //   type T2 <: HList
+    //   type T3 <: HList
 
-      type Out
+    //   type Out
 
-      def _1: T1
-      def _2: T2
-      def _3: T3
-    }
+    //   def _1: T1
+    //   def _2: T2
+    //   def _3: T3
+    // }
 
-    trait INatSp extends Sp {
-      type T1 <: Nat
-      type Out <: (T2, T3)
-    }
+    // trait INatSp extends Sp {
+    //   type T1 <: Nat
+    //   type Out <: (T2, T3)
+    // }
 
-    trait NatSp[N <: Nat,
-                P <: HList,
-                S <: HList] extends INatSp {
-      type T1 = N
-      type T2 = P
-      type T3 = S
+    // trait NatSp[N <: Nat,
+    //             P <: HList,
+    //             S <: HList] extends INatSp {
+    //   type T1 = N
+    //   type T2 = P
+    //   type T3 = S
 
-      type Out = (T2, T3)
-    }
+    //   type Out = (T2, T3)
+    // }
 
+    // trait IIntSp extends Sp {
+    //   type T1 <: Int
+    //   def res: (T2, T3) = (_2, _3)
+    // }
 
-    trait IIntSp extends Sp {
-      type T1 <: Int
-      def res: (T2, T3) = (_2, _3)
-    }
-
-    case class IntSp[P <: HList, S <: HList](val _1: Int,
-                                             val _2: P,
-                                             val _3: S) extends IIntSp {
-      type T1 = Int
-      type T2 = P
-      type T3 = S
-    }
+    // case class IntSp[P <: HList, S <: HList](val _1: Int,
+    //                                          val _2: P,
+    //                                          val _3: S) extends IIntSp {
+    //   type T1 = Int
+    //   type T2 = P
+    //   type T3 = S
+    // }
 
     sealed abstract class HList {
       type This >: this.type <: HList
@@ -1324,86 +1327,171 @@ object TypeLevelComputation {
       def length: Length = Nat._unsafe[Length](fold((_, n: Int) => n + 1, 0))
       type Length = Fold[Nat, ({ type λ[_, N <: Nat] = N # ++ })#λ, Zero]
 
-      // HList Span
-      def span1: Span1 = (HCons(head, HNil), tail)
-      type Span1 = (HCons[Head, HNil.type], Tail)
+      // HList take
+      def take[N <: Nat](n: N): Take[N] = HList._unsafe[Take[N]](this match {
+        case _ if (n.value <= 0) => HNil
+        case HNil => HNil
+        case HCons(h, t) => HCons(h, t.take(n --))
+      })
+      type Take[X <: Nat] <: HList
 
-      def span2: Span2 = (HCons(head, HCons(tail.head, HNil)), tail.tail)
-      type Span2 = (HCons[Head, HCons[Tail#Head, HNil.type]], Tail#Tail)
+//       implicitly[ HNil # Take[_0]                          =:= HNil ]
+//       implicitly[ HNil # Take[_1]                          =:= HNil ]
+//       implicitly[ HNil # Take[_2]                          =:= HNil ]
+//       implicitly[ HNil # Take[_3]                          =:= HNil ]
+//       implicitly[ HCons[Int,HNil] # Take[_0]               =:= HNil ]
+//       implicitly[ HCons[Int,HNil] # Take[_1]               =:= HCons[Int,HNil] ]
+//       implicitly[ HCons[Int,HNil] # Take[_2]               =:= HCons[Int,HNil] ]
+//       implicitly[ HCons[Int,HNil] # Take[_3]               =:= HCons[Int,HNil] ]
+//       implicitly[ HCons[Int,HCons[String,HNil]] # Take[_0] =:= HNil ]
+//       implicitly[ HCons[Int,HCons[String,HNil]] # Take[_1] =:= HCons[Int,HNil] ]
+//       implicitly[ HCons[Int,HCons[String,HNil]] # Take[_2] =:= HCons[Int,HCons[String,HNil]] ]
+//       implicitly[ HCons[Int,HCons[String,HNil]] # Take[_3] =:= HCons[Int,HCons[String,HNil]] ]
 
-      def span3: Span3 =
-        (HCons(head, HCons(tail.head, HCons(tail.tail.head, HNil))), tail.tail.tail)
-      type Span3 =
-        (HCons[Head, HCons[Tail#Head, HCons[Tail#Tail#Head, HNil.type]]], Tail#Tail#Tail)
+//       // typenes testing
+//       // TODO: use scala test
+//       // http://stackoverflow.com/questions/8561898/how-to-do-an-instanceof-check-with-scalatest
+//       val $take1: HNil = HCons("a", HCons(1, HNil)).take(_0)
+//       val $take2: HCons[String,HNil] = HCons("a", HCons(1, HNil)).take(_1)
+//       val $take3: HCons[String,HCons[Int,HNil]] = HCons("a", HCons(1, HNil)).take(_2)
 
-      // FIXME
+      // FIXME: HList drop
       /*
-       import TypeLevelComputation.NatTermAndTypeLevel._
        import TypeLevelComputation.HeterogeneousList._
-       HCons(1, HCons("1", HNil)).span(_1)
+       HCons(1, HCons("&", HNil)).drop(HCons(1, HNil).length)
        */
-      def span[N <: Nat](n: N)/*: SpanN[N]#Out*/ =
-        (fold[IIntSp](
-           { case (h, IntSp(n,p,s)) => if (n > 0) IntSp(n-1, HCons(h, p), s.tail)
-                                       else IntSp(0, p, s)
-           }, IntSp(n.value, HNil, this)).res)/*.asInstanceOf[SpanN[N] # Out]*/
+      def drop[N <: Nat](n: N): Drop[N] = HList._unsafe[Drop[N]](this match {
+        case _ if (n.value <= 0) => this
+        case HNil => HNil
+        case HCons(_, t) => t.drop(n --)
+      })
+      type Drop[X <: Nat] <: HList
+
+//       implicitly[ HNil # Drop[_0]                          =:= HNil ]
+//       implicitly[ HNil # Drop[_1]                          =:= HNil ]
+//       implicitly[ HNil # Drop[_2]                          =:= HNil ]
+//       implicitly[ HNil # Drop[_3]                          =:= HNil ]
+//       implicitly[ HCons[Int,HNil] # Drop[_0]               =:= HCons[Int,HNil] ]
+//       implicitly[ HCons[Int,HNil] # Drop[_1]               =:= HNil ]
+//       implicitly[ HCons[Int,HNil] # Drop[_2]               =:= HNil ]
+//       implicitly[ HCons[Int,HNil] # Drop[_3]               =:= HNil ]
+//       implicitly[ HCons[Int,HCons[String,HNil]] # Drop[_0] =:= HCons[Int,HCons[String,HNil]] ]
+//       implicitly[ HCons[Int,HCons[String,HNil]] # Drop[_1] =:= HCons[String,HNil] ]
+//       implicitly[ HCons[Int,HCons[String,HNil]] # Drop[_2] =:= HNil ]
+//       implicitly[ HCons[Int,HCons[String,HNil]] # Drop[_3] =:= HNil ]
+
+//       // typenes testing
+//       // TODO: use scala test
+//       // http://stackoverflow.com/questions/8561898/how-to-do-an-instanceof-check-with-scalates
+//       val $drop1: HCons[String,HCons[Int,HNil]] = HCons("a", HCons(1, HNil)).drop(_0)
+//       val $drop2: HCons[Int,HNil] = HCons("a", HCons(1, HNil)).drop(_1)
+//       val $drop3: HNil = HCons("a", HCons(1, HNil)).drop(_2)
+
+//       // HList Span
+//       def splitAt[N <: Nat](n: N): SplitAt[N] = (take(n), drop(n))
+//       type SplitAt[X <: Nat] = (Take[X], Drop[X])
+
+//       implicitly[ HNil # SplitAt[_0]            =:= (HNil, HNil) ]
+//       implicitly[ HNil # SplitAt[_1]            =:= (HNil, HNil) ]
+//       implicitly[ HNil # SplitAt[_2]            =:= (HNil, HNil) ]
+//       implicitly[ HNil # SplitAt[_3]            =:= (HNil, HNil) ]
+//       implicitly[ HCons[Int,HNil] # SplitAt[_0] =:= (HNil, HCons[Int,HNil]) ]
+//       implicitly[ HCons[Int,HNil] # SplitAt[_1] =:= (HCons[Int,HNil], HNil) ]
+//       implicitly[ HCons[Int,HNil] # SplitAt[_2] =:= (HCons[Int,HNil], HNil) ]
+//       implicitly[ HCons[Int,HNil] # SplitAt[_3] =:= (HCons[Int,HNil], HNil) ]
+//       implicitly[ HCons[Int,HCons[String,HNil]] # SplitAt[_0]
+//                    =:= (HNil, HCons[Int,HCons[String,HNil]]) ]
+//       implicitly[ HCons[Int,HCons[String,HNil]] # SplitAt[_1]
+//                    =:= (HCons[Int,HNil], HCons[String,HNil]) ]
+//       implicitly[ HCons[Int,HCons[String,HNil]] # SplitAt[_2]
+//                    =:= (HCons[Int,HCons[String,HNil]], HNil) ]
+//       implicitly[ HCons[Int,HCons[String,HNil]] # SplitAt[_3]
+//                    =:= (HCons[Int,HCons[String,HNil]], HNil) ]
+
+//       // typenes testing
+//       // TODO: use scala test
+//       // http://stackoverflow.com/questions/8561898/how-to-do-an-instanceof-check-with-scalates
+//       val $splitAt1: (HNil,HCons[String,HCons[Int,HNil]]) =
+//         HCons("a", HCons(1, HNil)).splitAt(_0)
+//       val $splitAt2: (HCons[String,HNil], HCons[Int,HNil]) =
+//         HCons("a", HCons(1, HNil)).splitAt(_1)
+//       val $splitAt3: (HCons[String,HCons[Int,HNil]],HNil) =
+//         HCons("a", HCons(1, HNil)).splitAt(_2)
+
+//       // FIXME
+//       /*
+//        import TypeLevelComputation.NatTermAndTypeLevel._
+//        import TypeLevelComputation.HeterogeneousList._
+// //       HCons(1, HCons("1", HNil)).splitAt(_1)
+//        */
+
+//       /* FIXME
+//       def span[N <: Nat](n: N)/*: SpanN[N]#Out*/ =
+//         (fold[IIntSp](
+//            { case (h, IntSp(n,p,s)) => if (n > 0) IntSp(n-1, HCons(h, p), s.tail)
+//                                        else IntSp(0, p, s)
+//            }, IntSp(n.value, HNil, this)).res)/*.asInstanceOf[SpanN[N] # Out]*/
 
 
-      implicitly[ _1 # GT_0[HList, HCons[Int,HNil], HNil]
-                  =:= HCons[Int,HNil] ]
-      implicitly[ _0 # GT_0[HList, HCons[Int,HNil], HNil]
-                  =:= HNil ]
-      implicitly[ _1 # GT_0[INatSp, NatSp[_1,HNil,HNil], NatSp[_0,HNil,HNil]]
-                  =:= NatSp[_1,HNil,HNil] ]
-      implicitly[ _0 # GT_0[INatSp, NatSp[_1,HNil,HNil], NatSp[_0,HNil,HNil]]
-                  =:= NatSp[_0,HNil,HNil] ]
-      implicitly[ _1 # GT_0[INatSp,
-                            NatSp[_1,HCons[Int,HNil],HNil],
-                            NatSp[_0,HCons[Int,HNil],HNil]]
-                  =:=  NatSp[_1,HCons[Int,HNil],HNil] ]
-      implicitly[ _0 # GT_0[INatSp,
-                            NatSp[_1,HCons[Int,HNil],HNil],
-                            NatSp[_0,HCons[Int,HNil],HNil]]
-                  =:=  NatSp[_0,HCons[Int,HNil],HNil] ]
+//       implicitly[ _1 # GT_0[HList, HCons[Int,HNil], HNil]
+//                   =:= HCons[Int,HNil] ]
+//       implicitly[ _0 # GT_0[HList, HCons[Int,HNil], HNil]
+//                   =:= HNil ]
+//       implicitly[ _1 # GT_0[INatSp, NatSp[_1,HNil,HNil], NatSp[_0,HNil,HNil]]
+//                   =:= NatSp[_1,HNil,HNil] ]
+//       implicitly[ _0 # GT_0[INatSp, NatSp[_1,HNil,HNil], NatSp[_0,HNil,HNil]]
+//                   =:= NatSp[_0,HNil,HNil] ]
+//       implicitly[ _1 # GT_0[INatSp,
+//                             NatSp[_1,HCons[Int,HNil],HNil],
+//                             NatSp[_0,HCons[Int,HNil],HNil]]
+//                   =:=  NatSp[_1,HCons[Int,HNil],HNil] ]
+//       implicitly[ _0 # GT_0[INatSp,
+//                             NatSp[_1,HCons[Int,HNil],HNil],
+//                             NatSp[_0,HCons[Int,HNil],HNil]]
+//                   =:=  NatSp[_0,HCons[Int,HNil],HNil] ]
 
-      implicitly[ NatSp[_0,HCons[Int,HNil],HNil]#T1                 =:= _0 ]
-      implicitly[ NatSp[_0,HCons[Int,HNil],HNil]#T2                 =:= HCons[Int,HNil] ]
-      implicitly[ NatSp[_0,HCons[Int,HNil],HNil]#T3                 =:= HNil ]
-      implicitly[ NatSp[_0,HCons[Int,HNil],HNil]#T1#GT_0[Nat,_1,_0] =:= _0 ]
-      implicitly[ NatSp[_1,HCons[Int,HNil],HNil]#T1#GT_0[Nat,_1,_0] =:= _1 ]
-      implicitly[ NatSp[_2,HCons[Int,HNil],HNil]#T1#GT_0[Nat,_1,_0] =:= _1 ]
+//       implicitly[ NatSp[_0,HCons[Int,HNil],HNil]#T1                 =:= _0 ]
+//       implicitly[ NatSp[_0,HCons[Int,HNil],HNil]#T2                 =:= HCons[Int,HNil] ]
+//       implicitly[ NatSp[_0,HCons[Int,HNil],HNil]#T3                 =:= HNil ]
+//       implicitly[ NatSp[_0,HCons[Int,HNil],HNil]#T1#GT_0[Nat,_1,_0] =:= _0 ]
+//       implicitly[ NatSp[_1,HCons[Int,HNil],HNil]#T1#GT_0[Nat,_1,_0] =:= _1 ]
+//       implicitly[ NatSp[_2,HCons[Int,HNil],HNil]#T1#GT_0[Nat,_1,_0] =:= _1 ]
+
+//       type SpanN[X <: Nat] = Fold[INatSp,
+//                                   ({ type λ[H, T <: INatSp] =
+//                                       T # T1 # GT_0[INatSp,
+//                                                     NatSp[T # T1 # --,
+//                                                           HCons[H, T # T2],
+//                                                           T # T3 # Tail],
+//                                                     NatSp[_0, T # T2, T # T3]]
+//                                    })#λ, NatSp[X,HNil,This]]
 
 
-      //* FIXME:
-      type SpanN[X <: Nat] = Fold[INatSp,
-                                  ({ type λ[H, T <: INatSp] =
-                                      T # T1 # GT_0[INatSp,
-                                                    NatSp[T # T1 # --,
-                                                          HCons[H, T # T2],
-                                                          T # T3 # Tail],
-                                                    NatSp[_0, T # T2, T # T3]]
-                                   })#λ, NatSp[X,HNil,This]]
+//       implicitly[ HNil # SpanN[_0] =:= NatSp[_0, HNil, HNil] ]
+//       implicitly[ HNil # SpanN[_1] =:= NatSp[_1, HNil, HNil] ]
+//       implicitly[ HNil # SpanN[_2] =:= NatSp[_2, HNil, HNil] ]
 
-      implicitly[ HNil # SpanN[_0] =:= NatSp[_0, HNil, HNil] ]
-      implicitly[ HNil # SpanN[_1] =:= NatSp[_1, HNil, HNil] ]
-      implicitly[ HNil # SpanN[_2] =:= NatSp[_2, HNil, HNil] ]
 
-      implicitly[ HCons[Int,HNil] # SpanN[_0] =:= NatSp[_0, HNil, HCons[Int,HNil]] ]
-      implicitly[ HCons[Int,HNil] # SpanN[_1] =:= NatSp[_0, HCons[Int,HNil], HNil] ]
-      implicitly[ HCons[Int,HNil] # SpanN[_2] =:= NatSp[_1, HCons[Int,HNil], HNil] ]
+//       implicitly[ HCons[Int,HNil] # SpanN[_0] =:= NatSp[_0, HNil, HCons[Int,HNil]] ]
+//       implicitly[ HCons[Int,HNil] # SpanN[_1] =:= NatSp[_0, HCons[Int,HNil], HNil] ]
+//       implicitly[ HCons[Int,HNil] # SpanN[_2] =:= NatSp[_1, HCons[Int,HNil], HNil] ]
 
-      implicitly[ HCons[Int,HCons[String,HNil]] # SpanN[_0]
-                   =:= NatSp[_0, HNil, HCons[Int,HCons[String,HNil]]] ]
-      // BUG: Why String, String in result?
-      implicitly[ HCons[Int,HCons[String,HNil]] # SpanN[_1]
-                   =:= NatSp[_0, HCons[String,HNil], HCons[String,HNil]] ]
+//       implicitly[ HCons[Int,HCons[String,HNil]] # SpanN[_0]
+//                    =:= NatSp[_0, HNil, HCons[Int,HCons[String,HNil]]] ]
+//       // BUG: Why String, String in result?
+//       implicitly[ HCons[Int,HCons[String,HNil]] # SpanN[_1]
+//                    =:= NatSp[_0, HCons[String,HNil], HCons[String,HNil]] ]
 
-      // val a: HCons[Int,HCons[String,HCons[Char,HNil]]] # SpanN[_1] = "a"
 
-      // */
+//       // val a: HCons[Int,HCons[String,HCons[Char,HNil]]] # SpanN[_1] = "a"
+
+//       // */
 
       def fold[U](f: (Any, U) => U, z: => U): U // f is Function2
       type Fold[U, F[_, _ <: U] <: U, Z <: U] <: U
+    }
+    object HList {
+      def _unsafe[T](f: => Any) = f.asInstanceOf[T]
     }
 
     final case class HCons[H, T <: HList](val head: H,
@@ -1411,6 +1499,14 @@ object TypeLevelComputation {
       type This = HCons[H,T]
       type Head = H
       type Tail = T
+
+      type Take[X <: Nat] = X # GT_0[HList,
+                                     HCons[Head, Tail#Take[X # --]] ,
+                                     HNil]
+
+      type Drop[X <: Nat] = X # GT_0[HList,
+                                     Tail#Drop[X # --],
+                                     This]
 
       // Utils
       def fold[U](f: (Any, U) => U, z: => U) = f(head, tail.fold[U](f, z))
@@ -1425,18 +1521,19 @@ object TypeLevelComputation {
       def head = throw new NoSuchElementException("HNil.head")
       def tail = throw new NoSuchElementException("HNil.tail")
 
+      type Take[X <: Nat] = HNil
+      type Drop[X <: Nat] = HNil
+
       // Utils
       def fold[U](f: (Any, U) => U, z: => U) = z
       type Fold[U, F[_, _ <: U] <: U, Z <: U] = Z
     }
     type HNil = HNil.type
 
-    assert ( HCons("a", HCons(1, HNil)).length  ==  _2 )
-    assert ( HCons(1, HCons("1", HNil)).span(_1) == (HCons(1, HNil), HCons("1", HNil)) )
+// import TypeLevelComputation.HeterogeneousList._
 
     object Test {
-      // val t:  (HCons[Int, HNil], HCons[String, HNil]) =
-      //   HCons(1, HCons("1", HNil)).span(_1)
+      val a = HCons("A", HNil)
     }
   }
 }
