@@ -1127,11 +1127,13 @@ object TypeLevelComputation {
     val _1 = _0.++
     val _2 = _1.++
     val _3 = _1 + _2
+    val _4 = _1 + _3
 
     object Test {
       assert ( _3           ==  _3 )
       assert ( _1 + _1 + _1 ==  _3 )
       assert ( _1.++ + _1   ==  _3 )
+      assert ( _1.++.++.++  ==  _4 )
     }
   }
 
@@ -1205,9 +1207,9 @@ object TypeLevelComputation {
         // the correct Nat.
         Nat._unsafe[+[X]](value + n.value)
 
-      def ++ : ++ = Succ(this.value)
+      def ++ : ++ = Succ[This](this.value + 1)
 
-      // -- For HList # Span
+      // FIXME: -- is not well typed
       def --  = if (this.value == 0) throw new NoSuchElementException("_0 --")
                 else if (this.value == 1) Zero
                 else Succ(value - 1)
@@ -1248,11 +1250,13 @@ object TypeLevelComputation {
     type _1 = _0 # ++
     type _2 = _1 # ++
     type _3 = _1 # + [_2]
+    type _4 = _3 # ++
 
     lazy val _0: _0 = Zero
     lazy val _1: _1 = Succ[_0](1)
     lazy val _2: _2 = Succ[_1](2)
     lazy val _3: _3 = Succ[_2](3)
+    lazy val _4: _4 = Succ[_3](4)
 
     object Test {
       implicitly[ _1 # ++ # + [_1]        =:= _3 ]
@@ -1273,6 +1277,8 @@ object TypeLevelComputation {
 
       assert ( (_1 + _1 + _1).value == _3.value )
       assert ( (_1 + _2).value      == _3.value )
+      assert ( _1.++.value    == _2.value )
+      assert ( _1.++.++.++.value    == _4.value )
     }
   }
 
@@ -1420,10 +1426,89 @@ object TypeLevelComputation {
       type Take[X <: Nat] = HNil
       type Drop[X <: Nat] = HNil
 
-      // Utils
       def fold[U](f: (Any, U) => U, z: => U) = z
       type Fold[U, F[_, _ <: U] <: U, Z <: U] = Z
     }
     type HNil = HNil.type
   }
+
+  // -------------------------------- Heterogeneous Lists with Better Fold
+  object HeterogeneousListBetterFold {
+    import NatTermAndTypeLevel._
+
+    trait TypedFunction2[-T1,
+                         -T2,
+                         +R,
+                         F[_ <: T1, _ <: T2] <: R // Result type of
+                                                  // application of
+                                                  // this typed
+                                                  // function.
+                         ] {
+      // Result type of the application of the function is the type of
+      // the application of the function on both parameter p1 and p2.
+      def apply[P1 <: T1, P2 <: T2](p1: P1, p2: P2): F[P1, P2]
+    }
+
+    sealed abstract class HList {
+      type This >: this.type <: HList
+      type Head
+      type Tail <: HList
+
+      def head: Head
+      def tail: Tail
+
+      // Fold takes a Function2 where first argument is head and
+      // second argumtent is the rest of the computation. Heach HCons
+      // will be replace by `f` and HNil by z. Because Fuction2 is
+      // untyped, we have to use `Nat._unsafe` in `length`. As shown
+      // in `HeterogeneousList.*` the fold function returns something
+      // of type `U` whereas the real type is `F[P1,P2]` the result of
+      // application of function `f` on arguments `p1`and `p2`. Thus
+      // we makes a new trait `TypedFunction2` that includes the
+      // result type of application of the function. And now we can
+      // have typness on fold usage without exmplicit cast.
+      def fold[U, F[_, _ <: U] <: U, Z <: U](
+        f: TypedFunction2[Any, U, U, F], z: Z): Fold[U, F, Z]
+      type Fold[U, F[_, _ <: U] <: U, Z <: U] <: U
+
+      // The well typed fold prevents the usage of unsafe operation
+      def length: Length = fold[
+        Nat,
+        ({ type λ[_, P2 <: Nat] = P2# ++ })#λ,
+        Zero
+      ](
+        new TypedFunction2[Any, Nat, Nat,
+                           ({ type λ[_, P2 <: Nat] = P2# ++ })#λ] {
+          def apply[P1 <: Any, P2 <: Nat](p1: P1, p2: P2) = p2 ++
+        },
+        Zero)
+      type Length = Fold[Nat, ({ type λ[_, N <: Nat] = N # ++ })#λ, Zero]
+    }
+
+    final case class HCons[H, T <: HList](val head: H,
+                                          val tail: T) extends HList {
+      type This = HCons[H,T]
+      type Head = H
+      type Tail = T
+
+      def fold[U, F[_, _ <: U] <: U, Z <: U](
+        f: TypedFunction2[Any, U, U, F], z: Z) = f[Head, Tail#Fold[U,F,Z]](head, tail.fold[U,F,Z](f, z))
+      type Fold[U, F[_, _ <: U] <: U, Z <: U] = F[Head, Tail#Fold[U,F,Z]]
+    }
+
+    final object HNil extends HList {
+      type This = HNil
+      type Head = Nothing
+      type Tail = Nothing
+
+      def head = throw new NoSuchElementException("HNil.head")
+      def tail = throw new NoSuchElementException("HNil.tail")
+
+      def fold[U, F[_, _ <: U] <: U, Z <: U](
+        f: TypedFunction2[Any, U, U, F], z: Z) = z
+      type Fold[U, F[_, _ <: U] <: U, Z <: U] = Z
+    }
+    type HNil = HNil.type
+  }
+
 }
