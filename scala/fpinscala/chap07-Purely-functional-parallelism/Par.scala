@@ -95,8 +95,8 @@ object FunctionalAPIMethodology {
   //   this means we lose the ability to control the parallelism
   //   strategy used for different parts of our program.
   // - If fork simply holds on to its unevaluated argument until
-  //   later, fork is more a description of a parallel computation that
-  //   gets interpreted at a leter time by something kike the
+  //   later, fork is more a description of a parallel computation
+  //   that gets interpreted at a later time by something like the
   //   `Par_2.get' function.
   //
   // The first requires fork to access to the mechanism for
