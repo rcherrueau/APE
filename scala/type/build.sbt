@@ -3,7 +3,7 @@ name := "scala-types"
 version := "1.0"
 
 // For standard scala
-scalaVersion := "2.11.2"
+scalaVersion := "2.11.5"
 
 // // For typelevel fork of scala
 // scalaVersion := "2.11.2-typelevel"
