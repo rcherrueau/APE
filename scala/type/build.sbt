@@ -10,7 +10,6 @@ scalaVersion := "2.11.5"
 
 // resolvers += Resolver.mavenLocal
 
-
 libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
 
 libraryDependencies +=  "com.chuusai" %% "shapeless" % "2.0.0"
