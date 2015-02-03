@@ -137,6 +137,160 @@ object OMO10a {
     // [Thu Jan 29 17:54:53 CET 2015] Does not compute!
   }
 
+
+  // Implicits provide the missing link for *type class programming*
+  // to be convenient in *OO langauges with generics*. They provide
+  // the *type-driven selection mechanism* that was missing for type
+  // class programming to be convenient in OO. Indeed, type-driven
+  // selection mechanism offers a type-safe solution that propagtes
+  // constraint automatically. Here is another instance for Ord type
+  // class and Tuple2 models.
+  object implicitsIsMissingLink {
+    import introWithImplicit._
+
+    implicit def pairOrd[A,B](implicit
+                              ordA: Ord[A],
+                              ordB: Ord[B]): Ord[(A,B)] = new Ord[(A,B)] {
+      override def compare(x: (A, B), y: (A, B)) = ordA.compare(x._1, y._1) &&
+        ordB.compare(x._2, y._2)
+    }
+
+    // scala> import OMO10a.introWithImplicit._
+    // scala> import OMO10a.implicitsIsMissingLink._
+    // scala> sort(List((5, 6), (3, 4)))
+    // res0: List[(Int, Int)] = List((3,4), (5,6))
+  }
+
+  // TODO: implicit overloading
+  // object implicitOverloading { }
+
+  // After all, `ordA.compare(x._1, y._1)` is not idiomatic in OOP.
+  // The pimp my library pattern use implicits to allow the more
+  // natural `x._1.compare(y._1)` assuming that the type of `x._1`
+  // doesn't define a `compare` method.
+  object pimpMyLibraryPattern {
+    import introWithImplicit._
+
+    // Implicit values that have a *function type* act as *implicit
+    // conversion*.
+    trait Ordered[T] {
+      def compare(o: T): Boolean
+    }
+
+    // The old way ; Requires an extra import:
+    // import scala.language.implicitConversions
+    // implicit def ord2Ordered[T](x: T)(implicit ordT: Ord[T]): Ordered[T] =
+    //   new Ordered[T] {
+    //     override def compare(o: T): Boolean = ordT.compare(x, o)
+    //   }
+    //
+    // The good way ; Explanation: The Ord2Ordered is a *type*
+    // specifically dedicated for the purpose of amending an existing
+    // type `T` (and an `Ord[T]`) with extra methods. Whereas implicit
+    // conversions allow for conversion from type `A` to a completely
+    // unassociated `B` without `B` having been created specifically
+    // for that purpose, i.e.: you cannot convert from type `A` to
+    // type `B` with an implicit class `C` (assuming `C ≠ B`) but
+    // instead only `A → C`. Whereas implicit conversion can convert
+    // to any types and can be invoked with less visibility to the
+    // programmer.
+    implicit class Ord2Ordered[T](x: T)(implicit
+                                        ordT: Ord[T]) extends Ordered[T] {
+      override def compare(o: T): Boolean = ordT.compare(x, o)
+    }
+
+    // Here, `x._1.compare(y._1)` is converted to `ordA.compare(x._1,
+    // y._1)` using ord2Ordered.
+    implicit def pairOrd[A,B](implicit
+                              ordA: Ord[A],
+                              ordB: Ord[B]): Ord[(A,B)] = new Ord[(A,B)] {
+      override def compare(x: (A, B), y: (A, B)) = x._1.compare(y._1) &&
+        x._2.compare(y._2)
+    }
+
+    // The implicit conversion although works for the sort method:
+    def sort[T](xs: List[T])(implicit ordT: Ord[T]): List[T] = xs match {
+      case Nil => Nil
+      case x :: xs => {
+        val lesser = xs.filter(_.compare(x))
+        val greater = xs.filter(!_.compare(x))
+
+        sort(lesser) ++ List(x) ++ sort(greater)
+      }
+    }
+
+    // scala> import OMO10a.pimpMyLibraryPattern._
+    // scala> sort(List(2,3,1))
+    // res0: List[Int] = List(1, 2, 3)
+    // scala> sort(List((5, 6), (3, 4)))
+    // res1: List[(Int, Int)] = List((3,4), (5,6))
+  }
+
+  // Combination of implicit search and dependent method types is an
+  // interesting recipe for type-level computation. In the above
+  // example, we generalize the `zipWith` function for two list
+  // arguments to `n` list arguments.
+  object naryZipWith {
+    case class Zero()
+    case class Succ[N](x: N)
+
+    // Concept interface for zipWithN. `S` is the modeled type. `N` is
+    // the arity of `S`.
+    trait ZipWith[N,S] {
+      // Type members that represents the type of ZipWith for `n` list
+      // arguments. The type of ZipWith depends on `S`. For instance,
+      // if `S` is an `Int`, then `ZipWithType` is `Stream[Int]`.
+      type ZipWithType
+
+      def manyApp: N => Stream[S] => ZipWithType
+      def zipWith: N => S => ZipWithType =
+        (n: N) => (f: S) => manyApp(n)(repeat(f))
+
+      private def repeat[A](x: A): Stream[A] = x #:: repeat(x)
+    }
+
+    // Model for the base case.
+    implicit def ZeroZW[S] = new ZipWith[Zero, S] {
+      type ZipWithType = Stream[S]
+
+      def manyApp = n => xs => xs
+    }
+
+    // Model for the inductive case.
+    implicit def SuccZW[N,S,R](implicit
+                               zw: ZipWith[N,R]) =
+      new ZipWith[Succ[N], S => R] {
+        type ZipWithType = Stream[S] => zw.ZipWithType
+
+        def manyApp = n => xs => ss => n match {
+          case Succ(i) => zw.manyApp(i)(zapp[S,R](xs,ss))
+        }
+
+        private def zapp[A,B](xs: Stream[A => B], ys: Stream[A]): Stream[B] =
+          (xs, ys) match {
+            case (f #:: fs, s #:: ss) => f(s) #:: zapp(fs, ss)
+            case (_,_) => Stream.Empty
+          }
+      }
+
+    // Method that calls zipWith for a function of arity `n`. That
+    // method is the one that the developper should call to apply
+    // zipWith. That method could be embeded in a "pimp-my-library
+    // pattern" for an idiomatic usage.
+    def zWith[N,S](n: N, s: S)(implicit
+                               zw: ZipWith[N,S]): zw.ZipWithType =
+      zw.zipWith(n)(s)
+
+    // scala> import OMO10a.naryZipWith._
+    // scala> def zipWith0 = zWith(Zero(), 0)
+    // zipWith0: Stream[Int]
+    // scala> def map[A,B](f: A => B) = zWith(Succ(Zero()), f)
+    // map: [A, B](f: A => B) Stream[A] => Stream[B]
+    // scala> def zipWith3[A,B,C,D](f: A => B => C => D)  =
+    //          zWith(Succ(Succ(Succ(Zero()))), f)
+    // zipWith3: [A, B, C, D](f: A => (B => (C => D)))
+    //            Stream[A] => (Stream[B] => (Stream[C] => Stream[D]))
+  }
 }
 
 
