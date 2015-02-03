@@ -229,7 +229,7 @@ object OMO10a {
   // Combination of implicit search and dependent method types is an
   // interesting recipe for type-level computation. In the above
   // example, we generalize the `zipWith` function for two list
-  // arguments to `n` list arguments.
+  // arguments into `n` list arguments.
   object naryZipWith {
     case class Zero()
     case class Succ[N](x: N)
