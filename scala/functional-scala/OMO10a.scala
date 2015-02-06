@@ -229,7 +229,7 @@ object OMO10a {
   // Combination of implicit search and dependent method types is an
   // interesting recipe for type-level computation. In the above
   // example, we generalize the `zipWith` function for two list
-  // arguments to `n` list arguments.
+  // arguments into `n` list arguments.
   object naryZipWith {
     case class Zero()
     case class Succ[N](x: N)
@@ -239,7 +239,9 @@ object OMO10a {
     trait ZipWith[N,S] {
       // Type members that represents the type of ZipWith for `n` list
       // arguments. The type of ZipWith depends on `S`. For instance,
-      // if `S` is an `Int`, then `ZipWithType` is `Stream[Int]`.
+      // if `S` is an `Int`, then `ZipWithType` is `Stream[Int]`. if
+      // `S` is a function `f: A => B => C`, then `ZipWithType` is 
+      // `Stream[A] => Stream[B] => Stream[C]`.
       type ZipWithType
 
       def manyApp: N => Stream[S] => ZipWithType
