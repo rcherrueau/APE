@@ -85,12 +85,6 @@ object ScalaCheck {
   // + OK, passed 100 tests.
 }
 
-trait Gen[A]
-object Gen {
-  def listOf[A](a: Gen[A]): Gen[List[A]] = ???
-  def listOfN[A](n: Int, a: Gen[A]): Gen[List[A]] = ???
-}
-
 // Combining prop values using combinator like `&&` required check to
 // return some meaningful value. What type should that value have?
 // Well, let's consider at minimum, we need to know whether the
@@ -129,15 +123,71 @@ trait Prop {
 
   def check: Either[(FailedCase, SuccessCount), SuccessCount]
 
-  def &&(p: Prop): Prop = ???
+  def &&(p: Prop): Prop = new Prop {
+    def check = Prop.this.check match {
+      case Right(x) => p.check match {
+        case Right(y) => Right(x+y)
+        case Left((s,y)) => Left(s, x+y)
+      }
+      case l@Left(_) => l
+    }
+  }
 }
 
-
 object Prop {
-  // Property creator
+  /** Property creator. */
   def forAll[A](gen: Gen[A])(f: A => Boolean): Prop = ???
 }
 
+case class Gen[A](sample: State[RNG, A]) {
+}
+object Gen {
+  /** Generates integers in the range `start` to `stopExclusive`. */
+  def choose(start: Int, stopExclusive: Int): Gen[Int] =
+    Gen(RNG2.nonNegativeInt map { n =>
+          start + n  % (stopExclusive - start) })
+
+  /** Always generates the value a */
+  def unit[A](a: => A): Gen[A] = Gen(State.unit(a))
+
+  def boolean: Gen[Boolean] =
+    Gen(RNG2.nonNegativeInt map { n => if (n % 2 > 0) true
+                                       else false })
+
+  /** Generates lists of length `n` usging the generator `g`. */
+  def listOfN[A](n: Int, g: Gen[A]): Gen[List[A]] = Gen(
+    State.sequence(List.fill(n)(g.sample)))
+
+  def listOf[A](a: Gen[A]): Gen[List[A]] = ???
+}
+
 object FPInScalaPropTest extends App {
+  (for {
+    a <- Gen.choose(1,10).sample
+    b <- Gen.choose(1,10).sample
+    c <- Gen.choose(1,10).sample
+    d <- Gen.choose(1,10).sample
+    e <- Gen.choose(1,10).sample
+    f <- Gen.choose(1,10).sample
+    g <- Gen.choose(1,10).sample
+    h <- Gen.choose(1,10).sample
+    i <- Gen.choose(1,10).sample
+    j <- Gen.choose(1,10).sample
+   } yield println(List(a,b,c,d,e,f,g,h,i,j))).run(Simple(42))
+
+  (for {
+    a <- Gen.boolean.sample
+    b <- Gen.boolean.sample
+    c <- Gen.boolean.sample
+    d <- Gen.boolean.sample
+    e <- Gen.boolean.sample
+    f <- Gen.boolean.sample
+    g <- Gen.boolean.sample
+    h <- Gen.boolean.sample
+    i <- Gen.boolean.sample
+    j <- Gen.boolean.sample
+   } yield println(List(a,b,c,d,e,f,g,h,i,j))).run(Simple(42))
+
+  Gen.listOfN(10, Gen.choose(1, 10)).sample map { println(_) } run(Simple(42))
 
 }
