@@ -205,11 +205,13 @@ object RNG2 {
 
   val int: Rand[Int] = State(_.nextInt)
   val ns: Rand[List[Int]] = for {
-     x <- nonNegativeLessThan(5)
-     y <- int
-    xs <- ints(x)
+     x <- nonNegativeLessThan(5) // Generates an integer x.
+     y <- int                    // Generates an integer y.
+    xs <- ints(x)                // Generates a list of `x` integers.
   } yield xs.map(_ % y) // xs here is the unboxed Rand[List[Int]] xs.
-                        // Thus, map is map on the List.
+                        // Thus, map is map on the List. That
+                        // operation replace all elements of `xs` with
+                        // its remainder when devided by `y`.
 
   def randomPair: Rand[(Int, Int)] = State(
     s => {
