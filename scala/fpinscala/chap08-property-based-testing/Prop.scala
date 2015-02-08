@@ -117,14 +117,15 @@ trait Prop1 {
 // - how many tests succeeded first, and what arguments produced the
 //   failure.
 // - If a property succeeds, how many tests it ran.
-trait Prop {
+trait Prop2 {
   type SuccessCount = Int // Help in the readability of the API
   type FailedCase = String
+  type Result = Either[(FailedCase, SuccessCount), SuccessCount]
 
-  def check: Either[(FailedCase, SuccessCount), SuccessCount]
+  def check: Result
 
-  def &&(p: Prop): Prop = new Prop {
-    def check = Prop.this.check match {
+  def &&(p: Prop2): Prop2 = new Prop2 {
+    def check = Prop2.this.check match {
       case Right(x) => p.check match {
         case Right(y) => Right(x+y)
         case Left((s,y)) => Left(s, x+y)
@@ -134,9 +135,66 @@ trait Prop {
   }
 }
 
+// However, our previous implementation of Prop misses one important
+// information: the number of tests to run. Let's implement this in
+// the `run` method and returns the result in a new data type `Result`
+// that shows or intent more cleary than with the Either type.
+import Prop._
+sealed trait Result {
+  def isFalsified: Boolean
+}
+/** Indicates that all tests passed. */
+case object Passed extends Result {
+  def isFalsified = false
+}
+/** Indicates that one of the test cases falsified the property. */
+case class Falsified(failure: FailedCase,
+                     successes: SuccessCount) extends Result {
+  def isFalsified = true
+}
+
+// To generate values from passed generators, will also need a `RNG`
+// seed. Thus, `run` method also takes a `RNG`.
+case class Prop(run: (TestCases, RNG) => Result) {
+  def check: Result = run(100, Simple(42))
+
+  def &&(p: Prop): Prop = Prop(
+    (n, rng) => run(n, rng) match {
+      case Passed => p.run(n, rng)
+      case x => x
+    })
+
+  def ||(p: Prop): Prop = Prop(
+    (n, rng) => run(n, rng) match {
+      // In case of failure, run the other prop.
+      case Falsified(m, _) => p.run(n, rng)
+      case x => x
+    }
+  )
+}
+
 object Prop {
+  type SuccessCount = Int
+  type FailedCase = String
+  type TestCases = Int
+
   /** Property creator. */
-  def forAll[A](gen: Gen[A])(f: A => Boolean): Prop = ???
+  def forAll[A](ga: Gen[A])(f: A => Boolean): Prop = Prop(
+    (n, rng) => (streamGenVal(ga)(rng).zipWithIndex).take(n).map {
+      // TODO: handle the case when `f(a)` throws an exception
+      case (a, i) => if (f(a)) Passed
+                     else Falsified(a.toString, i)
+    }.find(_.isFalsified) getOrElse(Passed)
+  )
+
+  private def streamGenVal[A](ga: Gen[A])(rng: RNG): Stream[A] = {
+    def unfold[A,S](z: S)(f: S => Option[(A, S)]): Stream[A] =
+      f(z) map {
+        case(a, s) => a #:: unfold(s)(f)
+      } getOrElse Stream.Empty
+
+    unfold(rng) { r => Some(ga.sample.run(r)) }
+  }
 }
 
 case class Gen[A](sample: State[RNG, A]) {
@@ -176,8 +234,25 @@ object Gen {
   def option[A](ga: Gen[A]): Gen[Option[A]] =
     ga flatMap { a => boolean map { if (_) Some(a) else None }}
 
+  /** Combines two generators of the same type into one.
+    *
+    * Union pulls values from each generator with equal likelihood.
+    */
   def union[A](g1: Gen[A], g2: Gen[A]): Gen[A] =
     boolean flatMap { if (_) g1 else g2 }
+
+  def weighted[A](g1: (Gen[A], Double), g2: (Gen[A], Double)): Gen[A] = {
+    val g1Proba = g1._2 / (g1._2 + g2._2)
+    val g2Proba = 1.0 - g1Proba
+
+    Gen(RNG2.double flatMap (d => if (g1._2 < g2._2)  {
+                               if (d <= g1Proba) g1._1.sample
+                               else g2._1.sample
+                             } else {
+                               if (d <= g2Proba) g2._1.sample
+                               else g1._1.sample
+                             }))
+  }
 
   def sequence[A](gs: List[Gen[A]]): Gen[List[A]] =
     gs.foldRight[Gen[List[A]]](Gen(State.unit(Nil)))((hd, rest) =>
@@ -187,6 +262,9 @@ object Gen {
 }
 
 object FPInScalaPropTest extends App {
+  val seed = Simple(42)
+
+  // Gen.choose
   (for {
     a <- Gen.choose(1,10).sample
     b <- Gen.choose(1,10).sample
@@ -198,8 +276,9 @@ object FPInScalaPropTest extends App {
     h <- Gen.choose(1,10).sample
     i <- Gen.choose(1,10).sample
     j <- Gen.choose(1,10).sample
-   } yield println(List(a,b,c,d,e,f,g,h,i,j))).run(Simple(42))
+   } yield println(List(a,b,c,d,e,f,g,h,i,j))) run(seed)
 
+  // Gen.boolean
   (for {
     a <- Gen.boolean.sample
     b <- Gen.boolean.sample
@@ -211,10 +290,12 @@ object FPInScalaPropTest extends App {
     h <- Gen.boolean.sample
     i <- Gen.boolean.sample
     j <- Gen.boolean.sample
-   } yield println(List(a,b,c,d,e,f,g,h,i,j))).run(Simple(42))
+   } yield println(List(a,b,c,d,e,f,g,h,i,j))) run(seed)
 
-  Gen.listOfN(10, Gen.choose(1, 10)).sample map { println(_) } run(Simple(42))
+  // Gen.listOfN
+  Gen.listOfN(10, Gen.choose(1, 10)).sample map (println) run(seed)
 
+  // Gen flatMap / map
   (for {
     a <- Gen.choose(1,10)
     b <- Gen.choose(1,10)
@@ -226,7 +307,7 @@ object FPInScalaPropTest extends App {
     h <- Gen.choose(1,10)
     i <- Gen.choose(1,10)
     j <- Gen.choose(1,10)
-   } yield println(List(a,b,c,d,e,f,g,h,i,j))).sample.run(Simple(42))
+   } yield println(List(a,b,c,d,e,f,g,h,i,j))).sample run(seed)
 
   (for {
     a <- Gen.boolean
@@ -239,7 +320,16 @@ object FPInScalaPropTest extends App {
     h <- Gen.boolean
     i <- Gen.boolean
     j <- Gen.boolean
-   } yield println(List(a,b,c,d,e,f,g,h,i,j))).sample.run(Simple(42))
+   } yield println(List(a,b,c,d,e,f,g,h,i,j))).sample.run(seed)
 
-   (Gen.choose(1,10).listOfN(Gen.choose(10,11)) map (println)).sample.run(Simple(42))
+  // Gen->listOf
+  (Gen.choose(1,10).listOfN(Gen.choose(10,11)) map (println)).
+    sample run(seed)
+
+  // Gen.weighted
+  (for {
+     g1g2s <- Gen.listOfN(10, (Gen.weighted(
+                                 (Gen.choose(1,10)  -> .1),
+                                 (Gen.choose(11,20) -> .9))))
+   } yield println(g1g2s)).sample run(seed)
 }
