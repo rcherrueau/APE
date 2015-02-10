@@ -139,7 +139,6 @@ trait Prop2 {
 // information: the number of tests to run. Let's implement this in
 // the `run` method and returns the result in a new data type `Result`
 // that shows or intent more cleary than with the Either type.
-import Prop._
 sealed trait Result {
   def isFalsified: Boolean
 }
@@ -148,23 +147,23 @@ case object Passed extends Result {
   def isFalsified = false
 }
 /** Indicates that one of the test cases falsified the property. */
-case class Falsified(failure: FailedCase,
-                     successes: SuccessCount) extends Result {
+case class Falsified(failure: String /* FailedCase */,
+                     successes: Int /* SuccessCount */) extends Result {
   def isFalsified = true
 }
 
 // To generate values from passed generators, will also need a `RNG`
 // seed. Thus, `run` method also takes a `RNG`.
-case class Prop(run: (TestCases, RNG) => Result) {
+case class Prop3(run: (Prop3.TestCases, RNG) => Result) {
   def check: Result = run(100, Simple(42))
 
-  def &&(p: Prop): Prop = Prop(
+  def &&(p: Prop3): Prop3 = Prop3(
     (n, rng) => run(n, rng) match {
       case Passed => p.run(n, rng)
       case x => x
     })
 
-  def ||(p: Prop): Prop = Prop(
+  def ||(p: Prop3): Prop3 = Prop3(
     (n, rng) => run(n, rng) match {
       // In case of failure, run the other prop.
       case Falsified(msg, _) => p.tag(msg).run(n, rng)
@@ -173,7 +172,7 @@ case class Prop(run: (TestCases, RNG) => Result) {
   )
 
   // In case of failure of the two branches print message of the two.
-  def tag(msg: String): Prop = Prop(
+  def tag(msg: String): Prop3 = Prop3(
     (n, rng) => run(n, rng) match {
       case Falsified(e, c) => Falsified(msg + "\n" + e, c)
       case x => x
@@ -181,13 +180,13 @@ case class Prop(run: (TestCases, RNG) => Result) {
   )
 }
 
-object Prop {
+object Prop3 {
   type SuccessCount = Int
   type FailedCase = String
   type TestCases = Int
 
   /** Property creator. */
-  def forAll[A](ga: Gen[A])(f: A => Boolean): Prop = Prop(
+  def forAll[A](ga: Gen[A])(f: A => Boolean): Prop3 = Prop3(
     (n, rng) =>
     (streamGenVal(ga)(rng).zipWith(Stream.from(1)))((_,_)).take(n).map {
       // TODO: handle the case when `f(a)` throws an exception
@@ -201,7 +200,99 @@ object Prop {
   }
 }
 
-case class Gen[A](sample: State[RNG, A]) {
+// Prop3 is OK but to implement test case minimization we wanna use
+// sized generation strategy. We simply generate our test case in
+// order of increasing size and complexity. Thus, we put `Prop` in
+// charge of invoking the underlying generator with various size and
+// we parameter `Prop` with a *maximum size*.
+case class Prop(run: (Prop.MaxSize, Prop.TestCases, RNG) => Result) {
+  def check: Result = ???
+
+  def &&(p: Prop): Prop = Prop(
+    (m, n, rng) => run(m, n, rng) match {
+      case Passed => p.run(m, n, rng)
+      case x => x
+    })
+
+  def ||(p: Prop): Prop = Prop(
+    (m, n, rng) => run(m, n, rng) match {
+      // In case of failure, run the other prop.
+      case Falsified(msg, _) => p.tag(msg).run(m, n, rng)
+      case x => x
+    }
+  )
+
+  // In case of failure of the two branches print message of the two.
+  def tag(msg: String): Prop = Prop(
+    (m, n, rng) => run(m, n, rng) match {
+      case Falsified(e, c) => Falsified(msg + "\n> " + e, c)
+      case x => x
+    }
+  )
+}
+
+object Prop {
+  type SuccessCount = Int
+  type FailedCase = String
+  type TestCases = Int
+  type MaxSize = Int
+
+  def run(p: Prop,
+          maxSize: MaxSize = 100,
+          testCases: TestCases = 100,
+          rng: RNG = Simple(42)): Unit =
+    println(
+      p.run(maxSize, testCases, rng) match {
+        case Passed => s"+ OK, passed ${testCases} test."
+        case Falsified(msg, n) =>
+          s"! Falsified after ${n} test.\n"+
+          s"> ${msg}"
+      })
+
+  def forAll[A](sg: SGen[A])(f: A => Boolean): Prop =
+    // forAll(g.forSize)(f)
+    forAll(sg(_))(f) // Using `SGen.apply`. It Gives the feeling of
+                     // using SGen as a function.
+
+  def forAll[A](g: Int => Gen[A])(f: A => Boolean): Prop = Prop(
+    (max, n, rng) => {
+      // Make one property per size but no more than `n` property
+      // because `forAll` will be test `n` times:
+      val props: Stream[Prop] =
+        Stream.from(0).take((n min max) + 1).map { i => forAll(g(i))(f) }
+      // For each size, we have to generate `casesPerSize` test case:
+      val casesPerSize = (n + max - 1) / max
+      // Combines all property into one:
+      val prop: Prop =
+        props.map {
+          p => Prop((max, _, rng) => p.run(max, casesPerSize, rng))
+        }.toList.reduce(_ && _)
+
+      prop.run(max, n, rng)
+    })
+
+  def forAll[A](g: Gen[A])(f: A => Boolean): Prop = Prop(
+    (m, n, rng) =>
+    (streamGenVal(g)(rng).zipWith(Stream.from(1)))((_,_)).take(n).map {
+      case (a,i) => try {
+        if (f(a)) Passed
+        else Falsified(a.toString, i)
+      } catch { case e: Exception => Falsified(buildMsg(a, e), i) }
+    }.find(_.isFalsified) getOrElse(Passed))
+
+  private def streamGenVal[A](ga: Gen[A])(rng: RNG): Stream[A] = {
+    Stream.unfold(rng) { r => Some(ga.sample.run(r)) }
+  }
+
+  // String interpolation syntax. A string starting with `s"` can refer to
+  // a Scala value `v` as `$v` or `${v}` in the string.
+  // This will be expanded to `v.toString` by the Scala compiler.
+  private def buildMsg[A](s: A, e: Exception): String =
+    s"test case: $s\n" +
+    s"> generated an exception: ${e.getMessage}\n"
+}
+
+case class Gen[+A](sample: State[RNG, A]) {
   def flatMap[B](f: A => Gen[B]): Gen[B] =
     Gen(sample flatMap { a => f(a).sample })
 
@@ -211,6 +302,9 @@ case class Gen[A](sample: State[RNG, A]) {
   /** Generates list of arbitrary length of this. */
   def listOfN(size: Gen[Int]): Gen[List[A]] =
     size flatMap { n => Gen.listOfN(n, this) }
+
+  /** Converts Gen to SGen */
+  def unsized: SGen[A] = SGen(n => this)
 }
 
 object Gen {
@@ -230,12 +324,21 @@ object Gen {
     Gen(RNG2.nonNegativeInt map { n => if (n % 2 > 0) true
                                        else false })
 
-  /** Generates lists of length `n` usging the generator `g`. */
+  /** Generates lists of size `n` usging the generator `g`. */
   def listOfN[A](n: Int, g: Gen[A]): Gen[List[A]] =
     Gen(State.sequence(List.fill(n)(g.sample)))
 
-  def listOf[A](g: Gen[A]): Gen[List[A]] =
+  /** Generates lists of arbitrary size (between 0 and 100) with `g` */
+  def listOf_v1[A](g: Gen[A]): Gen[List[A]] =
     g.listOfN(Gen.choose(0,100))
+
+  /** Generates lists of a requested size. */
+  def listOf[A](g: Gen[A]): SGen[List[A]] =
+    SGen(n => Gen.listOfN(n, g))
+
+  /** Generates non empty list lists of a requested size. */
+  def listOf1[A](g: Gen[A]): SGen[List[A]] =
+    SGen(n => Gen.listOfN((n max 1), g))
 
   /** Makes a generator result optional. */
   def option[A](ga: Gen[A]): Gen[Option[A]] =
@@ -264,6 +367,20 @@ object Gen {
   def sequence[A](gs: List[Gen[A]]): Gen[List[A]] =
     gs.foldRight[Gen[List[A]]](Gen(State.unit(Nil)))((hd, rest) =>
       hd flatMap { a => rest map {a :: _}})
+}
+
+// Use size generation as strategy for test case minimization. A size
+// generator is just a function that takes a size and produce a
+// generator.
+case class SGen[+A](forSize: Int => Gen[A]) {
+  def apply(n: Int): Gen[A] = forSize(n) // Enables the call of SGen
+                                         // like a function.
+
+  def flatMap[B](f: A => Gen[B]): SGen[B] =
+    SGen(n => forSize(n) flatMap (f))
+
+  def map[B](f: A => B): SGen[B] =
+    SGen(n => forSize(n) map (f))
 }
 
 object FPInScalaPropTest extends App {
@@ -338,39 +455,91 @@ object FPInScalaPropTest extends App {
                                  (Gen.choose(11,20) -> .9))))
    } yield println(g1g2s)).sample run(seed)
 
-  // Prop tests
-  val intList = Gen.listOf(Gen.choose(0,100))
+  // Prop3 tests
+  val intList = Gen.listOf_v1(Gen.choose(0,100))
 
   // Valid prop
   println(
-    (Prop.forAll (intList) {
+    (Prop3.forAll (intList) {
        ns => ns.reverse.reverse == ns
-     } && Prop.forAll (intList) {
+     } && Prop3.forAll (intList) {
        ns => ns.headOption == ns.reverse.lastOption
      }).check)
 
   // Falsified prop
   println(
-    (Prop.forAll (intList) {
+    (Prop3.forAll (intList) {
        ns => ns.reverse.reverse == ns
-     } && Prop.forAll (intList) {
+     } && Prop3.forAll (intList) {
        ns => ns.reverse == ns
      }).check)
 
   // Valid prop
   println(
-    (Prop.forAll (intList) {
+    (Prop3.forAll (intList) {
        ns => ns.reverse.reverse == ns
-     } || Prop.forAll (intList) {
+     } || Prop3.forAll (intList) {
        ns => ns.reverse == ns
      }).check)
 
   // Falsified prop
   println(
-    (Prop.forAll (intList) {
+    (Prop3.forAll (intList) {
        ns => ns.reverse == ns
-     } || Prop.forAll (intList) {
+     } || Prop3.forAll (intList) {
        ns => ns.reverse == ns
      }).check)
 
+  // Prop tests
+  val sIntList = Gen.listOf(Gen.choose(0,100))
+
+  // Valid prop
+  Prop.run(
+    Prop.forAll (sIntList) {
+      ns => ns.reverse.reverse == ns
+    } && Prop.forAll (sIntList) {
+      ns => ns.headOption == ns.reverse.lastOption
+    })
+
+  // Falsified prop
+  Prop.run(
+    Prop.forAll (sIntList) {
+      ns => ns.reverse.reverse == ns
+    } && Prop.forAll (sIntList) {
+      ns => ns.reverse == ns
+    })
+
+  // Valid prop
+  Prop.run(
+    Prop.forAll (sIntList) {
+      ns => ns.reverse.reverse == ns
+    } || Prop.forAll (sIntList) {
+      ns => ns.reverse == ns
+    })
+
+  // Falsified prop
+  Prop.run(
+    Prop.forAll (sIntList) {
+      ns => ns.reverse == ns
+    } || Prop.forAll (sIntList) {
+      ns => ns.reverse == ns
+    })
+
+  Prop.run(
+    Prop.forAll (Gen.listOf(Gen.choose(-10,10))) {
+      ns => ns.contains(ns.max)
+    })
+
+  Prop.run(
+    Prop.forAll (Gen.listOf1(Gen.choose(-10,10))) {
+      ns => ns.contains(ns.max)
+    })
+
+  Prop.run(
+    Prop.forAll (Gen.listOf(Gen.choose(-10,10))) { l =>
+      val ls = l.sorted
+      l.isEmpty ||
+      ls.tail.isEmpty ||
+      !l.zip(ls.tail).exists { case (a,b) => a > b }
+    })
 }
