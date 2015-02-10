@@ -10,6 +10,10 @@ scalaVersion := "2.11.5"
 
 // scalacOptions += "-feature"
 
+// Import Stream from chap05
+unmanagedSourceDirectories in Compile +=
+  baseDirectory.value / "../chap05-strictness-and-laziness"
+
 // Import RNG and State from chap06
 unmanagedSourceDirectories in Compile +=
   baseDirectory.value / "../chap06-purely-functional-state"

@@ -180,7 +180,8 @@ object Prop {
 
   /** Property creator. */
   def forAll[A](ga: Gen[A])(f: A => Boolean): Prop = Prop(
-    (n, rng) => (streamGenVal(ga)(rng).zipWithIndex).take(n).map {
+    (n, rng) =>
+    (streamGenVal(ga)(rng).zipWith(Stream.from(1)))((_,_)).take(n).map {
       // TODO: handle the case when `f(a)` throws an exception
       case (a, i) => if (f(a)) Passed
                      else Falsified(a.toString, i)
@@ -188,12 +189,7 @@ object Prop {
   )
 
   private def streamGenVal[A](ga: Gen[A])(rng: RNG): Stream[A] = {
-    def unfold[A,S](z: S)(f: S => Option[(A, S)]): Stream[A] =
-      f(z) map {
-        case(a, s) => a #:: unfold(s)(f)
-      } getOrElse Stream.Empty
-
-    unfold(rng) { r => Some(ga.sample.run(r)) }
+    Stream.unfold(rng) { r => Some(ga.sample.run(r)) }
   }
 }
 
@@ -230,6 +226,9 @@ object Gen {
   def listOfN[A](n: Int, g: Gen[A]): Gen[List[A]] =
     Gen(State.sequence(List.fill(n)(g.sample)))
 
+  def listOf[A](g: Gen[A]): Gen[List[A]] =
+    g.listOfN(Gen.choose(0,100))
+
   /** Makes a generator result optional. */
   def option[A](ga: Gen[A]): Gen[Option[A]] =
     ga flatMap { a => boolean map { if (_) Some(a) else None }}
@@ -257,8 +256,6 @@ object Gen {
   def sequence[A](gs: List[Gen[A]]): Gen[List[A]] =
     gs.foldRight[Gen[List[A]]](Gen(State.unit(Nil)))((hd, rest) =>
       hd flatMap { a => rest map {a :: _}})
-
-  def listOf[A](a: Gen[A]): Gen[List[A]] = ???
 }
 
 object FPInScalaPropTest extends App {
@@ -332,4 +329,40 @@ object FPInScalaPropTest extends App {
                                  (Gen.choose(1,10)  -> .1),
                                  (Gen.choose(11,20) -> .9))))
    } yield println(g1g2s)).sample run(seed)
+
+  // Prop tests
+  val intList = Gen.listOf(Gen.choose(0,100))
+
+  // Valid prop
+  println(
+    (Prop.forAll (intList) {
+       ns => ns.reverse.reverse == ns
+     } && Prop.forAll (intList) {
+       ns => ns.headOption == ns.reverse.lastOption
+     }).check)
+
+  // Falsified prop
+  println(
+    (Prop.forAll (intList) {
+       ns => ns.reverse.reverse == ns
+     } && Prop.forAll (intList) {
+       ns => ns.reverse == ns
+     }).check)
+
+  // Valid prop
+  println(
+    (Prop.forAll (intList) {
+       ns => ns.reverse.reverse == ns
+     } || Prop.forAll (intList) {
+       ns => ns.reverse == ns
+     }).check)
+
+  // Falsified prop
+  println(
+    (Prop.forAll (intList) {
+       ns => ns.reverse == ns
+     } || Prop.forAll (intList) {
+       ns => ns.reverse == ns
+     }).check)
+
 }
