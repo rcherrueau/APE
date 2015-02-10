@@ -75,7 +75,7 @@ object ScalaCheck {
       ns => ns.forall(ns.max >= _)
     } && scForAll (SCGen.nonEmptyListOf(SCGen.choose(0,100))) {
       // The max is an element of that list for non empty list
-      ns => ns.exists(ns.max == _)
+      ns => ns.contains(ns.max)
     } && scThrows (
       // The max of an empty list throws an exception
       classOf[UnsupportedOperationException])(List[Int]().max)
@@ -323,7 +323,7 @@ object FPInScalaPropTest extends App {
    } yield println(List(a,b,c,d,e,f,g,h,i,j))).sample.run(seed)
 
   // Gen->listOf
-  (Gen.choose(1,10).listOfN(Gen.choose(10,11)) map (println)).
+  (Gen.choose(1,10).listOfN(Gen.unit(10)) map (println)).
     sample run(seed)
 
   // Gen.weighted
