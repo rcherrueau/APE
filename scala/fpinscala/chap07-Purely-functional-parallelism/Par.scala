@@ -438,5 +438,5 @@ object FPInScalaParTest extends App {
   /*
   val a: Par[Int] = Par.lazyUnit(41 + 1)
   println(Par.equal(Executors.newFixedThreadPool(1))(a, Par.fork(a)))
-  //*/
+  // */
 }
