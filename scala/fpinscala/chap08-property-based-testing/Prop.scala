@@ -167,7 +167,15 @@ case class Prop(run: (TestCases, RNG) => Result) {
   def ||(p: Prop): Prop = Prop(
     (n, rng) => run(n, rng) match {
       // In case of failure, run the other prop.
-      case Falsified(m, _) => p.run(n, rng)
+      case Falsified(msg, _) => p.tag(msg).run(n, rng)
+      case x => x
+    }
+  )
+
+  // In case of failure of the two branches print message of the two.
+  def tag(msg: String): Prop = Prop(
+    (n, rng) => run(n, rng) match {
+      case Falsified(e, c) => Falsified(msg + "\n" + e, c)
       case x => x
     }
   )
