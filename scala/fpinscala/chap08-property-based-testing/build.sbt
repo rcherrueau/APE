@@ -18,6 +18,10 @@ unmanagedSourceDirectories in Compile +=
 unmanagedSourceDirectories in Compile +=
   baseDirectory.value / "../chap06-purely-functional-state"
 
+// Import Par library from chap07
+unmanagedSourceDirectories in Compile +=
+  baseDirectory.value / "../chap07-Purely-functional-parallelism"
+
 
 // Libraries
 libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.12.1"

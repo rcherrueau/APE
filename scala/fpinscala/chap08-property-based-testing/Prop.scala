@@ -210,7 +210,7 @@ case class Prop(run: (Prop.MaxSize, Prop.TestCases, RNG) => Result) {
 
   def &&(p: Prop): Prop = Prop(
     (m, n, rng) => run(m, n, rng) match {
-      case Passed => p.run(m, n, rng)
+      case Proved | Passed => p.run(m, n, rng)
       case x => x
     })
 
@@ -231,6 +231,10 @@ case class Prop(run: (Prop.MaxSize, Prop.TestCases, RNG) => Result) {
   )
 }
 
+case object Proved extends Result {
+  def isFalsified = false
+}
+
 object Prop {
   type SuccessCount = Int
   type FailedCase = String
@@ -247,6 +251,7 @@ object Prop {
         case Falsified(msg, n) =>
           s"! Falsified after ${n} test.\n"+
           s"> ${msg}"
+        case Proved => s"+ OK, proved propterty."
       })
 
   def forAll[A](sg: SGen[A])(f: A => Boolean): Prop =
@@ -254,7 +259,11 @@ object Prop {
     forAll(sg(_))(f) // Using `SGen.apply`. It Gives the feeling of
                      // using SGen as a function.
 
-  def forAll[A](g: Int => Gen[A])(f: A => Boolean): Prop = Prop(
+  /** Prop for traditional unit testing. */
+  def check(p: => Boolean): Prop = Prop(
+    (_,_,_) => if (p) Proved else Falsified("()", 0))
+
+  private def forAll[A](g: Int => Gen[A])(f: A => Boolean): Prop = Prop(
     (max, n, rng) => {
       // Make one property per size but no more than `n` property
       // because `forAll` will be test `n` times:
@@ -280,6 +289,7 @@ object Prop {
       } catch { case e: Exception => Falsified(buildMsg(a, e), i) }
     }.find(_.isFalsified) getOrElse(Passed))
 
+
   private def streamGenVal[A](ga: Gen[A])(rng: RNG): Stream[A] = {
     Stream.unfold(rng) { r => Some(ga.sample.run(r)) }
   }
@@ -289,7 +299,7 @@ object Prop {
   // This will be expanded to `v.toString` by the Scala compiler.
   private def buildMsg[A](s: A, e: Exception): String =
     s"test case: $s\n" +
-    s"> generated an exception: ${e.getMessage}\n"
+    s"> generated an exception: ${e.getMessage}"
 }
 
 case class Gen[+A](sample: State[RNG, A]) {
@@ -305,6 +315,17 @@ case class Gen[+A](sample: State[RNG, A]) {
 
   /** Converts Gen to SGen */
   def unsized: SGen[A] = SGen(n => this)
+
+  /** Combines two generator to produce a pair of their output. */
+  def **[B](g: Gen[B]): Gen[(A, B)] =
+    this flatMap { t => g map ((t, _)) }
+}
+
+// Custom extractors for using in pattern matching. See, `forAllPar`
+// See,
+// http://docs.scala-lang.org/tutorials/tour/extractor-objects.html
+object ** {
+  def unapply[A,B](p: (A,B)) = Some(p)
 }
 
 object Gen {
@@ -542,4 +563,113 @@ object FPInScalaPropTest extends App {
       ls.tail.isEmpty ||
       !l.zip(ls.tail).exists { case (a,b) => a > b }
     })
+
+  // Writing a test suite for parallel computations
+  import Par.Par
+  import java.util.concurrent.ExecutorService
+  import java.util.concurrent.Executors
+
+  object ES {
+    import java.util.concurrent.TimeUnit
+
+    lazy val t1 = Executors.newFixedThreadPool(1)
+    lazy val t2 = Executors.newFixedThreadPool(2)
+    lazy val t3 = Executors.newFixedThreadPool(2)
+    lazy val t4 = Executors.newFixedThreadPool(4)
+    lazy val c = Executors.newCachedThreadPool
+
+    def shutdown: Unit = {
+      t1.shutdown; t1.awaitTermination(1, TimeUnit.SECONDS)
+      t2.shutdown; t2.awaitTermination(1, TimeUnit.SECONDS)
+      t3.shutdown; t3.awaitTermination(1, TimeUnit.SECONDS)
+      t4.shutdown; t4.awaitTermination(1, TimeUnit.SECONDS)
+      c.shutdown; c.awaitTermination(1, TimeUnit.SECONDS)
+    }
+  }
+
+  // map(unit(1))(_ + 1) == unit(2)
+  Prop.run(
+    Prop.check {
+      val p1 = Par.map(Par.unit(1))(_ + 1)
+      val p2 = Par.unit(2)
+      p1(ES.c).get == p2(ES.c).get // Here p(ES.c).get is a bit noisy
+    })
+
+  // To avoid noise in previous check, we lift the equality
+  // comparison.
+  def equal[A](p1: Par[A], p2: Par[A]): Par[Boolean] =
+    Par.map2(p1, p2)((v1, v2) => v1 == v2)
+
+  Prop.run(
+    Prop.check {
+      equal(
+        Par.map(Par.unit(1))(_ + 1),
+        Par.unit(2)
+      )(ES.c).get})
+
+  // Good, but why don't we move the running of `Par` out into a
+  // separate function `forAllPar`.
+  def forAllPar[A](g: Gen[A])(f: A => Par[Boolean]): Prop = {
+    // This also gives us a good place to insert variation across
+    // different parallel strategies.
+    val esStrats = Gen.weighted(
+      Gen.choose(1,4).map(_ match {
+                            case 1 => ES.t1
+                            case 2 => ES.t2
+                            case 3 => ES.t3
+                            case 4 => ES.t4}) -> .75,
+      Gen.unit(ES.c) -> .25)
+    // // Next is a little mess way of combining two generator to produce
+    // // a pair of their outputs.
+    // val gforAll: Gen[(ExecutorService, A)] =
+    //   esStrats flatMap { es => g.map ((es, _)) }
+    // Prop.forAll(gforAll) { case (es, a) => f(a)(es).get }
+    // // Let's quickly introduce a combinator to clean that up:
+    val gforall: Gen[(ExecutorService, A)] = esStrats ** g
+    // and make it a pattern extractors which lets us write this:
+    Prop.forAll(gforall) { case es ** a => Par.run(es)(f(a)).get }
+  }
+
+  Prop.run(
+    forAllPar (Gen.choose(1, 10)) {
+      n: Int => equal(Par.map(Par.unit(n))(_ + 1),
+                      Par.unit(n + 1))
+    })
+
+  // map(unit(x)(f)) == unit(f(x))
+  // map(y)(x => x) == y // after simplification
+  Prop.run(
+    forAllPar (Gen.choose(1, 10) map (Par.unit)) {
+      n: Par[Int] => equal(Par.map(n)(x => x), n)
+    })
+
+  // A richer generator for Par[Int] which builds more deeply nested
+  // parallel computations.
+  lazy val pint: Gen[Par[Int]] = Gen.choose(-100,100).listOfN(Gen.choose(0,20)) map {
+    _.foldLeft(Par.unit(0)) {
+      (acc, hd) =>
+      Par.fork { Par.map2(acc, Par.unit(hd))(_ + _) }
+    }
+  }
+
+  // // BUG: The next two Props result in a Deadlock because of our Par
+  // // implementation that is not fully non-blocking. The result of one
+  // // `Callable` inside another `Callable` blocks on its result if our
+  // // thread pool has a size `1`.
+  // Prop.run(
+  //   forAllPar (pint) {
+  //     n => equal(Par.map(n)(x => x), n)
+  //   })
+  //
+  // Prop.run(
+  //   forAllPar (Gen.choose(1, 10) map (Par.lazyUnit(_))) {
+  //     n => equal(Par.fork(n), n)
+  //   })
+
+  Prop.run(
+    forAllPar (Gen.choose(1, 10) map (Par.unit)) {
+      n => equal(Par.fork(n), n)
+    })
+
+  ES.shutdown
 }
