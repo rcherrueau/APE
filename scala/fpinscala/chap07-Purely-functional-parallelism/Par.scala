@@ -206,13 +206,9 @@ object Par {
   def lazyUnit[A](a: => A): Par[A] = fork(unit(a))
 
   /** Extracts a value from a `Par' by actually performing the
-    * computation */
+    * computation. */
   def run[A](es: ExecutorService)(a: Par[A]): Future[A] = {
-    val res = a(es)
-    // shutdown the ExecutorService to doesn't accept new tasks
-    es.shutdown
-
-    res
+    a(es)
   }
 
   /** Evaluates a function asynchronously. */
@@ -345,7 +341,10 @@ object FPInScalaParTest extends App {
   import Par.Par
   import java.util.concurrent.Executors
 
-  Par.run(Executors.newFixedThreadPool(3))(
+  val esCached = Executors.newCachedThreadPool
+  val esT3 = Executors.newFixedThreadPool(3)
+
+  Par.run(esT3)(
     Par.sequence(
       List(
         // One concurent computation
@@ -361,6 +360,22 @@ object FPInScalaParTest extends App {
                    _ => println("Sleep 100")
                  }))))
 
+  // Alternative syntax, without using `Par.run`
+  Par.sequence(
+    List(
+      // One concurent computation
+      Par.fork(Par.map(Par.unit(Thread sleep 1000)) {
+                 _ => println("Sleep 1000")
+               }),
+      // A second concurrent computation
+      Par.fork(Par.map(Par.unit(Thread sleep 1)){
+                 _ => println("Sleep 1")
+               }),
+      // A third concurrent computation
+      Par.fork(Par.map(Par.unit(Thread sleep 100)){
+                 _ => println("Sleep 100")
+               })))(esT3)
+
   /** Sums a list of int in parallel (see methodology) */
   def sum(ints: Seq[Int]): Par[Int] =
     if (ints.size <= 1)
@@ -370,11 +385,11 @@ object FPInScalaParTest extends App {
       Par.map2(Par.fork(sum(l)), Par.fork(sum(r))) { _ + _ }
     }
 
-  Par.run(Executors.newCachedThreadPool)(
+  Par.run(esCached)(
     Par.map(sum(List.range(1,100)))(println))
 
   println(
-    Par.run(Executors.newCachedThreadPool)(
+    Par.run(esCached)(
       Par.sequence(
         List(
           Par.choice(Par.lazyUnit(true))(
@@ -385,7 +400,7 @@ object FPInScalaParTest extends App {
             Par.lazyUnit("false"))))).get)
 
   println(
-    Par.run(Executors.newCachedThreadPool)(
+    Par.run(esCached)(
       Par.sequence(
         List(
           Par.choice_2(Par.lazyUnit(true))(
@@ -396,18 +411,18 @@ object FPInScalaParTest extends App {
             Par.lazyUnit("false"))))).get)
 
   println(
-    Par.run(Executors.newCachedThreadPool)(
+    Par.run(esCached)(
       Par.choiceMap(
         Par.lazyUnit("lala"))(
         Map("lala" -> Par.lazyUnit("lalalala")))).get)
 
   println(
-    Par.run(Executors.newCachedThreadPool)(
+    Par.run(esCached)(
       Par.chooser(Par.lazyUnit("live long"))(
         s => Par.map(Par.lazyUnit("and prosper")){ s + " " + _ })).get)
 
   println(
-    Par.run(Executors.newCachedThreadPool)(
+    Par.run(esCached)(
       Par.sequence(
         List(
           Par.choice_3(Par.lazyUnit(true))(
@@ -418,14 +433,14 @@ object FPInScalaParTest extends App {
             Par.lazyUnit("false"))))).get)
 
   println(
-    Par.run(Executors.newCachedThreadPool)(
+    Par.run(esCached)(
       Par.choiceMap_2(
         Par.lazyUnit("lala"))(
         Map("lala" -> Par.lazyUnit("lalalala")))).get)
 
   val l = List.range(1,100)
   println(
-    Par.run(Executors.newCachedThreadPool)(
+    Par.run(esCached)(
       Par.flatMap(sum(l)) {
         r1 => Par.flatMap(sum(l)) {
           r2 => Par.map(sum(l)) {
@@ -433,6 +448,10 @@ object FPInScalaParTest extends App {
           }
         }
       }).get)
+
+  // shutdown the ExecutorService to doesn't accept new tasks
+  esCached.shutdown
+  esT3.shutdown
 
   // Breaking the law of forking: `fork(x) == x`
   /*
