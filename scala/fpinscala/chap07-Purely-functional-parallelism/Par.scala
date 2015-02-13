@@ -197,7 +197,7 @@ object Par {
     */
   def fork[A](a: => Par[A]): Par[A] = (es: ExecutorService) =>
     // It's only after the user calls `run' and the implementation
-    // *reveive and ExecutorService* that we expose the Future
+    // *receive an ExecutorService* that we expose the Future
     // machinery.
     es.submit(new Callable[A] { def call = a(es).get })
 
@@ -453,9 +453,29 @@ object FPInScalaParTest extends App {
   esCached.shutdown
   esT3.shutdown
 
-  // Breaking the law of forking: `fork(x) == x`
+  // BUG: Breaking the law of forking: `fork(x) == x`
   /*
   val a: Par[Int] = Par.lazyUnit(41 + 1)
   println(Par.equal(Executors.newFixedThreadPool(1))(a, Par.fork(a)))
+  // */
+
+  // The bug is cause by a our implementation of `fork` that will
+  // result in this code deadblocking. The `fork` calls `get` on a
+  // Futur that forces the Futur to return a result. In the above
+  // example we have *one thread* in the thread pool. That thread is
+  // handled by the most outer `fork` while the method `call` is
+  // calling and the thread waits for a result because of `get`.
+  // calling `get` will trigger the second `fork` that also requires a
+  // thread for its execution. Unfortunately, the thread pool *has
+  // only one thread* and this one will be never be free because the
+  // current task cannot terminate. Thus, we get a deadlock!
+  /*
+  val esT1 = Executors.newFixedThreadPool(1)
+  println(Par.fork(Par.fork(Par.unit("In a deadlock")))(esT1).get) // Never
+                                                                   // prints
+                                                                   // "In
+                                                                   // a
+                                                                   // deadlock"
+  esT1.shutdown
   // */
 }
