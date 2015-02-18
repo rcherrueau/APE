@@ -97,16 +97,48 @@ trait Parsers[Parser[+_]] {
     // Really, `many1(p)` is just _`p` followed by `many(p)`_.
     p.map2(many(p)) (_ :: _)
 
-  // `flatMap` is good for context-sensitive grammar.
+  /** Runs a parsers, and uses its result to select a second parser to
+    * run in sequence.
+    *
+    * `flatMap` is good for context-sensitive grammar.
+    */
   def flatMap[A,B](p: Parser[A])(f: A => Parser[B]): Parser[B]
-
-  import scala.util.matching.Regex
-  def regex(r: Regex): Parser[String]
 
   // Using flatMap
   def map2_2[A,B,C](p1: Parser[A], p2: => Parser[B])(f: (A,B) => C): Parser[C] =
     p1 flatMap { a => p2 map { f(a,_) } }
 
+  /** Promotes a regex to a Parser[String] */
+  import scala.util.matching.Regex
+  def regex(r: Regex): Parser[String]
+
+  /** Sequences two parsers, ignoring the result of the first. */
+  def skipL[A,B](p1: Parser[A], p2: Parser[B]): Parser[B] =
+    // We wrap `p1` in slice since we don't care about its result.
+    slice(p1) flatMap { _ => p2 }
+
+  /** Sequences two parsers, ignoring the result of the first. */
+  def skipR[A,B](p1: Parser[A], p2: Parser[B]): Parser[A] =
+    // We wrap `p1` in slice since we don't care about its result.
+    p1 flatMap { s => slice(p2) map { _ => s } }
+
+  /** Parser that recognizes a list of `p` separated by `sep`.
+    *
+    * In the result, `sep` is ommited.
+    */
+  def mkList[A,B](p: Parser[A])(sep: Parser[B]): Parser[List[A]] =
+    mkList1(p)(sep) | succeed(List())
+
+  def mkList1[A,B](p: Parser[A])(sep: Parser[B]): Parser[List[A]] =
+    map2(p, (sep *> p).many)(_ :: _)
+
+  /** Attempts `p` and strips trailing whitespace.
+    *
+    * Usually used for the tokens of a grammar.
+    */
+  val spaces = regex("""\s*""".r)
+  def token[A](p: Parser[A]): Parser[A] =
+    p <* spaces
 
   /** Adding infix syntax */
   implicit def operators[A](p: Parser[A]): ParserOps[A] =
@@ -116,8 +148,15 @@ trait Parsers[Parser[+_]] {
     def |[B>:A](p2: Parser[B]): Parser[B] = self.or(p, p2)
     def map[B](f: A => B): Parser[B] = self.map(p)(f)
     def **[B](p2: Parser[B]): Parser[(A,B)] = self.product(p, p2)
-    def map2[B,C](p2: Parser[B])(f: (A,B) => C): Parser[C] = self.map2(p,p2)(f)
-    def flatMap[B](f: A => Parser[B]): Parser[B] = self.flatMap(p)(f)
+    def map2[B,C](p2: => Parser[B])(f: (A,B) => C): Parser[C] =
+      self.map2(p,p2)(f)
+    def flatMap[B](f: A => Parser[B]): Parser[B] = self.flatMap(p)(f)p
+    def many: Parser[List[A]] = self.many(p)
+    def many1: Parser[List[A]] = self.many1(p)
+    def slice: Parser[String] = self.slice(p)
+    def *>[B](p2: Parser[B]): Parser[B] = self.skipL(p, p2)
+    def <*[B](p2: Parser[B]): Parser[A] = self.skipR(p, p2)
+    def mkList[B](sep: Parser[B]): Parser[List[A]] = self.mkList(p)(sep)
   }
 
   object Laws {
