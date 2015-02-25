@@ -10,6 +10,18 @@ scalaVersion := "2.11.5"
 
 // resolvers += Resolver.mavenLocal
 
+// Shows expansion of implicits:
+// scalacOptions += "-Xlog-implicits"
+
+// scalacOptions += "-feature"
+
+scalacOptions += "-Xprint:type"
+
+scalacOptions += "-Ytyper-debug"
+
+// Compile state only
+includeFilter in (Compile, unmanagedSources) := "State.scala"
+
 libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
 
 libraryDependencies +=  "com.chuusai" %% "shapeless" % "2.0.0"
