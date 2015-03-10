@@ -289,6 +289,7 @@ object sized {
 object ClientApp extends App {
   // What we have with actual List
   {
+    println("************************************************** List")
     import list._, List._
 
     Nil: List[Int]
@@ -313,6 +314,7 @@ object ClientApp extends App {
 
   // What we want with List that uses dependent type
   {
+    println("********************************************* SizedList")
     import list._, List._
     import nat._, Nat._
     import sizedlist._, SizedList._
@@ -341,6 +343,7 @@ object ClientApp extends App {
 
   // Generalization to all Seq
   {
+    println("************************************************* Sized")
     import nat._, Nat._
     import sized._, Sized._
 
