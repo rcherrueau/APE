@@ -121,39 +121,75 @@ object nat {
     // Sum(_5, Sum(_5, _1)) : Succ[Succ[Succ[Succ[Succ[Succ[_5]]]]]]
   }
 
-  @implicitNotFound("${N1} minus ${N2} leads to a non Nat")
-  trait Diff[N1 <: Nat, N2 <: Nat] {
+  // `a * b` is equivalent to `a + a + a + ... + a` b times. Thus in
+  // `Prod` we wanna reuse `Sum`
+  trait Prod[N1 <: Nat, N2 <: Nat] {
     type Out <: Nat
     def out(n1: N1, n2: N2): Out
   }
-  object Diff {
+  // XXX:
+  // object Prod {
+  //   def apply[N1 <: Nat, N2 <: Nat](n1: N1,
+  //                                   n2: N2)(
+  //                                   implicit
+  //                                   prod: Prod[N1, N2]) =
+  //     prod.out(n1, n2)
+  //
+  //   implicit def ProdN_1[N <: Nat] = new Prod[N, _1] {
+  //     type Out = N
+  //     def out(n1: N, n2: _1) = n1
+  //   }
+  //   implicit def ProdN1SuccN2[N1 <: Nat,
+  //                             N2 <: Nat](implicit
+  //                                        prod: Prod[N1, N2],
+  //                                        // Note: illegal dependent
+  //                                        // method type: parameter
+  //                                        // appears in the type of
+  //                                        // another parameter in the
+  //                                        // same section or an earlier
+  //                                        // one
+  //                                        sum: Sum[N1, prod.Out]) =
+  //     new Prod[N1, Succ[N2]] {
+  //       type Out = Sum[N1, prod.Out]
+  //       // Note: Sum(...) requires a implicit Sum[N1, prod.Out]
+  //       def out(n1: N1, n2: Succ[N2]) = Sum(n1, prod.out(n1, n2.p))
+  //     }
+  // }
+  // Solution:
+  object Prod {
     def apply[N1 <: Nat, N2 <: Nat](n1: N1,
                                     n2: N2)(
                                     implicit
-                                    diff: Diff[N1,N2]) =
-      diff.out(n1, n2)
+                                    prod: Prod[N1, N2]) =
+      prod.out(n1, n2)
 
-    implicit def DiffN_0[N <: Nat] = new Diff[N, _0] {
-      type Out = N
-      def out(n1: N, n2: _0) = n1
+    // N1 * N2 = R
+    type Aux[N1 <: Nat,
+             N2 <: Nat,
+             R <: Nat] = Prod[N1, N2] { type Out = R }
+
+    implicit def ProdN_0[N1 <: Nat]: Aux[N1, _0, _0] = new Prod[N1, _0] {
+      type Out = _0
+      def out(n1: N1, n2: _0) = _0
     }
 
-    // Tests:
-    // Diff(_4, _0)            : _4
-    // Diff(_0, _0)            : _0
-    // Diff(Sum(_1, _1), _0)   : _2
-
-    implicit def DiffN1N2[N1 <: Nat,
-                          N2 <: Nat](implicit
-                                     diff: Diff[N1, N2]) =
-      new Diff[Succ[N1], Succ[N2]] {
-        type Out = diff.Out
-        def out(n1: Succ[N1], n2: Succ[N2]) = diff.out(n1.p, n2.p)
+    // Scala doesn't like you!
+    implicit def ProdN1SuccN2[N1 <: Nat,
+                              N2 <: Nat,
+                              R  <: Nat](
+                              implicit
+                              prod: Prod.Aux[N1, N2, R],
+                              sum: Sum[N1, R]): Aux[N1, Succ[N2], sum.Out] =
+      new Prod[N1, Succ[N2]] {
+        type Out = sum.Out
+        def out(n1: N1, n2: Succ[N2]) = sum.out(n1, prod.out(n1, n2.p))
       }
 
     // Tests:
-    // Diff(_5, _1)   :_4
-    // Diff(_0, _1)   // Doesn't type check
+    // Prod(_5, _1)  : _5
+    // Prod(_5, _2)  : Succ[Succ[Succ[Succ[Succ[_5]]]]]
+    // Prod(_2, _2)  : _4
+    // Prod(_5, _0)  : _0
   }
 
   // Constraints:
