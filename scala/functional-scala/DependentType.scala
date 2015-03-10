@@ -287,6 +287,7 @@ object sized {
 }
 
 object ClientApp extends App {
+  //*
   // What we have with actual List
   {
     println("************************************************** List")
@@ -311,7 +312,9 @@ object ClientApp extends App {
       case r :RuntimeException => println("Type Checks but Runtime error")
     }
   }
+  // */
 
+  //*
   // What we want with List that uses dependent type
   {
     println("********************************************* SizedList")
@@ -340,16 +343,18 @@ object ClientApp extends App {
     SCons(1, SCons(2, SNil)) .index (Pred(_0))
     """)
   }
+  // */
 
+  //*
   // Generalization to all Seq
   {
-    println("************************************************* Sized")
+    println("********************************************** Sized[_]")
     import nat._, Nat._
     import sized._, Sized._
 
     import utils.illTyped
 
-    // Working with List
+    // Note: Working with List
     SEmpty[List]                     : Sized[List[Int], _0]
     SCons(1, SCons(2, SEmpty[List])) : Sized[List[Int], _2]
 
@@ -367,7 +372,7 @@ object ClientApp extends App {
     SCons(1, SCons(2, SEmpty[List])) .index (Pred(_0))
     """)
 
-    // Working with Stream
+    // Note: Working with Stream
     SEmpty[Stream]                     : Sized[Stream[Int], _0]
     SCons(1, SCons(2, SEmpty[Stream])) : Sized[Stream[Int], _2]
 
@@ -385,6 +390,29 @@ object ClientApp extends App {
     SCons(1, SCons(2, SEmpty[Stream])) .index (Pred(_0))
     """)
   }
+  // */
 }
+
+// Resources:
+// @InProceedings{OMO10a,
+//   author =    {Bruno C. d. S. Oliveira and Adriaan Moors and Martin
+//                Odersky},
+//   title =     {Type classes as objects and implicits},
+//   booktitle = {Proceedings of the 25th Annual {ACM} {SIGPLAN}
+//                Conference on Object-Oriented Programming, Systems,
+//                Languages, and Applications, {OOPSLA} 2010, October
+//                17-21, 2010, Reno/Tahoe, Nevada, {USA}},
+//   pages =     {341--360},
+//   year =      2010,
+//   url =       {http://doi.acm.org/10.1145/1869459.1869489},
+//   doi =       {10.1145/1869459.1869489},
+//   timestamp = {Wed, 27 Oct 2010 13:53:08 +0200},
+//   biburl =
+//                {http://dblp.uni-trier.de/rec/bib/conf/oopsla/OliveiraMO10},
+//   bibsource = {dblp computer science bibliography, http://dblp.org}
+// }
+//
+// https://markehammons.wordpress.com/2013/07/02/dependent-types-in-scala/
+// https://github.com/milessabin/shapeless/
 
 // Le mot de la fin: http://stackoverflow.com/a/12937819/2072144
