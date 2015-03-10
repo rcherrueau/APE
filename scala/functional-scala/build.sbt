@@ -1,4 +1,4 @@
-name := "temp test"
+name := "Dependent Types in Scala"
 
 version := "1.0"
 
@@ -15,11 +15,11 @@ includeFilter in unmanagedSources := "DependentType.scala"
 
 
 // Libraries
-libraryDependencies +=  "com.chuusai" %% "shapeless" % "2.1.0"
+// libraryDependencies +=  "com.chuusai" %% "shapeless" % "2.1.0"
 
-libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
+// libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
 
-libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.1.0"
+// libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.1.0"
 
 // illTyped macro
 unmanagedJars in Compile ++=
