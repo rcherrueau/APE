@@ -39,6 +39,8 @@ object list {
 
 // Dependent types with Natural
 object nat {
+  // Nat is a trait indicating a naturel number, and Succ is a subtype
+  // of it that takes a Nat as a type parameter.
   trait Nat { def toInt: Int }
   case class Succ[P <: Nat](p: P) extends Nat { def toInt = p.toInt + 1 }
   case object _0 extends Nat { def toInt = 0 }
@@ -63,16 +65,40 @@ object nat {
   import Nat._
   import scala.annotation.implicitNotFound
 
-  // Operations
+  // Operations:
+
+  // We don't define operation for our Nats as methods on our types,
+  // but rather as types themselves. Below is the definition of the
+  // dependent type `Pred`, which takes a Nat and returns it's
+  // predecessor as that number decremented by one.
+
+  // Pred is a Type class that witnesses that `Out` is the predecessor
+  // of `N`. It's used with the style `implicitly[ Pred[_2] ]` which
+  // returns a Pred trait with an `Out` type of `_1` and with a method
+  // `out` that takes a `_2` value and return a `_1`.. But how does it
+  // go from a definition that takes one generic parameter to
+  // determine the predecessor of our number? Look at the `Pred.apply`
+  // to find the answer.
   @implicitNotFound("Could not find the predecessor of ${N}")
   trait Pred[N <: Nat] {
     type Out <: Nat
     def out(n: N): Out
   }
   object Pred {
-    def apply[N <: Nat](n: N)(implicit pred: Pred[N]) =
+    // `apply` is a method that takes a type class `Pred` on `N`. When
+    // we call `apply`, scala compiler search for an implicit that has
+    // the same type as the type passed into implicit. For instance,
+    // if we call `apply` with value `_2`, the compiler will use the
+    // implicit definition `PredSuccN` to instantiate our type class.
+    // And if we try `apply(_0)` the compiler will complain about not
+    // being able to find an implicit value for the parameter `pred:
+    // Pred[_0]` because there is no implicit definition with a
+    // signature `Pred[N]` or `Pred[_0]`.
+    def apply[N <: Nat](n: N)(implicit pred: Pred[N]): pred.Out =
       pred.out(n)
 
+    // Implements the behaviour of Pred. The implicit method
+    // instantiate a `Pred` for a given Nat.
     implicit def PredSuccN[N <: Nat] = new Pred[Succ[N]] {
       type Out = N
       def out(n: Succ[N]) = n.p
@@ -85,6 +111,11 @@ object nat {
     // Pred(_5)          : _4
     // Pred.apply(_0)    // Doesn't type checksp
   }
+  // Thus, Pred is a Π-type (Dependent product type). It's a function
+  // from a value `n` to type `Out`. In other word, pred takes a type
+  // `N =:= Succ[_ <: Nat]` and return a type `Out` that is type `N`
+  // predecessor.
+
 
   trait Sum[N1 <: Nat, N2 <: Nat] {
     type Out <: Nat
