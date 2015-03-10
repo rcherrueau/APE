@@ -238,13 +238,14 @@ object nat {
     // implicitly [ _4 < _2 ] // No implicit found
   }
 
-  @implicitNotFound("${N1} is not lather than or equal ${N2}")
+  @implicitNotFound("${N1} is not lather than or equal to ${N2}")
   trait <=[N1 <: Nat, N2 <: Nat]
   object <= {
     implicit def lteq_0N[N <: Nat] = new <=[_0, N] {}
     implicit def lteqN1N2[N1 <: Nat,
                           N2 <: Nat](implicit
-                                     lt: N1 <= N2) = new <=[Succ[N1],Succ[N2]] {}
+                                     lt: N1 <= N2) =
+      new <=[Succ[N1], Succ[N2]] {}
 
     // Tests:
     // implicitly [ _2 <= _3 ]
@@ -316,18 +317,20 @@ object sized {
     import scala.language.higherKinds
     import scala.collection.generic.CanBuildFrom
 
-    def SEmpty[CC[_] <: Seq[_]](implicit
-                                cbf: CanBuildFrom[CC[Nothing],
-                                                  Nothing,
-                                                  CC[Nothing]]): Sized[CC[Nothing], _0] =
+    def SEmpty[CC[_] <: Seq[_]](
+               implicit
+               cbf: CanBuildFrom[CC[Nothing],
+                                 Nothing,
+                                 CC[Nothing]]): Sized[CC[Nothing], _0] =
       new Sized(cbf().result)
 
     def SCons[A,
               CC[A] <: Seq[A],
-              S <: Nat](a: A,
-                        s: Sized[CC[A], S])(
-                        implicit
-                        cbf: CanBuildFrom[CC[A], A, CC[A]]): Sized[CC[A], Succ[S]] =
+              S <: Nat](
+              a: A,
+              s: Sized[CC[A], S])(
+              implicit
+              cbf: CanBuildFrom[CC[A], A, CC[A]]): Sized[CC[A], Succ[S]] =
       new Sized({
                   val builder = cbf()
                   val seq = s.unsized
@@ -429,7 +432,8 @@ object ClientApp extends App {
     SCons(1, SCons(2, SEmpty[List])) : Sized[List[Int], _3]
     """)
 
-    println("value at index 1: " + SCons(1, SCons(2, SEmpty[List])) .index (_1))
+    println("value at index 1: " +
+              SCons(1, SCons(2, SEmpty[List])) .index (_1))
 
     illTyped("""
     SCons(1, SCons(2, SEmpty[List])) .index (_5)
@@ -447,7 +451,8 @@ object ClientApp extends App {
     SCons(1, SCons(2, SEmpty[Stream])) : Sized[Stream[Int], _3]
     """)
 
-    println("value at index 1: " + SCons(1, SCons(2, SEmpty[Stream])) .index (_1))
+    println("value at index 1: " +
+              SCons(1, SCons(2, SEmpty[Stream])) .index (_1))
 
     illTyped("""
     SCons(1, SCons(2, SEmpty[Stream])) .index (_5)
