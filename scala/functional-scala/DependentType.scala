@@ -1,162 +1,248 @@
-// http://wheaties.github.io/Presentations/Scala-Dep-Types/dependent-types.html#/
-
-object svect1 {
-  import shapeless.{Nat, Succ, ops}, ops.nat._, Nat._
-
-  // Vector
-  trait Vect[+A] {
+// List in Scala
+object list {
+  trait List[+A] {
     def head: A
-    def tail: Vect[A]
+    def tail: List[A]
+
     def size: Int = this match {
-      case VNil => 0
-      case VCons(_, tl) => 1 + tl.size
+      case Nil => 0
+      case Cons(_, tl) => 1 + tl.size
     }
+
     def index(n: Int): A =
-      if (n > size) throw new IndexOutOfBoundsException()
+      if (n > size || n < 0) throw new IndexOutOfBoundsException(n.toString)
       else if (n > 0) tail.index(n - 1)
       else head
   }
-
-  case class VCons[A, T <: Vect[A]](head: A, tail: T) extends Vect[A]
-
-  case object VNil extends Vect[Nothing] {
+  case class Cons[A](head: A,
+                     tail: List[A]) extends List[A]
+  case object Nil extends List[Nothing] {
     def head = throw new NoSuchElementException("VNil.head")
     def tail = throw new NoSuchElementException("VNil.tail")
   }
 
-  object Vect {
-    type VNil = VNil.type
-  }
-  import Vect._
-
-  // Usage
-  val a: Vect[Int] = VCons(1, VCons(2, VCons(3, VNil)))
-  a.head: Int
-  // a.tail.tail.tail.tail.tail.tail.tail.tail.tail // Type Checks!
-  //                                                // Exception at
-  //                                                // runtime
-  // a.index(1000000) // Type Checks!
-  //                  // Exception at runtime
-
-
-  // Compute the size of an Vector. To compute the size, I have to
-  // print in the type, the internal structure of that Vect. Thus,
-  // VCons is parametrized by its Tail. This doesn't make sense, it's
-  // redundant information. A solution is that a sized is based on an
-  // empty vect. Thus we don't have to compute the size of the vector
-  // and we don't need `Sizer` type class.
-  trait Sizer[V <: Vect[_]] {
-    type Size <: Nat
-    def size(v: V): Size
+  object List {
+    type Nil = Nil.type
   }
 
-  object Sizer {
-    def apply[V <: Vect[_]](v: V)(implicit sz: Sizer[V]) = sz.size(v)
-
-    implicit def SizerVNil = new Sizer[VNil] {
-      type Size = _0
-      def size(v: VNil) = _0
-    }
-    val a: _0 = Sizer(VNil)
-
-    implicit def SizerVCons[A, T <: Vect[A]](implicit sz: Sizer[T]) = new Sizer[VCons[A,T]] {
-      type Size = Succ[sz.Size]
-      def size(v: VCons[A,T]) = Succ[sz.Size]()
-    }
-    val b: _2 = Sizer(VCons(1, VCons(1, VNil)))
-
-  }
-
-  // Sized: Wrapper witnessing that it has the statically specified
-  // size.
-
-  class SizedVect[V <: Vect[_], S <: Nat](val unsized: V)
-  object SizedVect {
-    def apply[V<:Vect[_]](v: V)(implicit sz: Sizer[V]): SizedVect[V, sz.Size] = new SizedVect(v)
-  }
-
-  case class SizedOps[V <: Vect[_], S <: Nat](s: SizedVect[V, S]) { slef =>
-
-    def index(n: Nat)(implicit
-                      lt: LTEq[n.N, S],
-                      ev: ToInt[n.N]) = s.unsized.index(toInt[n.N])
-
-  }
-
-  SizedOps(SizedVect(VCons(1, VCons(2, VNil)))).index(_2)
+  // Tests:
+  // import List._
+  // Nil: List[Int]
+  // Nil: Nil
+  // Cons(1, Cons(2, Nil)): List[Int]
+  // Cons(1, Cons(2, Nil)) .index (1)  // > 2
+  // Cons(1, Cons(2, Nil)) .index (5)  // Type checks! Leads to an
+  //                                   // Exception at runtime
+  // Cons(1, Cons(2, Nil)) .index (-1) // Type checks! Leads to an
+  //                                   // Exception at runtime
 }
 
+// Dependent types with Natural
+object nat {
+  trait Nat { def toInt: Int }
+  case class Succ[P <: Nat](p: P) extends Nat { def toInt = p.toInt + 1 }
+  case object _0 extends Nat { def toInt = 0 }
 
-object svect2 extends App {
-  import shapeless.{Nat, Succ, ops}, ops.nat._, Nat._
+  object Nat {
+    type _0 = _0.type
+    type _1 = Succ[_0]
+    type _2 = Succ[_1]
+    type _3 = Succ[_2]
+    type _4 = Succ[_3]
+    type _5 = Succ[_4]
+    // Macro ...
 
-  trait Vect[+A] {
-    def head: A
-    def tail: Vect[A]
-    def size: Int = this match {
-      case VNil => 0
-      case VCons(_, tl) => 1 + tl.size
+    val _1 = Succ(_0)
+    val _2 = Succ(_1)
+    val _3 = Succ(_2)
+    val _4 = Succ(_3)
+    val _5 = Succ(_4)
+    // Macro ...
+  }
+
+  import Nat._
+  import scala.annotation.implicitNotFound
+
+  // Operations
+  @implicitNotFound("Could not find the predecessor of ${N}")
+  trait Pred[N <: Nat] {
+    type Out <: Nat
+    def out(n: N): Out
+  }
+  object Pred {
+    def apply[N <: Nat](n: N)(implicit pred: Pred[N]) =
+      pred.out(n)
+
+    implicit def PredSuccN[N <: Nat] = new Pred[Succ[N]] {
+      type Out = N
+      def out(n: Succ[N]) = n.p
     }
-    def index(n: Int): A =
-      if (n > size) throw new IndexOutOfBoundsException()
-      else if (n > 0) tail.index(n - 1)
-      else head
-  }
-  // Here VCons is no more parameteryzed by it's tail
-  case class VCons[A](head: A, tail: Vect[A]) extends Vect[A]
-  case object VNil extends Vect[Nothing] {
-    def head = throw new NoSuchElementException("VNil.head")
-    def tail = throw new NoSuchElementException("VNil.tail")
+
+    // Tests:
+    // Pred.apply(_5)    : Succ[Succ[Succ[Succ[_0]]]]
+    // Pred.apply(_5)    : _4
+    // Pred(_5)          : Succ[Succ[Succ[Succ[_0]]]]
+    // Pred(_5)          : _4
+    // Pred.apply(_0)    // Doesn't type checksp
   }
 
-  object Vect {
-    type VNil = VNil.type
+  trait Sum[N1 <: Nat, N2 <: Nat] {
+    type Out <: Nat
+    def out(n1: N1, n2: N2): Out
   }
-  import Vect._
+  object Sum {
+    def apply[N1 <: Nat, N2 <: Nat](n1: N1,
+                                    n2: N2)(
+                                    implicit
+                                    sum: Sum[N1, N2]) =
+      sum.out(n1, n2)
 
-  class SizedVect[+V <: Vect[_], S <: Nat](val unsized: V) {
-    def index(n: Nat)(implicit
-                      ev1: LT[n.N, S],
-                      ev2: ToInt[n.N]) = unsized.index(toInt[n.N])
+    implicit def Sum_0N[N <: Nat] = new Sum[_0, N] {
+      type Out = N
+      def out(n1: _0, n2: N) = n2
+    }
+
+    // Tests:
+    // Sum(_0, _4)          : _4
+    // Sum(_0, _0)          : _0
+    // Sum(_0, Pred(_1))    : _0
+    // Sum(_0, Pred(_0))    // Doesn't type check
+
+    implicit def SumSuccN1N2[N1 <: Nat,
+                             N2 <: Nat](implicit
+                                        sum: Sum[N1, N2]) =
+      new Sum[Succ[N1], N2] {
+        type Out = Succ[sum.Out]
+        def out(n1: Succ[N1], n2: N2) = Succ(sum.out(n1.p, n2))
+      }
+
+    // Tests:
+    // Sum(_5, _1)          : Succ[_5]
+    // Sum(_5, Sum(_5, _1)) : Succ[Succ[Succ[Succ[Succ[Succ[_5]]]]]]
   }
 
-  object SizedVect {
-    val SVNil: SizedVect[VNil, _0] = new SizedVect(VNil)
-    type SVNil = SVNil.type
+  @implicitNotFound("${N1} minus ${N2} leads to a non Nat")
+  trait Diff[N1 <: Nat, N2 <: Nat] {
+    type Out <: Nat
+    def out(n1: N1, n2: N2): Out
+  }
+  object Diff {
+    def apply[N1 <: Nat, N2 <: Nat](n1: N1,
+                                    n2: N2)(
+                                    implicit
+                                    diff: Diff[N1,N2]) =
+      diff.out(n1, n2)
 
-    def  SVCons[A,
-                V <: Vect[A],
-                S <: Nat](a: A, sv: SizedVect[V,S]): SizedVect[VCons[A], Succ[S]] =
-      new SizedVect(VCons(a, sv.unsized))
-    type SVCons[A,S <: Nat] = SizedVect[VCons[A], S]
-    type SVect[A,S<:Nat] = SizedVect[Vect[A],S]
+    implicit def DiffN_0[N <: Nat] = new Diff[N, _0] {
+      type Out = N
+      def out(n1: N, n2: _0) = n1
+    }
+
+    // Tests:
+    // Diff(_4, _0)            : _4
+    // Diff(_0, _0)            : _0
+    // Diff(Sum(_1, _1), _0)   : _2
+
+    implicit def DiffN1N2[N1 <: Nat,
+                          N2 <: Nat](implicit
+                                     diff: Diff[N1, N2]) =
+      new Diff[Succ[N1], Succ[N2]] {
+        type Out = diff.Out
+        def out(n1: Succ[N1], n2: Succ[N2]) = diff.out(n1.p, n2.p)
+      }
+
+    // Tests:
+    // Diff(_5, _1)   :_4
+    // Diff(_0, _1)   // Doesn't type check
   }
 
-  import SizedVect._
+  // Constraints:
+  @implicitNotFound("${N1} is not lather than ${N2}")
+  trait <[N1 <: Nat, N2 <: Nat]
+  object < {
+    implicit def lt_0SuccN[N <: Nat] = new <[_0, Succ[N]] {}
+    implicit def ltN1N2[N1 <: Nat,
+                        N2 <: Nat](implicit
+                                   lt: N1 < N2) = new <[Succ[N1],Succ[N2]] {}
 
-  val a = SVNil: SVNil
-  val b = SVNil: SVect[Nothing, _0] // Required SizedVect to be covariant on V
-  val c = SVCons(1, SVCons(2, SVNil)): SVCons[Int, _2]
-  val d = SVCons(1, SVCons(2, SVNil)): SVect[Int, _2]
-  // SVCons(1, SVCons(2, SVNil)): SVect[Int, _3] // Doesn't typecheck
+    // Tests:
+    // implicitly [ _2 < _3 ]
+    // implicitly [ _3 < _3 ] // No implicit found
+    // implicitly [ _4 < _2 ] // No implicit found
+  }
 
-  // println(a.index(_0)) // Doesn't type check
-  println(c.index(_0))
-  println(c.index(_1))
-  // println(c.index(_2)) // Doesn't type check
-  // I can send a proof by hand:
-  println(c.index(_2)(new LT[_2,_2] {},implicitly)) // leads to a
-                                                    // runtime error
+  @implicitNotFound("${N1} is not lather than or equal ${N2}")
+  trait <=[N1 <: Nat, N2 <: Nat]
+  object <= {
+    implicit def lteq_0N[N <: Nat] = new <=[_0, N] {}
+    implicit def lteqN1N2[N1 <: Nat,
+                          N2 <: Nat](implicit
+                                     lt: N1 <= N2) = new <=[Succ[N1],Succ[N2]] {}
 
-  // Generalization to Seq
-  class Sized[+CC <: Seq[_], S <: Nat](val unsized: CC) {
-    // // Error in the implementation
-    // def index(n: Nat)(implicit
-    //                   ev1: LTEq[n.N, S],
-    //                   ev2: ToInt[n.N]) = unsized.index(toInt[n.N])
-    def index(n: Nat)(implicit
-                      ev1: LT[n.N, S],
-                      ev2: ToInt[n.N]) = unsized.drop(toInt[n.N]).head
+    // Tests:
+    // implicitly [ _2 <= _3 ]
+    // implicitly [ _3 <= _3 ] // OK
+    // implicitly [ _4 <= _2 ] // No implicit found
+  }
+}
+
+// Use dependent types: Sized List
+object sizedlist {
+  import list._, List._
+  import nat._, Nat._
+
+  // private force creation of `SizedList` with the factory
+  class SizedList[+L <: List[_], S <: Nat] private (val unsized: L) {
+    def index[N <: Nat](n: N)(implicit
+                              evLT: N < S) = unsized.index(n.toInt)
+  }
+
+  object SizedList {
+    import scala.language.higherKinds
+
+    type SNil = SizedList[Nil, _0]
+    def SNil: SNil = new SizedList(Nil)
+
+    type SCons[L<:List[_], S<:Nat] = SizedList[L,Succ[S]]
+    def SCons[A, S <: Nat](a: A,
+                           sl: SizedList[List[A],S]): SCons[List[A],S] =
+      new SizedList(Cons(a, sl.unsized))
+  }
+
+  // Tests:
+  // import SizedList._
+  // SNil                     : SizedList[List[Int], _0]
+  // SNil                     : SNil
+  // SCons(1, SCons(2, SNil)) : SizedList[List[Int], _2]
+  // SCons(1, SCons(2, SNil)) .index (_1)  // > 2
+  // // Cons(1, Cons(2, Nil)) .index  (5)       // Type checks! Leads to an
+  // //                                         // Exception at runtime
+  // SCons(1, SCons(2, SNil)) .index (_5)       // Note: Doesn't type
+  //                                            // check
+  // // Cons(1, Cons(2, Nil)) .index (-1)       // Type checks! Leads to an
+  // //                                         // Exception at runtime
+  // SCons(1, SCons(2, SNil)) .index (Pred(_0)) // Note: Doesn't type
+  //                                            // check
+  // // Note: I can manually give a proof that `_2 < _5`
+  // SCons(1, SCons(2, SNil)) .index (_5) { new <[_5,_2] {} } // Type
+  //                                                          // checks!
+  //                                                          // Leads to
+  //                                                          // an
+  //                                                          // Exception
+  //                                                          // at
+  //                                                          // runtime
+}
+
+// Use subtypeing: Generalization to Seq
+object sized {
+  // In the rest, we'ill use `scala.collection.List`
+  // import list._, List._
+  import nat._, Nat._
+
+  // private force creation of `SizedList` with the factory
+  class Sized[+CC <: Seq[_], S <: Nat] private (val unsized: CC) {
+    def index[N <: Nat](n: N)(implicit
+                              evLT: N < S) = unsized.drop(n.toInt).head
   }
 
   object Sized {
@@ -164,30 +250,138 @@ object svect2 extends App {
     import scala.collection.generic.CanBuildFrom
 
     def SEmpty[CC[_] <: Seq[_]](implicit
-                               cbf: CanBuildFrom[CC[Nothing], Nothing, CC[Nothing]]) : Sized[CC[Nothing], _0] =
-      new Sized(cbf().result())
+                                cbf: CanBuildFrom[CC[Nothing],
+                                                  Nothing,
+                                                  CC[Nothing]]): Sized[CC[Nothing], _0] =
+      new Sized(cbf().result)
 
     def SCons[A,
               CC[A] <: Seq[A],
               S <: Nat](a: A,
                         s: Sized[CC[A], S])(
                         implicit
-                        cbf: CanBuildFrom[CC[A], A, CC[A]]):
-        Sized[CC[A], Succ[S]] = new Sized({
-                                            val builder = cbf()
-                                            builder += a
-                                            s.unsized.foreach { builder += (_:A) }
-                                            builder.result()
-                                          })
+                        cbf: CanBuildFrom[CC[A], A, CC[A]]): Sized[CC[A], Succ[S]] =
+      new Sized({
+                  val builder = cbf()
+                  val seq = s.unsized
+
+                  builder += a
+                  seq foreach { builder += _ }
+                  builder .result
+                })
   }
-  import Sized._
 
-
-  val seq: Sized[Seq[Nothing], _0] = SEmpty[Seq]
-  val list: Sized[List[Nothing], _0] = SEmpty[List]
-
-  val l2: Sized[List[Int], _1] = SCons(1, SEmpty[List])
-  val l3: Sized[List[Int], _2] = SCons(1, SCons(1, SEmpty[List]))
-
-  val l4 = SCons(1, SCons(1, SEmpty[List]))
+  // Tests:
+  // import Sized._
+  // SEmpty[List]                       : Sized[List[Int], _0]
+  // SEmpty[List]                       : Sized[List[Nothing], _0]
+  // SEmpty[Seq]                        : Sized[Seq[Nothing], _0]
+  // SCons(1, SCons(2, SEmpty[List]))   : Sized[List[Int], _2]
+  // SCons(1, SCons(2, SEmpty[Seq]))    : Sized[Seq[Int], _2]
+  // SCons(1, SCons(2, SEmpty[List])) .index (_1)      // > 2
+  // SCons(1, SCons(2, SEmpty[Seq]))  .index (_1)      // > 2
+  // // SCons(1, SCons(2, SEmpty[List])) .index (_5)      // Note: Doesn't
+  // //                                                   // type check
+  // // SCons(1, SCons(2, SEmpty[Seq])) .index (Pred(_0)) // Note: Doesn't
+  // //                                                   // type check
 }
+
+object ClientApp extends App {
+  // What we have with actual List
+  {
+    import list._, List._
+
+    Nil: List[Int]
+    Nil: Nil
+    Cons(1, Cons(2, Nil)): List[Int]
+
+    println("value at index 1: " + Cons(1, Cons(2, Nil)) .index (1))
+
+    // Both next expressions type check but lead to a runtime error:
+    try {
+      Cons(1, Cons(2, Nil)) .index (5)
+    } catch {
+      case r :RuntimeException => println("Type Checks but Runtime error")
+    }
+
+    try {
+      Cons(1, Cons(2, Nil)) .index (-1)
+    } catch {
+      case r :RuntimeException => println("Type Checks but Runtime error")
+    }
+  }
+
+  // What we want with List that uses dependent type
+  {
+    import list._, List._
+    import nat._, Nat._
+    import sizedlist._, SizedList._
+
+    import utils.illTyped
+
+    SNil                     : SizedList[List[Int], _0]
+    SNil                     : SNil
+    SCons(1, SCons(2, SNil)) : SizedList[List[Int], _2]
+
+    illTyped("""
+    SCons(1, SCons(2, SNil)) : SizedList[List[Int], _3]
+    """)
+
+    // Note: Here we use Nat instead of Int
+    println("value at index 1: " + SCons(1, SCons(2, SNil)) .index (_1))
+
+    illTyped("""
+    SCons(1, SCons(2, SNil)) .index (_5)
+    """)
+
+    illTyped("""
+    SCons(1, SCons(2, SNil)) .index (Pred(_0))
+    """)
+  }
+
+  // Generalization to all Seq
+  {
+    import nat._, Nat._
+    import sized._, Sized._
+
+    import utils.illTyped
+
+    // Working with List
+    SEmpty[List]                     : Sized[List[Int], _0]
+    SCons(1, SCons(2, SEmpty[List])) : Sized[List[Int], _2]
+
+    illTyped("""
+    SCons(1, SCons(2, SEmpty[List])) : Sized[List[Int], _3]
+    """)
+
+    println("value at index 1: " + SCons(1, SCons(2, SEmpty[List])) .index (_1))
+
+    illTyped("""
+    SCons(1, SCons(2, SEmpty[List])) .index (_5)
+    """)
+
+    illTyped("""
+    SCons(1, SCons(2, SEmpty[List])) .index (Pred(_0))
+    """)
+
+    // Working with Stream
+    SEmpty[Stream]                     : Sized[Stream[Int], _0]
+    SCons(1, SCons(2, SEmpty[Stream])) : Sized[Stream[Int], _2]
+
+    illTyped("""
+    SCons(1, SCons(2, SEmpty[Stream])) : Sized[Stream[Int], _3]
+    """)
+
+    println("value at index 1: " + SCons(1, SCons(2, SEmpty[Stream])) .index (_1))
+
+    illTyped("""
+    SCons(1, SCons(2, SEmpty[Stream])) .index (_5)
+    """)
+
+    illTyped("""
+    SCons(1, SCons(2, SEmpty[Stream])) .index (Pred(_0))
+    """)
+  }
+}
+
+// Le mot de la fin: http://stackoverflow.com/a/12937819/2072144
