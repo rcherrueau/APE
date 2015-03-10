@@ -75,7 +75,7 @@ object nat {
   // Pred is a Type class that witnesses that `Out` is the predecessor
   // of `N`. It's used with the style `implicitly[ Pred[_2] ]` which
   // returns a Pred trait with an `Out` type of `_1` and with a method
-  // `out` that takes a `_2` value and return a `_1`.. But how does it
+  // `out` that takes a `_2` value and return a `_1`. But how does it
   // go from a definition that takes one generic parameter to
   // determine the predecessor of our number? Look at the `Pred.apply`
   // to find the answer.
