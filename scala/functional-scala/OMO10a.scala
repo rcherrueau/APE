@@ -20,10 +20,20 @@
   */
 object OMO10a {
 
-  // First, implicit prevent the cumbersome of passing explicit
-  // constraint to generic algorithms. This is especially true when
-  // many generic algorithmes require multiple constraints on their
-  // type parameters.
+  /** Sort without Implicit.
+    *
+    * First, implicit prevent the cumbersome of passing explicit
+    * constraint to generic algorithms. This is especially true when
+    * many generic algorithms require multiple constraints on their
+    * type parameters.
+    *
+    *
+    * {{{
+    * scala> import OMO10a.introWithoutImplicit._
+    * scala> sort(List(2,3,1))(intOrd)
+    * res0: List[Int] = List(1, 2, 3)
+    * }}}
+    */
   object introWithoutImplicit {
     def sort[T](xs: List[T])(ordT: Ord[T]): List[T] = xs match {
       case Nil => Nil
@@ -42,14 +52,19 @@ object OMO10a {
     object intOrd extends Ord[Int] {
       override def compare(a: Int, b: Int) = a <= b
     }
-
-    // scala> import OMO10a.introWithoutImplicit._
-    // scala> sort(List(2,3,1))(intOrd)
-    // res0: List[Int] = List(1, 2, 3)
   }
 
+  /** Sort with Implicit prevents the cumbersome of passing constraint.
+    *
+    * {{{
+    * scala> // ordT is no more required in sort:
+    * scala> import OMO10a.introWithImplicit._
+    * scala> sort(List(2,3,1))
+    * res0: List[Int] = List(1, 2, 3)
+    * }}}
+    */
   object introWithImplicit {
-    // Notice implicit in front of ordT
+    // Note: implicit in front of ordT
     def sort[T](xs: List[T])(implicit ordT: Ord[T]): List[T] = xs match {
       case Nil => Nil
       case x :: xs => {
@@ -65,20 +80,27 @@ object OMO10a {
       def compare(a: T, b: T): Boolean
     }
 
-    // Notice implicit in front of intOrd object
+    // Note: implicit in front of intOrd object
     implicit object intOrd extends Ord[Int] {
       override def compare(a: Int, b: Int) = a <= b
     }
-
-    // scala> // ordT is no more required in sort:
-    // scala> import OMO10a.introWithImplicit._
-    // scala> sort(List(2,3,1))
-    // res0: List[Int] = List(1, 2, 3)
   }
 
-  // Second, the programmer is free to provide an explicit argument.
-  // This argument becomes part of the implicit scope so that implicit
-  // argument is propagated naturally.
+  /** Sort with Implicit let the programmer free to provide a constraint.
+    *
+    * Second, the programmer is free to provide an explicit argument.
+    * This argument becomes part of the implicit scope so that implicit
+    * argument is propagated naturally.
+    *
+    * {{{
+    * scala> import OMO10a.implicitsInScala._
+    * scala> implicit val out = System.out
+    * scala> logTm("Does not compute!")
+    * [Thu Jan 29 16:57:09 CET 2015] Does not compute!
+    * scala> logTm("Does not compute!")(System.err)
+    * Err: [Thu Jan 29 16:57:15 CET 2015] Does not compute!
+    * }}}
+    */
   object implicitsInScala {
     import java.io.PrintStream
 
@@ -87,19 +109,36 @@ object OMO10a {
 
     def log(msg: String)(implicit o: PrintStream): Unit =
       o.println(msg)
-
-    // scala> import OMO10a.implicitsInScala._
-    // scala> implicit val out = System.out
-    // scala> logTm("Does not compute!")
-    // [Thu Jan 29 16:57:09 CET 2015] Does not compute!
-    // scala> logTm("Does not compute!")(System.err)
-    // Err: [Thu Jan 29 16:57:15 CET 2015] Does not compute!
    }
 
-  // Problem is, when you want to pass mutliple implicit arguments and
-  // fix one of them, because implicit argument list may either be
-  // omitted or supplied in its entierly. However there is a simple
-  // idiom to encode a wildcard for an implicit argument.
+  /** Implicit argument list may either be omitter or supplied entirely.
+    *
+    * Problem is, when you want to pass multiple implicit arguments
+    * and fix one of them, because implicit argument list may either
+    * be omitted or supplied in its entirely. However there is a
+    * simple idiom to encode a wild-card for an implicit argument.
+    *
+    * {{{
+    * scala> import OMO10a.implicitsWildcard._
+    * scala> implicit val out = System.out
+    * scala> // When we want to fix a implicit parameter, the entire implicit
+    * scala> // argument list must be supplied. Thus, without wild-card, if we
+    * scala> // want to fix `prefix`, we also have to fix `output`.
+    * scala> logPrefix("Does not compute!")(out, (new java.util.Date()).toString())
+    * [Thu Jan 29 17:54:53 CET 2015] Does not compute!
+    * scala> // With wildcard, we can omitting the value for the `output`,
+    * scala> // while providing an explicit value for the `prefix`. Type
+    * scala> // inference and implicit search will turn the `?` into
+    * scala> // `?[PrintStream](out)`.
+    * scala> logPrefix("Does not compute!")(?, (new java.util.Date()).toString())
+    * [Thu Jan 29 17:54:53 CET 2015] Does not compute!
+    * scala> // In scala, the `?[T]` methods is available as
+    * scala> // scala.Predef.implicilty
+    * scala> logPrefix("Does not compute!")(implicitly,
+    * scala>                                (new java.util.Date()).toString())
+    * [Thu Jan 29 17:54:53 CET 2015] Does not compute!
+    * }}}
+    */
   object implicitsWildcard {
     import java.io.PrintStream
 
@@ -116,35 +155,26 @@ object OMO10a {
     // Polymorphic method which look up an implicit value for type T
     // in the implicit scope.
     def ?[T](implicit w: T): T = w
-
-    // scala> import OMO10a.implicitsWildcard._
-    // scala> implicit val out = System.out
-    // scala> // When we want to fix a implicit paramter, the entire implicit
-    // scala> // argument list must be supplied. Thus, without wildcard, if we
-    // scala> // want to fix `prefix`, we also have to fix `output`.
-    // scala> logPrefix("Does not compute!")(out, (new java.util.Date()).toString())
-    // [Thu Jan 29 17:54:53 CET 2015] Does not compute!
-    // scala> // With wildcard, we can omitting the value for the `output`,
-    // scala> // while providing an explicit value for the `prefix`. Type
-    // scala> // inference and implicit search will turn the `?` into
-    // scala> // `?[PrintStream](out)`.
-    // scala> logPrefix("Does not compute!")(?, (new java.util.Date()).toString())
-    // [Thu Jan 29 17:54:53 CET 2015] Does not compute!
-    // scala> // In scala, the `?[T]` methods is available as
-    // scala> // scala.Predef.implicilty
-    // scala> logPrefix("Does not compute!")(implicitly,
-    // scala>                                (new java.util.Date()).toString())
-    // [Thu Jan 29 17:54:53 CET 2015] Does not compute!
   }
 
 
-  // Implicits provide the missing link for *type class programming*
-  // to be convenient in *OO langauges with generics*. They provide
-  // the *type-driven selection mechanism* that was missing for type
-  // class programming to be convenient in OO. Indeed, type-driven
-  // selection mechanism offers a type-safe solution that propagtes
-  // constraint automatically. Here is another instance for Ord type
-  // class and Tuple2 models.
+  /** Implicit is the missing link between type class and OO languages.
+    *
+    * Implicits provide the missing link for *type class programming*
+    * to be convenient in *OO languages with generics*. They provide
+    * the *type-driven selection mechanism* that was missing for type
+    * class programming to be convenient in OO. Indeed, type-driven
+    * selection mechanism offers a type-safe solution that propagates
+    * constraint automatically. Here is another instance for Ord type
+    * class and Tuple2 models.
+    *
+    * {{{
+    * scala> import OMO10a.introWithImplicit._
+    * scala> import OMO10a.implicitsIsMissingLink._
+    * scala> sort(List((5, 6), (3, 4)))
+    * res0: List[(Int, Int)] = List((3,4), (5,6))
+    * }}}
+    */
   object implicitsIsMissingLink {
     import introWithImplicit._
 
@@ -154,20 +184,26 @@ object OMO10a {
       override def compare(x: (A, B), y: (A, B)) = ordA.compare(x._1, y._1) &&
         ordB.compare(x._2, y._2)
     }
-
-    // scala> import OMO10a.introWithImplicit._
-    // scala> import OMO10a.implicitsIsMissingLink._
-    // scala> sort(List((5, 6), (3, 4)))
-    // res0: List[(Int, Int)] = List((3,4), (5,6))
   }
 
   // TODO: implicit overloading
   // object implicitOverloading { }
 
-  // After all, `ordA.compare(x._1, y._1)` is not idiomatic in OOP.
-  // The pimp my library pattern use implicits to allow the more
-  // natural `x._1.compare(y._1)` assuming that the type of `x._1`
-  // doesn't define a `compare` method.
+  /** Pimp My Library Pattern.
+    *
+    * After all, `ordA.compare(x._1, y._1)` is not idiomatic in OOP.
+    * The pimp my library pattern use implicits to allow the more
+    * natural `x._1.compare(y._1)` assuming that the type of `x._1`
+    * doesn't define a `compare` method.
+    *
+    * {{{
+    * scala> import OMO10a.pimpMyLibraryPattern._
+    * scala> sort(List(2,3,1))
+    * res0: List[Int] = List(1, 2, 3)
+    * scala> sort(List((5, 6), (3, 4)))
+    * res1: List[(Int, Int)] = List((3,4), (5,6))
+    * }}}
+    */
   object pimpMyLibraryPattern {
     import introWithImplicit._
 
@@ -218,18 +254,27 @@ object OMO10a {
         sort(lesser) ++ List(x) ++ sort(greater)
       }
     }
-
-    // scala> import OMO10a.pimpMyLibraryPattern._
-    // scala> sort(List(2,3,1))
-    // res0: List[Int] = List(1, 2, 3)
-    // scala> sort(List((5, 6), (3, 4)))
-    // res1: List[(Int, Int)] = List((3,4), (5,6))
   }
 
-  // Combination of implicit search and dependent method types is an
-  // interesting recipe for type-level computation. In the above
-  // example, we generalize the `zipWith` function for two list
-  // arguments into `n` list arguments.
+  /** Type-level computation.
+    *
+    * Combination of implicit search and dependent method types is an
+    * interesting recipe for type-level computation. In the above
+    * example, we generalize the `zipWith` function for two list
+    * arguments into `n` list arguments.
+    *
+    * {{{
+    * scala> import OMO10a.naryZipWith._
+    * scala> def zipWith0 = zWith(Zero(), 0)
+    * zipWith0: Stream[Int]
+    * scala> def map[A,B](f: A => B) = zWith(Succ(Zero()), f)
+    * map: [A, B](f: A => B) Stream[A] => Stream[B]
+    * scala> def zipWith3[A,B,C,D](f: A => B => C => D)  =
+    *          zWith(Succ(Succ(Succ(Zero()))), f)
+    * zipWith3: [A, B, C, D](f: A => (B => (C => D)))
+    *            Stream[A] => (Stream[B] => (Stream[C] => Stream[D]))
+    * }}}
+    */
   object naryZipWith {
     case class Zero()
     case class Succ[N](x: N)
@@ -240,7 +285,7 @@ object OMO10a {
       // Type members that represents the type of ZipWith for `n` list
       // arguments. The type of ZipWith depends on `S`. For instance,
       // if `S` is an `Int`, then `ZipWithType` is `Stream[Int]`. if
-      // `S` is a function `f: A => B => C`, then `ZipWithType` is 
+      // `S` is a function `f: A => B => C`, then `ZipWithType` is
       // `Stream[A] => Stream[B] => Stream[C]`.
       type ZipWithType
 
@@ -276,22 +321,12 @@ object OMO10a {
       }
 
     // Method that calls zipWith for a function of arity `n`. That
-    // method is the one that the developper should call to apply
-    // zipWith. That method could be embeded in a "pimp-my-library
+    // method is the one that the developer should call to apply
+    // zipWith. That method could be embedded in a "pimp-my-library
     // pattern" for an idiomatic usage.
     def zWith[N,S](n: N, s: S)(implicit
                                zw: ZipWith[N,S]): zw.ZipWithType =
       zw.zipWith(n)(s)
-
-    // scala> import OMO10a.naryZipWith._
-    // scala> def zipWith0 = zWith(Zero(), 0)
-    // zipWith0: Stream[Int]
-    // scala> def map[A,B](f: A => B) = zWith(Succ(Zero()), f)
-    // map: [A, B](f: A => B) Stream[A] => Stream[B]
-    // scala> def zipWith3[A,B,C,D](f: A => B => C => D)  =
-    //          zWith(Succ(Succ(Succ(Zero()))), f)
-    // zipWith3: [A, B, C, D](f: A => (B => (C => D)))
-    //            Stream[A] => (Stream[B] => (Stream[C] => Stream[D]))
   }
 }
 
