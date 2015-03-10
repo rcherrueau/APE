@@ -13,6 +13,11 @@ object list {
       if (n > size || n < 0) throw new IndexOutOfBoundsException(n.toString)
       else if (n > 0) tail.index(n - 1)
       else head
+
+    def ++[B >: A](l: List[B]): List[B] = this match {
+      case Nil => l
+      case Cons(hd, tl) => Cons(hd, tl ++ l)
+    }
   }
   case class Cons[A](head: A,
                      tail: List[A]) extends List[A]
@@ -263,6 +268,11 @@ object sizedlist {
   class SizedList[+L <: List[_], S <: Nat] private (val unsized: L) {
     def index[N <: Nat](n: N)(implicit
                               evLT: N < S) = unsized.index(n.toInt)
+    def append[S2 <: Nat](
+               s: SizedList[List[Any],S2])(
+               implicit
+               sum: Sum[S,S2]): SizedList[List[Any], sum.Out] =
+      new SizedList(unsized ++ s.unsized)
   }
 
   object SizedList {
