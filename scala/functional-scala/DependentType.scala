@@ -10,7 +10,7 @@ object list {
     }
 
     def index(n: Int): A =
-      if (n > size || n < 0) throw new IndexOutOfBoundsException(n.toString)
+      if (n >= size || n < 0) throw new IndexOutOfBoundsException(n.toString)
       else if (n > 0) tail.index(n - 1)
       else head
 
