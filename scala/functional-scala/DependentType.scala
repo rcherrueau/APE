@@ -359,8 +359,13 @@ object sized {
                sl: Sized[B, CC2, S2])(
                implicit
                sum: Sum[S,S2],
-               cbf: CanBuildFrom[Seq[B],B,CC2[B]]): Sized[B, CC2, sum.Out] =
-      new Sized(unsized.++:(sl.unsized)(cbf))
+               cbf: CanBuildFrom[CC2[B],B,CC2[B]]): Sized[B, CC2, sum.Out] =
+      new Sized({
+                  val builder = cbf()
+                  unsized foreach { builder += _ }
+                  sl.unsized foreach { builder += _ }
+                  builder .result
+                })
   }
 
   object Sized {
@@ -510,13 +515,23 @@ object ClientApp extends App {
     """)
 
     // Note: Working with both
-    val l: Sized[Int, List, _2] = SCons(1, SCons(2, SEmpty[List]))
-    val s: Sized[Unit, Seq, _2] = SCons((), SCons((), SEmpty[Stream]))
+    import scala.collection.immutable.LinearSeq
 
+    val l: Sized[Int, List, _2] = SCons(1, SCons(2, SEmpty[List]))
+    val s: Sized[Unit, Stream, _2] = SCons((), SCons((), SEmpty[Stream]))
+
+    // In the Scala type hierarchy:
+    //                  | Unit
+    // Any >: AnyVal >: |
+    //                  | Int
+    // And
+    //                     | Stream
+    // Seq >: LinearSeq >: |
+    //                     | List
     // Sized is convariant on collection and covariant on items of
     // that collection. Appending a List of Int with a Stream of Unit
-    // result in a Sized of Seq of AnyVal.
-    l.append(s)                        : Sized[AnyVal, Seq, _4]
+    // result in a Sized of LinearSeq of AnyVal.
+    l.append(s)                        : Sized[AnyVal, LinearSeq, _4]
   }
   // */
 }
