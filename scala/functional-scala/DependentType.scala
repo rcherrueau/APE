@@ -10,7 +10,7 @@ object list {
     }
 
     def index(n: Int): A =
-      if (n > size || n < 0) throw new IndexOutOfBoundsException(n.toString)
+      if (n >= size || n < 0) throw new IndexOutOfBoundsException(n.toString)
       else if (n > 0) tail.index(n - 1)
       else head
 
@@ -257,6 +257,17 @@ object nat {
     // implicitly [ _3 <= _3 ] // OK
     // implicitly [ _4 <= _2 ] // No implicit found
   }
+
+  @implicitNotFound("${N1} is not greater than ${N2}")
+  trait >[N1 <: Nat, N2 <: Nat]
+  object > {
+    implicit def gtN1N2[N1 <: Nat,
+                        N2 <: Nat](implicit ev: N2 < N1) = new >[N1,N2] {}
+    // Tests:
+    // implicitly [ _4 > _2 ]
+    // implicitly [ _3 > _3 ] // No implicit found
+    // implicitly [ _2 > _3 ] // No implicit found
+  }
 }
 
 // Use dependent types: Sized List
@@ -265,36 +276,41 @@ object sizedlist {
   import nat._, Nat._
 
   // private force creation of `SizedList` with the factory
-  class SizedList[+L <: List[_], S <: Nat] private (val unsized: L) {
-    def index[N <: Nat](n: N)(implicit
-                              evLT: N < S) = unsized.index(n.toInt)
-    def append[S2 <: Nat](
-               s: SizedList[List[Any],S2])(
+  class SizedList[+A, S <: Nat] private (val unsized: List[A]) {
+    def head(implicit ev: S > _0): A = unsized.head
+
+    def tail(implicit ev: S > _0, pred: Pred[S]): SizedList[A, pred.Out] =
+      new SizedList(unsized.tail)
+
+    def index[N <: Nat](n: N)(implicit evLT: N < S): A =
+      unsized.index(n.toInt)
+
+    def append[B >: A,
+               S2 <: Nat](
+               sl: SizedList[B, S2])(
                implicit
-               sum: Sum[S,S2]): SizedList[List[Any], sum.Out] =
-      new SizedList(unsized ++ s.unsized)
+               sum: Sum[S,S2]): SizedList[B, sum.Out] =
+      new SizedList(unsized ++ sl.unsized)
   }
 
   object SizedList {
-    import scala.language.higherKinds
+    def SNil = new SizedList[Nothing, _0](Nil)
 
-    type SNil = SizedList[Nil, _0]
-    def SNil: SNil = new SizedList(Nil)
-
-    type SCons[L<:List[_], S<:Nat] = SizedList[L,Succ[S]]
-    def SCons[A, S <: Nat](a: A,
-                           sl: SizedList[List[A],S]): SCons[List[A],S] =
-      new SizedList(Cons(a, sl.unsized))
+    def SCons[A,
+              B >: A,
+              S <: Nat](
+              b: B,
+              sl: SizedList[A, S]) =
+      new SizedList[B, Succ[S]](Cons(b, sl.unsized))
   }
 
   // Tests:
   // import SizedList._
-  // SNil                     : SizedList[List[Int], _0]
-  // SNil                     : SNil
-  // SCons(1, SCons(2, SNil)) : SizedList[List[Int], _2]
+  // SNil                     : SizedList[Int, _0]
+  // SCons(1, SCons(2, SNil)) : SizedList[Int, _2]
   // SCons(1, SCons(2, SNil)) .index (_1)  // > 2
-  // // Cons(1, Cons(2, Nil)) .index  (5)       // Type checks! Leads to an
-  // //                                         // Exception at runtime
+  // Cons(1, Cons(2, Nil)) .index  (5)       // Type checks! Leads to an
+  //                                         // Exception at runtime
   // SCons(1, SCons(2, SNil)) .index (_5)       // Note: Doesn't type
   //                                            // check
   // // Cons(1, Cons(2, Nil)) .index (-1)       // Type checks! Leads to an
@@ -314,56 +330,76 @@ object sizedlist {
 // Use subtypeing: Generalization to Seq
 object sized {
   // In the rest, we'ill use `scala.collection.List`
-  // import list._, List._
   import nat._, Nat._
+  import scala.collection.generic.CanBuildFrom
+  import scala.language.higherKinds
 
-  // private force creation of `SizedList` with the factory
-  class Sized[+CC <: Seq[_], S <: Nat] private (val unsized: CC) {
-    def index[N <: Nat](n: N)(implicit
-                              evLT: N < S) = unsized.drop(n.toInt).head
+  // private force creation of `Sized` with the factory
+  class Sized[+A,
+              +CC[+A] <: Seq[A],
+              S <: Nat] private (val unsized: CC[A])(
+                                 implicit
+                                 cbf: CanBuildFrom[CC[A],A,CC[A]]) {
+
+    def head(implicit ev: S > _0): A = unsized.head
+
+    def tail(implicit ev: S > _0, pred: Pred[S]): Sized[A, CC, pred.Out] =
+      new Sized({
+                  val builder = cbf()
+                  unsized.tail foreach { builder += _ }
+                  builder .result
+                })
+
+    def index[N <: Nat](n: N)(implicit evLT: N < S) =
+      unsized.drop(n.toInt).head
+
+    def append[B >: A,
+               CC2[+B] <: Seq[B],
+               S2 <: Nat](
+               sl: Sized[B, CC2, S2])(
+               implicit
+               sum: Sum[S,S2],
+               cbf: CanBuildFrom[Seq[B],B,CC2[B]]): Sized[B, CC2, sum.Out] =
+      new Sized(unsized.++:(sl.unsized)(cbf))
   }
 
   object Sized {
-    import scala.language.higherKinds
-    import scala.collection.generic.CanBuildFrom
-
-    def SEmpty[CC[_] <: Seq[_]](
+    def SEmpty[CC[+Nothing] <: Seq[Nothing]](
                implicit
-               cbf: CanBuildFrom[CC[Nothing],
-                                 Nothing,
-                                 CC[Nothing]]): Sized[CC[Nothing], _0] =
-      new Sized(cbf().result)
+               cbf: CanBuildFrom[CC[Nothing], Nothing, CC[Nothing]]):
+               Sized[Nothing, CC, _0] = new Sized({ cbf() .result })
+
 
     def SCons[A,
-              CC[A] <: Seq[A],
+              B >: A,
+              CC[+A] <: Seq[A],
               S <: Nat](
-              a: A,
-              s: Sized[CC[A], S])(
+              b: B,
+              sl: Sized[A, CC, S])(
               implicit
-              cbf: CanBuildFrom[CC[A], A, CC[A]]): Sized[CC[A], Succ[S]] =
+              cbf: CanBuildFrom[CC[B], B, CC[B]]): Sized[B, CC, Succ[S]] =
       new Sized({
                   val builder = cbf()
-                  val seq = s.unsized
-
-                  builder += a
-                  seq foreach { builder += _ }
+                  builder += b
+                  sl.unsized foreach { builder += _ }
                   builder .result
                 })
   }
 
   // Tests:
-  // import Sized._
-  // SEmpty[List]                       : Sized[List[Int], _0]
-  // SEmpty[List]                       : Sized[List[Nothing], _0]
-  // SEmpty[Seq]                        : Sized[Seq[Nothing], _0]
-  // SCons(1, SCons(2, SEmpty[List]))   : Sized[List[Int], _2]
-  // SCons(1, SCons(2, SEmpty[Seq]))    : Sized[Seq[Int], _2]
-  // SCons(1, SCons(2, SEmpty[List])) .index (_1)      // > 2
-  // SCons(1, SCons(2, SEmpty[Seq]))  .index (_1)      // > 2
-  // // SCons(1, SCons(2, SEmpty[List])) .index (_5)      // Note: Doesn't
-  // //                                                   // type check
-  // // SCons(1, SCons(2, SEmpty[Seq])) .index (Pred(_0)) // Note: Doesn't
-  // //                                                   // type check
+  import Sized._
+  // SEmpty[List]                       : Sized[Nothing, List,   _0]
+  // SEmpty[List]                       : Sized[Int,     List,   _0]
+  // SEmpty[Stream]                     : Sized[Int,     Stream, _0]
+  // SCons(1, SCons(2, SEmpty[List]))   : Sized[Int,     List,   _2]
+  // SCons(1, SCons(2, SEmpty[Stream])) : Sized[Int,     Stream, _2]
+  // // FIXME:
+  // SCons(1, SCons(2, SEmpty[List])) .index (_1)         // >2
+  // SCons(1, SCons(2, SEmpty[Stream])) .index (_1)       // >2
+  // SCons(1, SCons(2, SEmpty[List])) .index (_5)         // Note: Doesn't
+  //                                                      // type check
+  // SCons(1, SCons(2, SEmpty[Stream])) .index (Pred(_0)) // Note: Doesn't
+  //                                                      // type check
 }
 
 object ClientApp extends App {
@@ -398,15 +434,14 @@ object ClientApp extends App {
   // What we want with List that uses dependent type
   {
     println("********************************************* SizedList")
-    import list._, List._
     import nat._, Nat._
     import sizedlist._, SizedList._
 
     import utils.illTyped
 
-    SNil                     : SizedList[List[Int], _0]
-    SNil                     : SNil
-    SCons(1, SCons(2, SNil)) : SizedList[List[Int], _2]
+    SNil                     : SizedList[Int,     _0]
+    SNil                     : SizedList[Nothing, _0]
+    SCons(1, SCons(2, SNil)) : SizedList[Int,     _2]
 
     illTyped("""
     SCons(1, SCons(2, SNil)) : SizedList[List[Int], _3]
@@ -435,11 +470,12 @@ object ClientApp extends App {
     import utils.illTyped
 
     // Note: Working with List
-    SEmpty[List]                     : Sized[List[Int], _0]
-    SCons(1, SCons(2, SEmpty[List])) : Sized[List[Int], _2]
+    SEmpty[List]                       : Sized[Nothing, List, _0]
+    SEmpty[List]                       : Sized[Int,     List, _0]
+    SCons(1, SCons(2, SEmpty[List]))   : Sized[Int,     List, _2]
 
     illTyped("""
-    SCons(1, SCons(2, SEmpty[List])) : Sized[List[Int], _3]
+    SCons(1, SCons(2, SEmpty[List]))   : Sized[Int, List, _3]
     """)
 
     println("value at index 1: " +
@@ -454,11 +490,12 @@ object ClientApp extends App {
     """)
 
     // Note: Working with Stream
-    SEmpty[Stream]                     : Sized[Stream[Int], _0]
-    SCons(1, SCons(2, SEmpty[Stream])) : Sized[Stream[Int], _2]
+    SEmpty[Stream]                     : Sized[Nothing, Stream, _0]
+    SEmpty[Stream]                     : Sized[Int,     Stream, _0]
+    SCons(1, SCons(2, SEmpty[Stream])) : Sized[Int,     Stream, _2]
 
     illTyped("""
-    SCons(1, SCons(2, SEmpty[Stream])) : Sized[Stream[Int], _3]
+    SCons(1, SCons(2, SEmpty[Stream])) : Sized[Int, Stream, _3]
     """)
 
     println("value at index 1: " +
@@ -471,6 +508,15 @@ object ClientApp extends App {
     illTyped("""
     SCons(1, SCons(2, SEmpty[Stream])) .index (Pred(_0))
     """)
+
+    // Note: Working with both
+    val l: Sized[Int, List, _2] = SCons(1, SCons(2, SEmpty[List]))
+    val s: Sized[Unit, Seq, _2] = SCons((), SCons((), SEmpty[Stream]))
+
+    // Sized is convariant on collection and covariant on items of
+    // that collection. Appending a List of Int with a Stream of Unit
+    // result in a Sized of Seq of AnyVal.
+    l.append(s)                        : Sized[AnyVal, Seq, _4]
   }
   // */
 }
