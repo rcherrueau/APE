@@ -1,0 +1,213 @@
+(*
+const n  : bitstring [private].
+const a  : bitstring [private].
+const d  : bitstring [private].
+
+reduc
+  confidentiality((n,a))  = n;
+  confidentiality((d,n,a))  = (n, dn, da).
+
+reduc forall a: bitstring, b: bitstring; commut((a,b)) = commut((b,a)).
+*)
+
+(* Database attributes *)
+const d: bitstring.
+const n: bitstring.
+const a: bitstring.
+
+const data______: bitstring [private].
+const data_D____: bitstring [private].
+const data___N__: bitstring [private].
+const data_____A: bitstring [private].
+const data___N_A: bitstring [private].
+const data_D_N_A: bitstring [private].
+
+(* Confidentiality constraints *)
+const cc_n  : bitstring [private].
+const cc_dn : bitstring [private].
+const cc_da : bitstring [private].
+
+query attacker(cc_n).
+query attacker(cc_dn).
+query attacker(cc_da).
+
+reduc
+  confidentiality(data___N__)  = cc_n;
+  confidentiality(data___N_A)  = cc_n;
+  confidentiality(data_D_N_A)  = (cc_n, cc_dn, cc_da).
+
+(* Defragmentation *)
+reduc
+  defrag(data_D____, data___N_A) = data_D_N_A.
+
+(* Projections *)
+reduc forall db: bitstring; proj_dna(db) = db.
+
+reduc forall db: bitstring; proj_id(db) = data______.
+
+reduc
+  proj_d(data______) = data______;
+  proj_d(data_D____) = data_D____;
+  proj_d(data___N__) = data______;
+  proj_d(data_____A) = data______;
+  proj_d(data___N_A) = data______;
+  proj_d(data_D_N_A) = data_D____.
+
+reduc
+  proj_a(data______) = data______;
+  proj_a(data_D____) = data______;
+  proj_a(data___N__) = data______;
+  proj_a(data_____A) = data_____A;
+  proj_a(data___N_A) = data_____A;
+  proj_a(data_D_N_A) = data_____A.
+
+reduc
+  proj_na(data______) = data______;
+  proj_na(data_D____) = data______;
+  proj_na(data___N__) = data___N__;
+  proj_na(data_____A) = data_____A;
+  proj_na(data___N_A) = data___N_A;
+  proj_na(data_D_N_A) = data___N_A.
+
+(*
+let proj_dna(read: channel, write: channel) =
+    in(read, db: bitstring);
+    out(write, proj_dna(db)).
+
+let proj_na(read: channel, write: channel) =
+    in(read, db: bitstring);
+    out(write, proj_na(db)).
+
+let proj_id(read: channel, write: channel) =
+    in(read, db: bitstring);
+    out(write, proj_id(db)).
+
+let proj_d(read: channel, write: channel) =
+    in(read, db: bitstring);
+    out(write, proj_d(db)).
+
+let proj_a(read: channel, write: channel) =
+    in(read, db: bitstring);
+    out(write, proj_a(db)).
+*)
+
+(* let proj(read: channel, write: channel, attributes: bitstring) = *)
+{{+proj:: (lambda (_ render) (render
+
+#<<HERESTRING
+  let read = {{read}} in
+  let write = {{write}} in
+  let attributes = {{attributes}} in
+  in(read, db: bitstring);
+  if attributes = d then out(write, proj_d(db))
+  else if attributes = a then out(write, proj_a(db))
+  else if attributes = (n,a) then out(write, proj_na(db))
+  else if attributes = (d,n,a) then out(write, proj_dna(db))
+  else if attributes = () then out(write, proj_id(db))
+HERESTRING
+))}}
+
+(* Selections *)
+reduc forall db: bitstring; select_(db) = db.
+
+(* let select(read: channel, write: channel) = *)
+{{+select::  (lambda (_ render) (render
+
+#<<HERESTRING
+  let read = {{read}} in
+  let write = {{write}} in
+  in(read, db: bitstring);
+  out(write, select_(db))
+HERESTRING
+))}}
+
+(* Grouping *)
+reduc forall db: bitstring; group_(db) = db.
+
+(* let group(read: channel, write: channel) = *)
+{{+group:: (lambda (_ render) (render
+
+#<<HERESTRING
+  let read = {{read}} in
+  let write = {{write}} in
+  in(read, db: bitstring);
+  out(write, group_(db))
+HERESTRING
+))}}
+
+(* Aggragations - count *)
+reduc forall db: bitstring; count_star(db) = data______.
+reduc
+  count_d(data______) = data______;
+  count_d(data_D____) = data_D____;
+  count_d(data___N__) = data______;
+  count_d(data_____A) = data______;
+  count_d(data___N_A) = data______;
+  count_d(data_D_N_A) = data_D____.
+
+(* let count(read: channel, write: channel, attributes: bitstring) = *)
+{{+count:: (lambda (_ render) (render
+
+#<<HERESTRING
+  let read = {{read}} in
+  let write = {{write}} in
+  let attributes = {{attributes}} in
+  in(read, db: bitstring);
+  if attributes = d then out(write, count_d(db))
+  else if attributes = () then out(write, count_star(db))
+HERESTRING
+))}}
+
+(* set traceDisplay = long. *)
+
+(* Database *)
+
+let database(read: channel, write: channel, init: bitstring) =
+    new db: channel;
+    out(db, init)
+    | (!in(db, x: bitstring); in(write, y: bitstring); out(db, y))
+    | (!in(db, x: bitstring); out(read, x); out(db, x)).
+
+(* Database services *)
+let meetings_local(dbread: channel, dbwrite:channel) =
+    {{+read:: "dbread"}}
+    {{+write:: "dbwrite"}}
+    {{+attributes:: "d"}}
+    {{select}};
+    {{proj}};
+    {{group}};
+    {{count}};
+    {{group}};
+    0.
+
+let meetings_dist_l(read: channel, write: channel) =
+    select(read, write)
+    | proj(read, write, d)
+    | group(read, write).
+
+let meetings_dist_r(read: channel, write: channel) =
+    select(read, write).
+
+(* Agenda: local / dist *)
+let agenda_local(dbread: channel, dbwrite: channel) =
+    meetings_local(dbread, dbwrite).
+
+let agenda_dist(lread: channel, lwrite: channel,
+                rread: channel, rwrite: channel) =
+    meetings_dist_l(lread, lwrite)
+    | meetings_dist_r(rread, rwrite).
+
+(* Local Application Process *)
+free dbread, dbwrite: channel [private].
+
+process
+  database(dbread, dbwrite, data_D_N_A)
+  | agenda_local(dbread, dbwrite)
+
+(*
+process
+  !database(toFragD,  data_D____)
+  | !database(toFragNA, data___N_A)
+  | agenda(toFragD, toFragNA)
+*)
+  (*| leak(toFragD, toFragNA)*)

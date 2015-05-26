@@ -1,3 +1,7 @@
 [submodule "racket/webAppInRacket/style/flat-ui"]
 	path = racket/webAppInRacket/style/flat-ui
 	url = git@github.com:designmodo/Flat-UI.git
+[submodule "racket/proverif/rastache"]
+	path = racket/proverif/fill-rastache
+	url = git@github.com:rcherrueau/rastache.git
+	branch = fill-mustache
