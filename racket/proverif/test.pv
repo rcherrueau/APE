@@ -69,29 +69,7 @@ reduc
   proj_na(data___N_A) = data___N_A;
   proj_na(data_D_N_A) = data___N_A.
 
-(*
-let proj_dna(read: channel, write: channel) =
-    in(read, db: bitstring);
-    out(write, proj_dna(db)).
-
-let proj_na(read: channel, write: channel) =
-    in(read, db: bitstring);
-    out(write, proj_na(db)).
-
-let proj_id(read: channel, write: channel) =
-    in(read, db: bitstring);
-    out(write, proj_id(db)).
-
-let proj_d(read: channel, write: channel) =
-    in(read, db: bitstring);
-    out(write, proj_d(db)).
-
-let proj_a(read: channel, write: channel) =
-    in(read, db: bitstring);
-    out(write, proj_a(db)).
-*)
-
-(* let proj(read: channel, write: channel, attributes: bitstring) = *)
+{{!proj:: read: channel, write: channel, attribute: bitstring}}
 {{+proj:: (lambda (_ render) (render
 
 #<<HERESTRING
@@ -110,8 +88,8 @@ HERESTRING
 (* Selections *)
 reduc forall db: bitstring; select_(db) = db.
 
-(* let select(read: channel, write: channel) = *)
-{{+select::  (lambda (_ render) (render
+{{!select:: read: channel, write: channel}}
+{{+select:: (lambda (_ render) (render
 
 #<<HERESTRING
   let read = {{read}} in
@@ -124,7 +102,7 @@ HERESTRING
 (* Grouping *)
 reduc forall db: bitstring; group_(db) = db.
 
-(* let group(read: channel, write: channel) = *)
+{{!group:: read: channel, write: channel}}
 {{+group:: (lambda (_ render) (render
 
 #<<HERESTRING
@@ -145,7 +123,7 @@ reduc
   count_d(data___N_A) = data______;
   count_d(data_D_N_A) = data_D____.
 
-(* let count(read: channel, write: channel, attributes: bitstring) = *)
+{{!count:: read: channel, write: channel, attributes: bitstring}}
 {{+count:: (lambda (_ render) (render
 
 #<<HERESTRING
@@ -177,9 +155,9 @@ let meetings_local(dbread: channel, dbwrite:channel) =
     {{proj}};
     {{group}};
     {{count}};
-    {{group}};
     0.
 
+(*
 let meetings_dist_l(read: channel, write: channel) =
     select(read, write)
     | proj(read, write, d)
@@ -187,16 +165,18 @@ let meetings_dist_l(read: channel, write: channel) =
 
 let meetings_dist_r(read: channel, write: channel) =
     select(read, write).
+*)
 
 (* Agenda: local / dist *)
 let agenda_local(dbread: channel, dbwrite: channel) =
     meetings_local(dbread, dbwrite).
 
+{{!
 let agenda_dist(lread: channel, lwrite: channel,
                 rread: channel, rwrite: channel) =
     meetings_dist_l(lread, lwrite)
     | meetings_dist_r(rread, rwrite).
-
+}}
 (* Local Application Process *)
 free dbread, dbwrite: channel [private].
 
