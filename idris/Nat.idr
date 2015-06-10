@@ -1,3 +1,5 @@
+module Main
+
 data MyNat : Type where
   Z : MyNat
   S : MyNat -> MyNat
@@ -82,10 +84,15 @@ data Vect : MyNat -> Type -> Type where
   Nil  : Vect Z a
   (::) : a -> Vect k a -> Vect (S k) a
 
-
-index : (idx: MyNat) -> Vect n a -> {p: idx `MyGTE` n} -> a
-index         Z     (hd :: tl) = hd
-index {p=p'} (S k) (hd :: tl)  = index k tl {p=fromLteSucc p'}
+-- Use auto, to automatically proof `pf`.
+-- index : (idx: MyNat) -> Vect n a -> {pf: idx `MyLTE` n} -> a
+index : (idx: MyNat) -> Vect n a -> {auto pf: idx `MyLTE` n} -> a
+index          Z     (hd :: tl)  = hd
+index {pf=pf'} (S k) (hd :: tl)  = index k tl {pf=fromLteSucc pf'}
 
 value : Int
-value = index (S (S Z)) (1 :: 1 :: Nil) {p=MyLTESucc (MyLTESucc MyLTEZero)}
+-- value = index (S (S Z)) (1 :: 1 :: Nil) {pf=MyLTESucc (MyLTESucc MyLTEZero)}
+value = index (S (S Z)) (1 :: 1 :: Nil)
+
+main : IO ()
+main = putStrLn (show value)
