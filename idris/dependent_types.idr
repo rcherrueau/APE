@@ -51,13 +51,15 @@ v2 : Vect (S (S Z)) Char
 v2 = 'b' :: 'a' :: Nil
 
 
--- The Finite Sets
+-- The Finite Sets: Type constructor to represent a canonical set with
+-- a finite number of elements.
 -- http://docs.idris-lang.org/en/latest/tutorial/typesfuns.html#the-finite-sets
 -- Note: Here Nat stands for a value of Nat.
 data Fin : Nat -> Type where
-  FZ : Fin (S k)
+  FZ : Fin (S k)         -- Construct doesn't target Fin Z because we
+                         -- cannot construct an element of an empty
+                         -- set.
   FS : Fin k -> Fin (S k)
-
 
 -- We declare F4, the type of the finite set that contains four
 -- elements.
@@ -168,10 +170,6 @@ t3Sugared = (1, 1, 1)
 -- Pair in libs/prelude/Prelude and MkPaire in libs/prelude/Builtins
 t3Desugared : Pair Integer (Pair Integer Integer)
 t3Desugared = MkPair 1 (MkPair 1 1)
-
-data MyPair : Type -> Type -> Type where
-  MkMyPair : a -> b -> MyPair a b
-
 
 data Nested : Pair a (Pair b c) -> Type where
   -- Nest : x -> (y: Pair _ _) -> Nested (MkPair x y)
