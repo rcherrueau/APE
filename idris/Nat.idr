@@ -75,11 +75,10 @@ succNotLTEzero MyLTEZero impossible
 fromLteSucc : (S k `MyLTE` S k') -> (k `MyLTE` k')
 fromLteSucc (MyLTESucc x) = x
 
--- isLTE : (k: MyNat) -> (k': MyNat) -> Dec (k `MyLTE` k')
--- isLTE Z     k' = Yes MyLTEZero
--- isLTE (S k) Z  = No succNotLTEzero
--- isLTE (S k) (S k') with (isLTE k k')
-
+-------------------------------------------------------------------------------
+-- A use case with Vect: In idris library, index on Vect takes a `Fin
+-- Nat` as index value. Here we take a `Nat` and we satisfy the `LTE`
+-- predicate.
 data Vect : MyNat -> Type -> Type where
   Nil  : Vect Z a
   (::) : a -> Vect k a -> Vect (S k) a
