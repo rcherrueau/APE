@@ -1,4 +1,4 @@
-module Main
+module MyNat
 
 data MyNat : Type where
   Z : MyNat
@@ -93,5 +93,3 @@ value : Int
 -- value = index (S (S Z)) (1 :: 1 :: Nil) {pf=MyLTESucc (MyLTESucc MyLTEZero)}
 value = index (S (S Z)) (1 :: 1 :: Nil)
 
-main : IO ()
-main = putStrLn (show value)
