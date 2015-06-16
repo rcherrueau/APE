@@ -5,7 +5,7 @@ import Data.SortedSet
 Id : Type
 Id = String
 
--- λ term
+-- λ-term
 data Term =                   -- terms:
             Var Id            -- variables
             | Abs Id Term     -- abstraction
@@ -24,9 +24,16 @@ instance Show Term where
   show (Abs id t)  = "\\" ++ id ++ "." ++ show t
   show (App t1 t2) = "(" ++ show t1 ++ " " ++ show t2 ++ ")"
 
--- Bound context
-Ctx : Type
-Ctx = SortedMap Id Term
+
+-- λ-term Examples
+λZ : Term  -- Zero
+λZ = Abs "f" (Abs "x" (Var "x"))
+
+λS : Term  -- Succ
+λS = Abs "n" (Abs "f" (Abs "x" (App (Var "f") (App (App (Var "n") (Var "f")) (Var "x")))))
+
+λP: Term   -- Plus
+λP = Abs "m" (Abs "n" (Abs "f" (Abs "x" (App (Var "m") (App (Var "f") (App (App (Var "n") (Var "f")) (Var "x")))))))
 
 -- Utils
 lookupOrElse : k -> v -> SortedMap k v -> v
@@ -105,6 +112,10 @@ getFV t = let (bd, fv) = getFV' t empty empty in fv
         (fromList $ (SortedSet.toList bds1) ++ (SortedSet.toList bds2)),
         (fromList $ (SortedSet.toList fvs1) ++ (SortedSet.toList fvs2)))
 
+-- Evaluation Context
+Ctx : Type
+Ctx = SortedMap Id Term
+
 -- Substitution: replaces all free occurences of a variable `v` in a
 -- term with expression `s`. The substitution sometimes employes
 -- α-conversion to avoid variable capture.
@@ -152,112 +163,46 @@ substitute ctx (App t1 t2) = (App (substitute ctx t1) (substitute ctx t2))
 --   (substitute (insert "x" (App (Var "y") (Var "z")) empty) (Abs "y" (App (Var "x") (Var "y")))) ==
 --     (Abs "yy" (App (App (Var "y") (Var "z")) (Var "yy")))
 
+
 -- Evaluation
-eval : Ctx -> Term -> Term
-eval ctx (App (Abs id t) a@(Abs _ _)) = substitute (insert id a ctx) t -- E-AppAbs
-eval ctx (App abs@(Abs _ _) app@(App _ _)) = let app' = eval ctx app in
-                                             eval ctx (App abs app')   -- E-App2
-eval ctx (App (Abs id t) v@(Var _)) = substitute (insert id v ctx) t
-eval ctx (App t1 t2) = let t1' = eval ctx t1 in                        -- E-App1
-                       eval ctx (App t1' t2)
-eval ctx t = t
+-- Single Step evaluation function
+eval1 : Ctx -> Term -> Maybe Term
+-- E-AppAbs
+eval1 ctx (App (Abs id t)    var@(Var _)  ) =
+                           Just $ substitute (insert id var ctx) t
+eval1 ctx (App (Abs id t)    abs@(Abs _ _)) =
+                           Just $ substitute (insert id abs ctx) t
+-- E-App1
+eval1 ctx (App abs@(Abs _ _) t2           ) =
+                           do t2' <- eval1 ctx t2
+                              return $ App abs t2'
+eval1 ctx (App (Var id)      t2           ) =
+                           do t2' <- eval1 ctx t2
+                              return $ App (Var id) t2'
+-- E-App2
+eval1 ctx (App t1            t2           ) =
+                           do t1' <- eval1 ctx t1
+                              return $ App t1' t2
+-- Reduction to minimal form
+eval1 ctx (Abs id t)                       =
+                           do t' <- eval1 ctx t
+                              return (Abs id t')
+eval1 _   _                                 =
+                           Nothing
 
+-- Multi-step evaluation function
+eval : Term -> Term
+eval t = case eval1 empty t of
+           Just t' => eval t'
+           _       => t
 
-λZ : Term
-λZ = Abs "f" (Abs "x" (Var "x"))
-
-one : Term
-one = Abs "f" (Abs "x" (App (Var "f") (Var "x")))
-
-two : Term
-two = Abs "f" (Abs "x" (App (Var "f") (App (Var "f") (Var "x"))))
-
-λS : Term
-λS = (Abs "n" (Abs "f" (Abs "x" (App (Var "f") (App (App (Var "n") (Var "f")) (Var "x"))))))
-
-one' : String
-one' = show $ eval empty $ App λS λZ
-
-
--- import Effect.Random
--- import Effects
---
--- import Debug.Trace
--- -- Rename: Terms that differ only in the names of bound variables are
--- -- interchangeable in all contexts. Do the alpha renaming. replae `old` by
--- -- `fresh` in the current term.
--- -- old -> fresh -> term -> Eff Term [RND]
--- αRename : Id -> Id -> Term -> { [RND] } Eff Term
--- αRename o f (Var id)    = if (id == o) then
---                             return (Var f)
---                           else
---                             return (Var id)
--- αRename o f (App t1 t2) = do t1' <- αRename o f t1
---                              t2' <- αRename o f t2
---                              return $ App t1' t2'
--- αRename o f (Abs id t)  = if (id == o) then
---                             -- The old identifier to αRename is the
---                             -- same as the one binded by the
---                             -- abstraction. We have, first, to αRename
---                             -- the current abstraction by giving her a
---                             -- fresh name. And then αRenames the old
---                             -- identifier into the fresh new
---                             -- abstraction.
---                             do i <- rndInt 0 100
---                                let f' = id ++ (show i)
---                                t' <- αRename id f' t
---                                let fabs = (Abs f' t')
---                                αRename o f fabs
---                           else
---                             -- The old identifier to αRename is
---                             -- different to the one bind by the
---                             -- abstraction: Do the renaming in the
---                             -- body of abstraction Without changing
---                             -- the identifier of the abstraction
---                             do t' <- αRename o f t
---                                return (Abs id t')
--- test : Bool
--- test =
---   -- Var tests
---   (runPure $ rename "y" "w" (Var "y")) ==
---     (Var "w") &&
---   -- App tests
---   (runPure $ rename "y" "w" (App (Var "y") (Var "z"))) ==
---     (App (Var "w") (Var "z")) &&
---   (runPure $ rename "y" "w" (App (Var "z") (Var "y"))) ==
---     (App (Var "z") (Var "w")) &&
---   (runPure $ rename "y" "w" (App (Var "y") (Var "y"))) ==
---     (App (Var "w") (Var "w")) &&
---   (runPure $ rename "y" "w" (App (Var "y") (App (Var "z") (Var "y")))) ==
---     (App (Var "w") (App (Var "z") (Var "w"))) &&
---   (runPure $ rename "y" "w" (App (Var "y") (App (Var "y") (Var "y")))) ==
---     (App (Var "w") (App (Var "w") (Var "w"))) &&
---   -- Abs tests
---   (runPure $ rename "y" "w" (Abs "x" (Var "x"))) ==
---     (Abs "x" (Var "x")) &&
---   (runPure $ rename "y" "w" (Abs "y" (Var "y"))) ==
---     (Abs "y23" (Var "y23")) &&
---   (runPure $ rename "y" "w" (Abs "z" (Var "y"))) ==
---     (Abs "z" (Var "w"))
-
--- Random monad tests
--- test1 : { [RND] } Eff ()
--- test1 = do srand 12345
-
--- test2 : Eff () [RND]
--- test2 = do srand 12345
-
--- test3 : { [RND] } Eff Integer
--- test3 = do srand 12345
---            rndInt 0 100
-
--- test4 : { [RND] } Eff Integer
--- test4 = do srand 42
---            i <- rndInt 0 100
---            return i
-
--- test5 : { [RND] } Eff Integer
--- test5 = do rndInt 0 100
-
--- test5' : Integer
--- test5' = runPure test4
+evalTest : Bool
+evalTest =
+  (eval $ App λS λZ) ==                                -- 1
+    Abs "f" (Abs "x" (App (Var "f") (Var "x"))) &&
+  (eval $ App λS $ App λS λZ) ==                       -- 2
+    Abs "f" (Abs "x" (App (Var "f") (App (Var "f") (Var "x")))) &&
+  (eval $ App λS $ App λS $ App λS λZ) ==              -- 3
+    Abs "f" (Abs "x" (App (Var "f") (App (Var "f") (App (Var "f") (Var "x"))))) -- &&
+  -- (eval $ App λP (App (App λS λZ) (App λS λZ))) ==
+  --   eval $ App λS $ App λS λZ
