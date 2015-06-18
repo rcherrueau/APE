@@ -1,8 +1,7 @@
--- Untyped Lambda Calculus
+-- Untyped, Call by Value, Lambda Calculus
 module uλ
 
 import Data.SortedSet
-import Debug.Trace
 
 infixr 10 |->
 
@@ -48,22 +47,54 @@ instance Show Ctx where
 λ2 : Term  -- One
 λ2 = Abs "f" (Abs "x" (App (Var "f") (App (Var "f") (Var "x"))))
 
+λ3 : Term
+λ3 = Abs "f" (Abs "x" (App (Var "f") (App (Var "f") (App (Var "f") (Var "x")))))
+
 λS : Term  -- Succ
-λS = Abs "n" (Abs "f" (Abs "x" (App (Var "f") (App (App (Var "n") (Var "f")) (Var "x")))))
+λS = Abs "n" (Abs "f" (Abs "x"
+                           (App (Var "f")
+                                (App (App (Var "n") (Var "f")) (Var "x")))))
 
 λP: Term   -- Plus
-λP = Abs "m" (Abs "n" (Abs "f" (Abs "x" (App (App (Var "m") (Var "f")) (App (App (Var "n") (Var "f")) (Var "x"))))))
+λP = Abs "m" (Abs "n" (Abs "f"
+                           (Abs "x"
+                             (App (App (Var "m") (Var "f"))
+                                  (App (App (Var "n") (Var "f")) (Var "x"))))))
+
+-- Predicate & utils
+-- =================
+-- In λ calculus, there is two kinds of values:
+-- Lambda Abstraction
+-- Variable, or list of Variables
+isVal : Term -> Bool
+isVal (Abs _ _) = True
+isVal (Var _)   = True
+isVal t         = listOfVar t where
+                  listOfVar (App (Var _) k) = listOfVar k
+                  listOfVar (Var _)         = True
+                  listOfVar _               = False
+
+
+-- Returns all free identifier of an expression
+FV : Term -> SortedSet Id
+FV (Var x)     = insert x empty
+FV (Abs x t)   = delete x $ FV t
+FV (App t1 t2) = let fv1 = FV t1 in
+                 let fv2 = FV t2 in
+                 fromList $ (SortedSet.toList fv1) ++
+                            (SortedSet.toList fv2)
 
 -- Rules
 -- =====
 -- Rename: Terms that differ only in the names of bound variables are
 -- interchangeable in all contexts. This function does the alpha
--- renaming on *Abstraction terms*. Replaces old identifier (`o`) by
--- fresh identifer (`f`) in the current term.
+-- renaming on *Abstraction terms*, doeas nothing otherwise.
 αRename : Term -> Term
 αRename (Abs old t) = let fresh = old ++ old in
                       Abs fresh (αRename' old fresh t)
                       where
+  -- Replaces old identifier (`o`) by fresh identifer (`f`) in the
+  -- current term.
   αRename' : Id -> Id -> Term -> Term
   αRename' o f (Var id)    = if (id == o) then Var f else Var id
   αRename' o f (App t1 t2) = let t1' = αRename' o f t1 in
@@ -90,41 +121,6 @@ instance Show Ctx where
                               let t' = αRename' o f t in
                               Abs id t'
 αRename t           = t
-
-αTest : Bool
-αTest =
-  -- Var tests
-  (αRename $ Abs "y" (Var "y")) == Abs "yy" (Var "yy")
-  && (αRename $ Abs "y" (Var "x")) == Abs "yy" (Var "x")
-  -- Abs tests
-  && (αRename $ Abs "y" (Abs "x" (Var "x"))) == Abs "yy" (Abs "x" (Var "x"))
-  && (αRename $ Abs "y" (Abs "x" (Var "y"))) == Abs "yy" (Abs "x" (Var "yy"))
-  && (αRename $ Abs "y" (Abs "y" (Var "y"))) ==
-       Abs "yy" (Abs "yyyy" (Var "yyyy"))
-  && (αRename $ Abs "y" (Abs "yy" (Var "y"))) ==
-       Abs "yy" (Abs "yyyy" (Var "yy"))
-  && (αRename $ Abs "y" (Abs "yy" (Var "yy"))) ==
-       Abs "yy" (Abs "yyyy" (Var "yyyy"))
-  -- App Test
-  && (αRename $ Abs "y" (App (Var "y") (Var "z"))) ==
-       Abs "yy" (App (Var "yy") (Var "z"))
-  && (αRename $ Abs "y" (App (Var "z") (Var "y"))) ==
-       Abs "yy" (App (Var "z") (Var "yy"))
-  && (αRename $ Abs "y" (App (Var "y") (Var "y"))) ==
-       Abs "yy" (App (Var "yy") (Var "yy"))
-  && (αRename $ Abs "y" (App (Var "y") (App (Var "z") (Var "y")))) ==
-       Abs "yy" (App (Var "yy") (App (Var "z") (Var "yy")))
-  && (αRename $ Abs "y" (App (Var "y") (App (Var "y") (Var "y")))) ==
-       Abs "yy" (App (Var "yy") (App (Var "yy") (Var "yy")))
-
--- Returns all free identifier of an expression
-FV : Term -> SortedSet Id
-FV (Var x)     = insert x empty
-FV (Abs x t)   = delete x $ FV t
-FV (App t1 t2) = let fv1 = FV t1 in
-                 let fv2 = FV t2 in
-                 fromList $ (SortedSet.toList fv1) ++
-                            (SortedSet.toList fv2)
 
 -- Substitution: replaces all free occurences of a variable `v` in a
 -- term with expression `s`. The substitution sometimes employes
@@ -157,51 +153,27 @@ substitute ctx (App t1 t2)                   = App (substitute ctx t1)
                                                    (substitute ctx t2)
 substitute ctx t                             = t
 
-subsTest : Bool
-subsTest =
-  substitute ("x" |-> (Abs "z" (App (Var "z") (Var "w")))) (Abs "y" (Var "x")) ==
-    Abs "y" (Abs "z" (App (Var "z") (Var "w"))) &&
-  -- Avoid substitution on rebinding
-  substitute ("x" |-> (Var "y")) (Abs "x" (Var "x")) ==
-    Abs "x" (Var "x") &&
-  -- α-converts on var capturing
-  substitute ("x" |-> (Var "z")) (Abs "z" (Var "x")) ==
-    Abs "zz" (Var "z") &&
-  substitute ("x" |-> (App (Var "y") (Var "z"))) (Abs "y" (App (Var "x") (Var "y"))) ==
-    Abs "yy" (App (App (Var "y") (Var "z")) (Var "yy"))
-
-
-listOfVar : Term -> Bool
-listOfVar (App (Var _) k) = listOfVar k
-listOfVar (Var _)         = True
-listOfVar _               = False
-
 -- Evaluation
 -- ==========
 -- Single Step evaluation function with call by value reduction strategy.
 -- In call by value, only the outermost redexes are reduced: a redex
--- is reduces only when its right hand side has reduces to a value
--- (Variable or Abstraction)
+-- is reduces only when its right hand side has reduces to a value.
 eval1 : Term -> Maybe Term
-eval1 (App (Abs x t) s@(Var _))    = Just $ substitute (x |-> s) t
-eval1 (App (Abs x t) s@(Abs _ _))  = Just $ substitute (x |-> s) t
-eval1 (App (Abs x t) s) with (listOfVar s)
-                        | True     = Just $ substitute (x |-> s) t
-                        | _        = do s' <- eval1 s
-                                        return $ App (Abs x t) s'
-eval1 (App t         s@(uλ.Var _)) = do t' <- eval1 t
-                                        return $ App t' s
-eval1 (App t         s@(Abs _ _))  = do t' <- eval1 t
-                                        return $ App t' s
-eval1 (App t1        t2) with (listOfVar t2)
-                         | True    = do t1' <- eval1 t1
-                                        return $ App t1' t2
-                         | _       = do t2' <- eval1 t2
-                                        return $ App t1 t2'
--- Find inner redexs to reduce them
-eval1 (Abs x t)                    = do t' <- eval1 t
-                                        return $ Abs x t'
-eval1 _                            = Nothing
+-- E-AppAbs (computation)
+eval1 (App (Abs x t) s) with (isVal s)
+                          | True    = Just $ substitute (x |-> s) t
+                          | _       = do s' <- eval1 s
+                                         return $ App (Abs x t) s'
+-- E-App (congruence)
+eval1 (App t1        t2) with (isVal t2)
+                          | True    = do t1' <- eval1 t1
+                                         return $ App t1' t2
+                          | _       = do t2' <- eval1 t2
+                                         return $ App t1 t2'
+-- Term normalization
+eval1 (Abs x t)                     = do t' <- eval1 t
+                                         return $ Abs x t'
+eval1 _                             = Nothing
 
 -- Multi-step evaluation function
 eval : Term -> Term
@@ -209,15 +181,52 @@ eval t = case eval1 t of
            Just t' => eval t'
            _       => t
 
+-- Tests
+-- =====
+αTest : Bool
+αTest =
+  -- Var tests
+  (αRename $ Abs "y" (Var "y")) == Abs "yy" (Var "yy")
+  && (αRename $ Abs "y" (Var "x")) == Abs "yy" (Var "x")
+  -- Abs tests
+  && (αRename $ Abs "y" (Abs "x" (Var "x"))) == Abs "yy" (Abs "x" (Var "x"))
+  && (αRename $ Abs "y" (Abs "x" (Var "y"))) == Abs "yy" (Abs "x" (Var "yy"))
+  && (αRename $ Abs "y" (Abs "y" (Var "y"))) ==
+       Abs "yy" (Abs "yyyy" (Var "yyyy"))
+  && (αRename $ Abs "y" (Abs "yy" (Var "y"))) ==
+       Abs "yy" (Abs "yyyy" (Var "yy"))
+  && (αRename $ Abs "y" (Abs "yy" (Var "yy"))) ==
+       Abs "yy" (Abs "yyyy" (Var "yyyy"))
+  -- App Test
+  && (αRename $ Abs "y" (App (Var "y") (Var "z"))) ==
+       Abs "yy" (App (Var "yy") (Var "z"))
+  && (αRename $ Abs "y" (App (Var "z") (Var "y"))) ==
+       Abs "yy" (App (Var "z") (Var "yy"))
+  && (αRename $ Abs "y" (App (Var "y") (Var "y"))) ==
+       Abs "yy" (App (Var "yy") (Var "yy"))
+  && (αRename $ Abs "y" (App (Var "y") (App (Var "z") (Var "y")))) ==
+       Abs "yy" (App (Var "yy") (App (Var "z") (Var "yy")))
+  && (αRename $ Abs "y" (App (Var "y") (App (Var "y") (Var "y")))) ==
+       Abs "yy" (App (Var "yy") (App (Var "yy") (Var "yy")))
+
+subsTest : Bool
+subsTest =
+  substitute ("x" |-> (Abs "z" (App (Var "z") (Var "w"))))
+             (Abs "y" (Var "x")) ==
+    Abs "y" (Abs "z" (App (Var "z") (Var "w"))) &&
+  -- Avoid substitution on rebinding
+  substitute ("x" |-> (Var "y")) (Abs "x" (Var "x")) ==
+    Abs "x" (Var "x") &&
+  -- α-converts on var capturing
+  substitute ("x" |-> (Var "z")) (Abs "z" (Var "x")) ==
+    Abs "zz" (Var "z") &&
+  substitute ("x" |-> (App (Var "y") (Var "z")))
+             (Abs "y" (App (Var "x") (Var "y"))) ==
+    Abs "yy" (App (App (Var "y") (Var "z")) (Var "yy"))
+
 evalTest : Bool
 evalTest =
-  (eval $ App λS λZ) ==                                -- 1
-    Abs "f" (Abs "x" (App (Var "f") (Var "x"))) &&
-  (eval $ App λS $ App λS λZ) ==                       -- 2
-    Abs "f" (Abs "x" (App (Var "f") (App (Var "f") (Var "x")))) &&
-  (eval $ App λS $ App λS $ App λS λZ) ==              -- 3
-    Abs "f" (Abs "x" (App (Var "f") (App (Var "f") (App (Var "f") (Var "x"))))) -- &&
-  -- (eval $ App λP (App (App λS λZ) (App λS λZ))) ==
-  --   (eval $ App λS $ App λS λZ)
-
--- eval1 $ App λP λ1
+  (eval $ App λS λZ) ==  λ1
+  && (eval $ App λS $ App λS λZ) == λ2
+  && (eval $ App λS $ App λS $ App λS λZ) ==  λ3
+  && (eval $ App (App λP $ App λS λZ) (App λS $ App λS λZ)) == λ3
