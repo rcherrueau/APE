@@ -45,11 +45,14 @@ instance Show Ctx where
 λ1 : Term  -- One
 λ1 = Abs "f" (Abs "x" (App (Var "f") (Var "x")))
 
+λ2 : Term  -- One
+λ2 = Abs "f" (Abs "x" (App (Var "f") (App (Var "f") (Var "x"))))
+
 λS : Term  -- Succ
 λS = Abs "n" (Abs "f" (Abs "x" (App (Var "f") (App (App (Var "n") (Var "f")) (Var "x")))))
 
 λP: Term   -- Plus
-λP = Abs "m" (Abs "n" (Abs "f" (Abs "x" (App (Var "m") (App (Var "f") (App (App (Var "n") (Var "f")) (Var "x")))))))
+λP = Abs "m" (Abs "n" (Abs "f" (Abs "x" (App (App (Var "m") (Var "f")) (App (App (Var "n") (Var "f")) (Var "x"))))))
 
 -- Rules
 -- =====
@@ -168,25 +171,37 @@ subsTest =
     Abs "yy" (App (App (Var "y") (Var "z")) (Var "yy"))
 
 
+listOfVar : Term -> Bool
+listOfVar (App (Var _) k) = listOfVar k
+listOfVar (Var _)         = True
+listOfVar _               = False
+
 -- Evaluation
 -- ==========
--- Single Step evaluation function
+-- Single Step evaluation function with call by value reduction strategy.
+-- In call by value, only the outermost redexes are reduced: a redex
+-- is reduces only when its right hand side has reduces to a value
+-- (Variable or Abstraction)
 eval1 : Term -> Maybe Term
--- E-AppAbs
-eval1 (App (Abs x t) s@(Abs _ _)) = Just $ substitute (x |-> s) t -- 1
-eval1 (App (Abs x t) s@(Var _))   = Just $ substitute (x |-> s) t -- 2
--- E-App1: reduce right after left, see E-App2
-eval1 (App λ@(Abs _ _) t2)        = do t2' <- eval1 t2            -- 3
-                                       return $ App λ t2'
-eval1 (App (Var x)     t2)        = do t2' <- eval1 t2            -- 4
-                                       return $ App (Var x) t2'
--- E-App2: Left most application (reduce left first)
-eval1 (App t1          t2)        = do t1' <- eval1 t1            -- 5
-                                       return $ App t1' t2
--- Reduction to minimal form
-eval1 (Abs x t)                   = do t' <- eval1 t              -- 6
-                                       return $ Abs x t'
-eval1 _                           = Nothing                       -- 7
+eval1 (App (Abs x t) s@(Var _))    = Just $ substitute (x |-> s) t
+eval1 (App (Abs x t) s@(Abs _ _))  = Just $ substitute (x |-> s) t
+eval1 (App (Abs x t) s) with (listOfVar s)
+                        | True     = Just $ substitute (x |-> s) t
+                        | _        = do s' <- eval1 s
+                                        return $ App (Abs x t) s'
+eval1 (App t         s@(uλ.Var _)) = do t' <- eval1 t
+                                        return $ App t' s
+eval1 (App t         s@(Abs _ _))  = do t' <- eval1 t
+                                        return $ App t' s
+eval1 (App t1        t2) with (listOfVar t2)
+                         | True    = do t1' <- eval1 t1
+                                        return $ App t1' t2
+                         | _       = do t2' <- eval1 t2
+                                        return $ App t1 t2'
+-- Find inner redexs to reduce them
+eval1 (Abs x t)                    = do t' <- eval1 t
+                                        return $ Abs x t'
+eval1 _                            = Nothing
 
 -- Multi-step evaluation function
 eval : Term -> Term
