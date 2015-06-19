@@ -1,4 +1,4 @@
--- Untyped, Call by Value, Lambda Calculus
+-- Untyped, Call by Value, Lambda Calculus, with de Bruijn notation
 -- idris -p contrib ulambda.idr
 module uλ
 
@@ -6,15 +6,18 @@ import Data.SortedSet
 
 infixr 10 |->
 
--- Identifier
+-- Identifier: In de Bruijn notation, named variables are replaced by
+-- natural numbers, where the number `k` stands for "the variable
+-- bound by the `k`-th enclosing λ". λx.x = λ.0 and λx.λy.x (y x) =
+-- λ.λ.1 (0 1)
 Id : Type
-Id = String
+Id = Int
 
 -- λ-term
 -- ======
 data Term =                   -- terms:
             Var Id            -- variables
-            | Abs Id Term     -- abstraction
+            | Abs Term        -- abstraction
             | App Term Term   -- application
 
 instance Eq Term where
@@ -40,27 +43,23 @@ instance Show Ctx where
 
 -- λ-term Examples
 λZ : Term  -- Zero
-λZ = Abs "f" (Abs "x" (Var "x"))
+λZ = Abs (Abs (Var 0))
 
 λ1 : Term  -- One
-λ1 = Abs "f" (Abs "x" (App (Var "f") (Var "x")))
+λ1 = Abs (Abs (App (Var 1) (Var 0)))
 
 λ2 : Term  -- One
-λ2 = Abs "f" (Abs "x" (App (Var "f") (App (Var "f") (Var "x"))))
+λ2 = Abs (Abs (App (Var 1) (App (Var 1) (Var 0))))
 
 λ3 : Term
-λ3 = Abs "f" (Abs "x" (App (Var "f") (App (Var "f") (App (Var "f") (Var "x")))))
+λ3 = Abs (Abs (App (Var 1) (App (Var 1) (App (Var 1) (Var 0)))))
 
 λS : Term  -- Succ
-λS = Abs "n" (Abs "f" (Abs "x"
-                           (App (Var "f")
-                                (App (App (Var "n") (Var "f")) (Var "x")))))
+λS = Abs (Abs (Abs (App (Var 1) (App (App (Var 2) (Var 1)) (Var 0)))))
 
 λP: Term   -- Plus
-λP = Abs "m" (Abs "n" (Abs "f"
-                           (Abs "x"
-                             (App (App (Var "m") (Var "f"))
-                                  (App (App (Var "n") (Var "f")) (Var "x"))))))
+λP = Abs (Abs (Abs (Abs (App (App (Var 3) (Var 1))
+                        (App (App (Var 2) (Var 1)) (Var 0))))))
 
 -- Predicate & utils
 -- =================
