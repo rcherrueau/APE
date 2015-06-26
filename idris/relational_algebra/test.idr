@@ -39,7 +39,7 @@ row3 = "2015-07-25" |: "Bob" |: 1 |: RNil
 
 -- Predicate that a schema `s` has an attribute `n`
 using (n: String)
-  data HasAttribute : Schema as -> String -> Type -> Type where
+  data HasAttribute : Schema _ -> String -> Type -> Type where
     Here  : {s: Schema (Attribute n a :: as)} -> HasAttribute s n a
     There : {t: Attribute _ _} -> {s: Schema as} ->
                 HasAttribute s n a -> HasAttribute (t `SCons` s) n a
@@ -52,6 +52,22 @@ hasAttributeName = There Here
 
 hasAttributeAddr : HasAttribute schemaAgenda "Addr" Integer
 hasAttributeAddr = There $ There Here
+
+-- Predicate that a schema `s'` is a subset of schema `s`. In this
+-- implementation of `Sub`, order of attributes in Schemas matters.
+data Sub : Schema _' -> Schema _ -> Type where
+  SubNilS2 : Sub SNil s
+  SubS1S2  : Sub cs'  cs -> Sub (c `SCons` cs') (c `SCons` cs)
+  SubS1S2D : Sub cs'  cs -> Sub cs'             (c `SCons` cs)
+
+snilSubAgenda : SNil `Sub` schemaAgenda
+snilSubAgenda = SubNilS2
+
+dateSubAgenda : (attrDate `SCons` SNil) `Sub` schemaAgenda
+dateSubAgenda = SubS1S2 SubNilS2
+
+nameSubAgenda : (attrName `SCons` SNil) `Sub` schemaAgenda
+nameSubAgenda = SubS1S2D $ SubS1S2 SubNilS2
 
 -- Get the value of a given attribute
 get : (n: String) -> Row s -> {auto pf: HasAttribute s n a} -> a
@@ -97,4 +113,4 @@ todayAgendaV2 : Table schemaAgenda
 todayAgendaV2 = σ tAgenda today
 
 -- Projection
--- π : Table s -> (s': Schema _) -> {auto pf : s' `SubSchema` s} -> Table s'
+-- π : Table s -> (s': Schema _) -> {auto pf : s' `Sub` s} -> Table s'
