@@ -9,6 +9,13 @@ total
 Attribute : Type
 Attribute = (String, Type)
 
+-- total
+-- eqType : (t: Type) -> (t': Type) -> {auto p: t = t'} -> Bool
+-- eqType t t' {p=refl} = True
+
+-- instance Eq Attribute where
+--   (n,a) == (n',a')  = (n == n') && a `eqType` a'
+
 -- Examples
 attrDate : Attribute
 attrDate = ("Date", String)
@@ -71,6 +78,29 @@ dateSub = SubRec IsSub
 dateAddrSub : scDateAddr `Sub` scAgenda
 dateAddrSub = SubRec $ SubRec IsSub
 
+total
+foldlImpl : (b -> Attribute -> b) -> b -> Schema _ -> b
+foldlImpl f z SNil      = z
+foldlImpl f z (t |: ts) = foldlImpl f (f z t) ts
+
+data IsIn : Attribute -> List Attribute -> Type where
+  IsHead : (l = x :: xs) -> IsIn x l
+  InTail : (IsIn x xs) -> IsIn x (y :: xs)
+
+total
+lDelete : {auto p: t `IsIn` l} -> (l: List Attribute) -> (t: Attribute) -> List Attribute
+lDelete               Nil       t = Nil
+lDelete {p=IsHead}    (x :: xs) t = xs
+lDelete {p=InTail p'} (x :: xs) t = x :: (lDelete {p=p'} xs t)
+
+total
+delete : {auto p: t `Elem` s} -> (s: Schema ts) -> (t: Attribute) -> Schema (foldl lDelete ts t)
+delete {p=Here}     (x |: xs) t = xs
+delete {p=There p'} (x |: xs) t = x |: delete {p=p'} xs t
+
+comp : Schema s -> Schema s' -> Schema (foldl lDelete s s')
+comp s s' = foldlImpl ()
+
 -- -- Row of a Database
 -- -- =================
 data Row : Schema _ -> Type where
@@ -120,7 +150,6 @@ dateAddrR = πRow scDateAddr row1
 data Table : Schema _ -> Type where
   TNil : Table s
   (::) : (r: Row s) -> Table s -> Table s
-
 
 tAgenda : Table scAgenda
 tAgenda = row1 ::
