@@ -84,8 +84,12 @@ foldlImpl f z SNil      = z
 foldlImpl f z (t |: ts) = foldlImpl f (f z t) ts
 
 data IsIn : Attribute -> List Attribute -> Type where
-  IsHead : (l = x :: xs) -> IsIn x l
+  -- IsHead : (l = x :: xs) -> IsIn x l
+  IsHead : {x: Attribute} -> IsIn x (x :: xs)
   InTail : (IsIn x xs) -> IsIn x (y :: xs)
+
+-- isInDate : IsIn attrDate (attrDate :: attrName :: attrAddr :: Nil)
+-- isInDate = IsHead
 
 total
 lDelete : {auto p: t `IsIn` l} -> (l: List Attribute) -> (t: Attribute) -> List Attribute
@@ -94,12 +98,15 @@ lDelete {p=IsHead}    (x :: xs) t = xs
 lDelete {p=InTail p'} (x :: xs) t = x :: (lDelete {p=p'} xs t)
 
 total
-delete : {auto p: t `Elem` s} -> (s: Schema ts) -> (t: Attribute) -> Schema (foldl lDelete ts t)
-delete {p=Here}     (x |: xs) t = xs
-delete {p=There p'} (x |: xs) t = x |: delete {p=p'} xs t
+delete : {auto p: t `IsIn` ts} -> (s: Schema ts) -> (t: Attribute) -> Schema (lDelete ts t)
+delete {p=IsHead}    (_ |: ts) t  = ts
+delete {p=InTail p'} (t |: ts) t' = t |: (delete {p=p'} ts t' )
+
+scDateName : Schema (lDelete (attrDate :: attrName :: attrAddr :: Nil) attrAddr)
+scDateName = delete scAgenda attrAddr
 
 comp : Schema s -> Schema s' -> Schema (foldl lDelete s s')
-comp s s' = foldlImpl ()
+comp s s' = foldlImpl delete s s'
 
 -- -- Row of a Database
 -- -- =================
