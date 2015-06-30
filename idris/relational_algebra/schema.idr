@@ -21,24 +21,23 @@ data Schema : List Attr -> Type where
   SNil : Schema []
   (::) : (t: Attr) -> Schema ts -> Schema (t :: ts)
 
+scAgenda : Schema (attrDate :: attrName :: attrAddr :: Nil)
+scAgenda = attrDate :: attrName :: attrAddr :: SNil
+
 total
 head : Schema ts -> {auto ok: isCons ts = True} -> Attr
 head SNil      {ok=Refl} impossible
-head (t :: ts) {ok=p}    = t
+head (s :: ss) {ok=p}    = s
 
 total
 tail : Schema (t :: ts) -> Schema ts
-tail (t :: ts) = ts
+tail (s :: ss) = ss
 
--- Utils, auxiliary functions on list
--- data IsIn : Attr -> List Attr -> Type where
---   InHead : {t: Attr} -> IsIn t (t :: ts)
---   InTail : IsIn t ts -> IsIn t (t' :: ts)
-
--- isIn : (t: Attr) -> (ts: List Attr) -> {auto p: t `IsIn` ts} -> Bool
--- isIn t Nil {p=InHead} impossible
--- isIn _ _   {p=p'}     = True
-
+total
+elem : Attr -> Schema _ -> Bool
+elem t SNil                           = False
+elem t (x :: ts) with (t == x) | True = True
+                               | _    = elem t ts
 -- Set operation
 -- Interserction (S,T) Returns the intersection of S and T
 -- Difference (S,T) Returns the difference of S and T
@@ -51,25 +50,54 @@ union SNil      ss' = ss'
 union (s :: ss) ss' = s :: (ss `union` ss')
 
 total
-filter' : (p: Attr -> Bool) -> Schema ts -> (ts' ** Schema ts')
-filter' p SNil                         = (_ ** SNil)
-filter' p (t :: ts) with (filter' p ts)
-                    | (_ ** tail)      = if p t then (_ ** t :: tail)
-                                         else (_ ** tail)
+filter : (p: Attr -> Bool) -> Schema ts -> (ts' ** Schema ts')
+filter p SNil                         = (_ ** SNil)
+filter p (t :: ts) with (filter p ts)
+                   | (_ ** tail)      = if p t then (_ ** t :: tail)
+                                        else (_ ** tail)
 
-total
-elem : Attr -> Schema _ -> Bool
-elem t SNil                           = False
-elem t (x :: ts) with (t == x) | True = True
-                               | _    = elem t ts
+scDateName : Schema (attrDate :: attrName :: Nil)
+scDateName = getProof $ filter (\t => t `elem` (attrDate :: attrName :: SNil)) scAgenda
 
 -- Difference s' C s
--- Todo
-diff : Schema ts -> Schema ts' -> Schema (ts \\ ts')
-diff SNil ss' = SNil
-diff (s :: ss) ss' with (s `elem` ss') | True = diff ss ss'
-                                       | _    = diff s :: ss ss'
+data Diff : List Attr -> List Attr -> List Attr -> Type where
+  DiffNil : Diff Nil l Nil
+  DiffIn  : {auto p: (x `elem` l') = True}  -> Diff l l' res -> Diff (x :: l) l' res
+  DiffOut : {auto p: (x `elem` l') = False} -> Diff l l' res -> Diff (x :: l) l' (x :: res)
 
+-- Diff pridicate test
+-- tDiff : Diff (attrDate :: attrName :: attrAddr :: Nil) (attrAddr :: Nil) (attrDate :: attrName :: Nil)
+-- tDiff = DiffOut $ DiffOut $ DiffIn $ DiffNil
+
+total
+diff : Schema ts -> Schema ts' -> {auto p: Diff ts ts' res} -> Schema res
+diff SNil      _   {p=DiffNil}    = SNil
+diff (s :: ss) _   {p=DiffNil}    impossible
+diff (s :: ss) ss' {p=DiffIn p'}  = diff ss ss' {p=p'}
+diff (s :: ss) ss' {p=DiffOut p'} = s :: (diff ss ss' {p=p'})
+
+scDateAddr : Schema (attrDate :: attrAddr :: Nil)
+scDateAddr = diff scAgenda (attrName :: SNil)
+
+
+diffOfNil : (l: List Attr) -> [] \\ l = []
+diffOfNil []         = Refl
+diffOfNil (x :: xs)  = ?diffOfNil_XS
+
+diff' : Schema ts -> Schema ts' -> Schema (ts \\ ts')
+diff' SNil      ss'                            ?= SNil
+diff' (s :: ss) ss' with (s `elem` ss') | True ?= diff' ss ss'
+                                        | _    ?= s :: diff' ss ss'
+
+diff'' : Schema ts -> Schema ts' -> Schema (ts \\ ts')
+diff'' SNil      ss'                            = ?diffNil
+diff'' (s :: ss) ss' with (s `elem` ss') | True = ?diffIn  -- diff'' ss ss'
+                                         | _    = ?diffOut -- s :: diff'' ss ss'
+
+-- plusReducesZ : (n: Nat) -> n = plus n Z
+-- plusReducesZ Z     = ?plusredZ_Z
+-- plusReducesZ (S k) = let ih = plusReducesZ k in
+--                      ?plusredZ_S
 
 
 
@@ -104,3 +132,30 @@ diff (s :: ss) ss' with (s `elem` ss') | True = diff ss ss'
 -- instance Eq (Schema ts) => Eq (Schema ((n,a) :: ts)) where
 --   ((n,a) :: ts) == ((n,a) :: ts') = ts == ts'
 --   ((n,a) :: ts) == _              = False
+
+---------- Proofs ----------
+
+sql.schema.diff'_lemma_1 = proof
+  intros
+  induction ts'
+  exact SNil
+  intro
+  intro
+  intro
+  refine ihl__0
+
+
+sql.schema.diffNil = proof
+  intros
+  induction ts'
+  exact SNil
+  intros
+  refine ihl__0
+
+
+sql.schema.diffOfNil_XS = proof
+  intros
+  induction xs
+  refine Refl
+  intros
+  refine ihl__0
