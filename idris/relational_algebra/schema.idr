@@ -8,6 +8,8 @@ record Attr where
 instance Eq Attr where
   attr == attr' = (name attr) == (name attr')
 
+instance DecEq Attr where
+
 attrDate : Attr
 attrDate = MkAttr "Date" String
 
@@ -80,9 +82,21 @@ scDateAddr : Schema (attrDate :: attrAddr :: Nil)
 scDateAddr = diff scAgenda (attrName :: SNil)
 
 
-diffOfNil : (l: List Attr) -> [] \\ l = []
+diffOfNil : (l: List Attr) -> ([] \\ l = [])
 diffOfNil []         = Refl
 diffOfNil (x :: xs)  = ?diffOfNil_XS
+-- diffOfNil : (l: List Attr) -> ([] = [] \\ l)
+-- diffOfNil []         = Refl
+-- diffOfNil (x :: xs)  = diffOfNil xs
+
+diff1 : (ts: List Attr) -> (ts': List Attr) -> List Attr
+diff1 Nil       ts' = Nil
+diff1 x         Nil = x
+diff1 (t :: ts) ts' with (t `elem` ts') | True = diff1 ts ts'
+                                        | _    = t :: (diff1 ts ts')
+
+diffOfList : (l: List Attr) -> (l': List Attr) -> (l \\ l') = diff1 l l'
+diffOfList ts ts' = ?diffOfList
 
 diff' : Schema ts -> Schema ts' -> Schema (ts \\ ts')
 diff' SNil      ss'                            ?= SNil
@@ -135,14 +149,25 @@ diff'' (s :: ss) ss' with (s `elem` ss') | True = ?diffIn  -- diff'' ss ss'
 
 ---------- Proofs ----------
 
-sql.schema.diff'_lemma_1 = proof
-  intros
-  induction ts'
-  exact SNil
-  intro
-  intro
-  intro
-  refine ihl__0
+-- sql.schema.diff'_lemma_1 = proof
+--   intros
+--   compute
+--   induction ts'
+--   compute
+--   exact SNil
+--   intros
+--   compute
+--   exact ihl__0
+
+
+-- sql.schema.diff'_lemma_1 = proof
+--   intros
+--   induction ts'
+--   exact SNil
+--   intro
+--   intro
+--   intro
+--   refine ihl__0
 
 
 sql.schema.diffNil = proof
