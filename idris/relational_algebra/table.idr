@@ -18,8 +18,11 @@ tableAgenda = row1 :: row2 :: row3 :: TNil
 π s' TNil = TNil
 π s' (r :: rs) {p=p'} = row.π s' r {p=p'} :: π s' rs
 
-frag : (s' : Schema) -> Table s -> {auto p : s' `Sub` s} -> (Table s', Table (s \\ s'))
+attrId : Attr
+attrId = (MkAttr "id" Integer)
+
+frag : (s' : Schema) -> Table s -> {auto p : s' `Sub` s} -> (Table $ attrId :: s', Table $ attrId :: (s \\ s'))
 frag s' TNil = (TNil, TNil)
 frag s' (r :: rs) {p=p'} = let (rleft, rright) = row.frag s' r {p=p'} in
                            let (tleft, tright) = frag s' rs in
-                           (rleft :: tleft, rright :: tright)
+                           ((1 |: rleft) :: tleft, (1 |: rright) :: tright)

@@ -100,6 +100,11 @@ inter_lemmaXSNil_Nil []        = Refl
 inter_lemmaXSNil_Nil (x :: xs) = inter_lemmaXSNil_Nil xs
 
 -- Note: proof `exact absurd`
+pi : (s : Schema) -> Row s' -> Row (s `inter` s')
+pi [] rs {s'=ts'} = RNil
+pi ((MkAttr n t) :: ts) rs {s'=ts'} with ((MkAttr n t) `isElem` ts')
+  | (Yes p) ?= let r = get (MkAttr n t) rs {p=p} in (|:) r (pi ts rs) {n=n}
+
 -- π' : (s' : Schema) -> Row s -> Row (s `inter` s')
 -- π' [] rs ?= RNil
 -- π' s  RNil = RNil
