@@ -87,9 +87,9 @@ frag s rs {p=p'} = let left = π s rs {p=p'} in
 -- TODO: implements π with intersect insted of proof in argument.
 inter: List Attr -> List Attr -> List Attr
 inter Nil       ys = Nil
-inter (x :: xs) ys with (x `elem` ys)
-  | True  = x :: inter xs ys
-  | False = inter xs ys
+inter (x :: xs) ys with (x `isElem` ys)
+  | (Yes _)  = x :: inter xs ys
+  | (No _)   = inter xs ys
 
 inter_lemmaNilXS_Nil : (l: List Attr) -> ([] `inter` l) = []
 inter_lemmaNilXS_Nil []        = Refl
@@ -101,9 +101,23 @@ inter_lemmaXSNil_Nil (x :: xs) = inter_lemmaXSNil_Nil xs
 
 -- Note: proof `exact absurd`
 pi : (s : Schema) -> Row s' -> Row (s `inter` s')
-pi [] rs {s'=ts'} = RNil
-pi ((MkAttr n t) :: ts) rs {s'=ts'} with ((MkAttr n t) `isElem` ts')
-  | (Yes p) ?= let r = get (MkAttr n t) rs {p=p} in (|:) r (pi ts rs) {n=n}
+pi [] rs = RNil
+pi (x :: xs) rs {s'=ts'} with (isElem x ts')
+  pi (t@(MkAttr n _) :: xs) rs {s'=ts'} | (Yes prf) = let r = get t rs {p=prf} in
+                                                      r |: (pi xs rs)
+  pi (x :: xs) rs {s'=ts'} | (No contra) = (pi xs rs)
+
+-- pi ((MkAttr n t) :: ts) rs {s'=ts'} with (isElem (MkAttr n t) ts')
+--   | (Yes p) = ?pi_yes
+--   | (No  _) = ?pi_no
+
+-- with (t `isElem` ts')
+--   pi (t :: ts) rs  | (Yes tints') = ?tyui
+--   pi (t :: ts) rs  | (No tnints') = ?tyun
+
+-- pi [] rs {s'=ts'} = RNil
+-- pi ((MkAttr n t) :: ts) rs {s'=ts'} with ((MkAttr n t) `isElem` ts')
+--   | (Yes p) ?= let r = get (MkAttr n t) rs {p=p} in (|:) r (pi ts rs) {n=n}
 
 -- π' : (s' : Schema) -> Row s -> Row (s `inter` s')
 -- π' [] rs ?= RNil
@@ -190,6 +204,11 @@ pi ((MkAttr n t) :: ts) rs {s'=ts'} with ((MkAttr n t) `isElem` ts')
 -- frag s rs {p=p'} = let left = π s rs {p=p'} in
 --                    let right = diff s rs in
 --                    (left, right)
+
+-- Tests
+foo : (1 = 2) -> Void
+foo Refl impossible
+
 
 ---------- Proofs ----------
 
