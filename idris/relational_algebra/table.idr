@@ -1,28 +1,38 @@
 module sql.table
 
+import schema
 import row
 
 %default total
 
--- infixr 7 |
+Table : Schema -> Type
+Table s = List (Row s)
 
-data Table : Schema -> Type where
-  TNil : Table s
-  (::) : Row s -> Table s -> Table s
+zipWithId : Table s -> Table (attrId :: s)
+zipWithId rs = reverse $ fst $ foldl (\(rs,id) => \r =>
+                                       ((id |: r) :: rs, (S id)))
+                                     (Nil, Z)
+                                     rs
+-- zipWithId rs = let size = (toIntegerNat $ length rs) - 1 in
+--                let zip = [0..size] in
+--                zipWith (\id => \r => id |: r) zip rs ?=σ
 
-tableAgenda : Table scAgenda
-tableAgenda = row1 :: row2 :: row3 :: TNil
+-- Selection
+π : (s: Schema) -> Table s' -> Table (s `inter` s')
+π s []        = []
+π s (r :: rs) = row.π s r :: π s rs
+
+σ : (Row s -> Bool) -> Table s -> Table s
+σ p []        = []
+σ p (x :: xs) with (p x)
+  σ p (x :: xs) | False = σ p xs
+  σ p (x :: xs) | True  = x :: σ p xs
 
 
-π : (s' : Schema) -> Table s -> {auto p : s' `Sub` s} -> Table s'
-π s' TNil = TNil
-π s' (r :: rs) {p=p'} = row.π s' r {p=p'} :: π s' rs
 
-attrId : Attr
-attrId = (MkAttr "id" Integer)
+-- Tests
+tAgenda : Table scAgenda
+tAgenda = [row1,row2,row3]
 
-frag : (s' : Schema) -> Table s -> {auto p : s' `Sub` s} -> (Table $ attrId :: s', Table $ attrId :: (s \\ s'))
-frag s' TNil = (TNil, TNil)
-frag s' (r :: rs) {p=p'} = let (rleft, rright) = row.frag s' r {p=p'} in
-                           let (tleft, tright) = frag s' rs in
-                           ((1 |: rleft) :: tleft, (1 |: rright) :: tright)
+-- pi1 : Table [attrDate,attrAddr]
+-- pi1 ?= π [attrName] tAgenda
