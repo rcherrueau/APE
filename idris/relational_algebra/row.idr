@@ -63,17 +63,54 @@ frag' s rs {p=p'} = let left = π' s rs {p=p'} in
                     let right = diff s rs in
                     (left, right)
 
+-- Je veux du void. Le seul moyen d'avoir du void c'est d'utiliser f.
+-- Maintenant il me faut un preuve que `Elem x b`. Cette preuve, je
+-- l'ai en Popant sur sub.
+lemma1 : (Elem x b -> Void) -> Sub (x :: xs) b -> Void
+lemma1 f (Pop x {p=xinb}) = f xinb
+
+lemma2 : (Sub a b) -> (Sub (x :: a) b -> Void) -> (Elem x b -> Void)
+lemma2 x f x1 = f (Pop x)
+
+lemma3 : (Sub a b) -> (Sub (x :: a) b) -> (Elem x b)
+lemma3 x (Pop {p} y) = p
+
+lemma_AintB_isinB : (a : Schema) -> (b : Schema) -> Sub (intersect a b) b
+lemma_AintB_isinB a b = lemma' (intersect a b)
+  where
+  lemma' : (s: Schema) ->  Sub s b
+  lemma' []        = Stop
+  lemma' (x :: xs) with (isElem x b)
+    lemma' (x :: xs) | (Yes prf)   = Pop {p=prf} (lemma' xs)
+    lemma' (x :: xs) | (No contra) with (lemma' xs)
+      lemma' (x :: []) | (No contra) | Stop = ?foo
+      lemma' (x :: (t :: ts)) | (No contra) | (Pop y) = ?truc_rhs_2
+
+
+  -- void (lemma1 contra (Pop {p=} subrec))
+
+ -- with (lemma' xs)
+ --      lemma' (x :: [])        | (No contra)  | Stop             = ?lemma'_rhs_1
+ --      lemma' (x :: (t :: ts)) | (No contra)  | (Pop y {p=yinb}) = ?lemm -- void (lemma1 contra (Pop {p=yinb} $ y)) -- ?lemma'_rhs_3
+
+    -- lemma' (x :: [])        | Stop with (isElem x b)
+    --   lemma' (x :: [])        | Stop | (Yes prf) = Pop Stop
+    --   lemma' (x :: [])        | Stop | (No contra) = let rec = (lemma' []
+    -- lemma' (x :: (t :: ts)) | (Pop y) = ?xs_rhs_2
+
 
 pi : (s : Schema) -> Row s' -> Row (intersect s s')
-pi s rs {s'} = let sub = assert_total $ makeSub (s `intersect` s') s' in
+pi s rs {s'} = let sub = lemma_AintB_isinB s s' in  -- assert_total $ makeSub (s `intersect` s') s' in
                 π' (s `intersect` s') rs {p=sub}
-  where
-  -- TODO, make a Dec instead
-  makeSub : (s : Schema) -> (s' : Schema) -> (s `Sub` s')
-  makeSub []        s' = Stop
-  makeSub (x :: xs) s' with (x `isElem` s')
-    makeSub (x :: xs) s' | (Yes prf)  = Pop {p=prf} (makeSub xs s')
-    -- makeSub (x :: xs) s' | (No contra) = absurd x
+  -- where
+  -- -- TODO, make a Dec instead
+  -- makeSub : (s : Schema) -> (s' : Schema) -> (s `Sub` s')
+  -- makeSub []        s' = Stop
+  -- makeSub (x :: xs) s' with (x `isElem` s')
+  --   makeSub (x :: xs) s' | (Yes prf)  = Pop {p=prf} (makeSub xs s')
+  --   -- makeSub (x :: xs) s' | (No contra) = absurd x
+
+
 
 -- Tests
 row1 : Row scAgenda
