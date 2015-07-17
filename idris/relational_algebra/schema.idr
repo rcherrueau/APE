@@ -65,10 +65,10 @@ inter_lemmaXSNil_Nil (x :: xs) = inter_lemmaXSNil_Nil xs
 --   inter_lem1 t (t :: xs) Here | True = ?inter_lem1_rhs_2
 --   inter_lem1 t (x :: xs) (There p) | True = ?absurd2
 
-inter_lemNotIn : (t: Attr) -> (ts: Schema) -> (p: Elem t ts) -> (intersect [t] ts) = [t]
-inter_lemNotIn t [] p = absurd p
-inter_lemNotIn t (x :: xs) p with (p)
-  inter_lemNotIn t (t :: xs) _ | Here ?= (t :: (replace inter_lemIn (intersect [t] xs) t ts void) = [t] --?inter_lemNotIn_rhs_1
-  inter_lemNotIn t (x :: xs) _ | (There y) = ?inter_lemNotIn_rhs_2
+-- inter_lemNotIn : (t: Attr) -> (ts: Schema) -> (p: Elem t ts) -> (intersect [t] ts) = [t]
+-- inter_lemNotIn t [] p = absurd p
+-- inter_lemNotIn t (x :: xs) p with (p)
+--   inter_lemNotIn t (t :: xs) _ | Here ?= (t :: (replace inter_lemIn (intersect [t] xs) t ts void) = [t] --?inter_lemNotIn_rhs_1
+--   inter_lemNotIn t (x :: xs) _ | (There y) = ?inter_lemNotIn_rhs_2
 
-inter_lemIn : (t: Attr) -> (ts: Schema) -> (p: (Elem t ts) -> Void) -> (intersect [t] ts) = []
+-- inter_lemIn : (t: Attr) -> (ts: Schema) -> (p: (Elem t ts) -> Void) -> (intersect [t] ts) = []
