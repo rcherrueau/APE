@@ -44,6 +44,7 @@ frag s rs = let left = π s rs in
             let right = diff s rs in
             (left, right)
 
+
 -- Note: The following requires a proof that s' is a subset of s.
 -- Henceforth, the proof should be give as argument, which is not as
 -- practiable as defining `π` as the intersection of s' and s.
@@ -61,6 +62,18 @@ frag' : (s' : Schema) -> Row s -> {auto p : s' `Sub` s} -> (Row s', Row (s \\ s'
 frag' s rs {p=p'} = let left = π' s rs {p=p'} in
                     let right = diff s rs in
                     (left, right)
+
+
+pi : (s : Schema) -> Row s' -> Row (intersect s s')
+pi s rs {s'} = let sub = assert_total $ makeSub (s `intersect` s') s' in
+                π' (s `intersect` s') rs {p=sub}
+  where
+  -- TODO, make a Dec instead
+  makeSub : (s : Schema) -> (s' : Schema) -> (s `Sub` s')
+  makeSub []        s' = Stop
+  makeSub (x :: xs) s' with (x `isElem` s')
+    makeSub (x :: xs) s' | (Yes prf)  = Pop {p=prf} (makeSub xs s')
+    -- makeSub (x :: xs) s' | (No contra) = absurd x
 
 -- Tests
 row1 : Row scAgenda
@@ -111,8 +124,8 @@ dif3 = diff [attrName] row1
 π1   : Row ([attrDate] `inter` scAgenda)
 π1   = π [attrDate] row1
 
--- π2   : Row scAgenda
--- π2   ?= π scAgenda row1
+π2   : Row scAgenda
+π2   = pi scAgenda row1
 
 frg1 : (Row ([attrDate] `inter` scAgenda), Row [attrName,attrAddr])
 frg1 = frag [attrDate] row1
