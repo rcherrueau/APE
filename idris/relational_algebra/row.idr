@@ -102,6 +102,73 @@ lemma_AintB_isinB a b = lemma' (intersect a b)
 pi : (s : Schema) -> Row s' -> Row (intersect s s')
 pi s rs {s'} = let sub = lemma_AintB_isinB s s' in  -- assert_total $ makeSub (s `intersect` s') s' in
                 π' (s `intersect` s') rs {p=sub}
+
+inter2 : Schema -> Schema -> Schema
+inter2 [] ys = []
+inter2 (x :: xs) ys with (x `elem` ys)
+  inter2 (x :: xs) ys | False = inter2 xs ys
+  inter2 (x :: xs) ys | True = x :: (inter2 xs ys)
+
+inter_lemmaNil : (l: Schema) -> (inter2 l []) = []
+inter_lemmaNil [] = Refl
+inter_lemmaNil (x :: xs) = inter_lemmaNil xs
+
+lem1 : Sub (inter2 a b) b -> Elem x b -> Sub (inter2 (x :: a) b) b
+lem1 p Here = ?lem1_rhs_1
+lem1 p (There z) = ?with_pat
+
+lem6 : (Elem z (_ :: b) -> Void) -> (Elem z b -> Void)
+lem6 f Here = f (There Here)
+lem6 f (There x) = f (There (There x))
+
+lem7 : (z = x) -> (Elem z [x])
+lem7 prf = rewrite prf in Here
+
+lem9 : {x,z: Attr} -> (z = x -> Void) -> (z == x) = False
+lem9 f {z} {x} with (z == x)
+  lem9 f | False = Refl
+  lem9 f | True = ?lem9_rhs_2
+
+lem8 : (Elem z [x] -> Void) -> (z = x -> Void) -> inter2 [z] [x] = []
+lem8 f g {z} {x} with (decEq z x) -- Je fais l'hypothèse absurd que z = x
+  lem8 f g {z} {x} | (Yes prf) = void (g prf)
+  lem8 f g {z} {x} | (No contra) = ?x_rhs_2
+
+lem5 : (b : Schema) -> (Elem z b -> Void) -> inter2 [z] b = []
+lem5 [] nop = Refl
+lem5 (x :: []) nop {z} with (z `decEq` x)
+  lem5 (x :: []) nop | (Yes prf) = void (nop (lem7 prf)) -- absurd: z = x and z ∉ [x]
+  lem5 (x :: []) nop | (No contra) = ?lem5_rhs_2  -- z ‡ x and z ∉ [x]
+lem5 (x :: xs) nop ?= lem5 xs (lem6 nop) -- (Elem z (x :: b) -> Void) -> (Elme z b -> Void)
+
+lem4 : (b : Schema) -> (Elem z b) -> inter2 [z] b = [z]
+lem4 []        zinb = absurd zinb
+lem4 (z :: xs) Here = ?lem4_rhs_1 -- I have to reduce xs to []
+lem4 (x :: xs) (There zinxs) = ?lem4_rhs_2
+
+lem2 : (a,b : Schema) -> (Elem z b) -> inter (z :: a) b = z :: (inter2 a b)
+lem2 [] [] zinb = absurd zinb
+lem2 [] b zinb = ?lem2_rhs_5
+lem2 (x :: xs) b zinb = ?lem2_rhs_2
+
+lem3 : (xs, ys : Schema) -> (z : Attr) ->
+  Elem z xs -> Elem z ys -> Elem z (inter2 xs ys)
+
+makePrf : (a : Schema) -> (b : Schema) -> Sub (inter2 a b) b
+makePrf [] b = Stop
+makePrf (x :: xs) [] ?= Stop {s'=[]}
+makePrf (x :: xs) b with (isElem x b)
+  makePrf (x :: xs) b | (Yes prf) = let inter = makePrf xs b in
+                                    ?rhs_1
+
+  makePrf (x :: xs) b | (No contra) = ?rhs_2
+
+pi2 : (s : Schema) -> Row s' -> Row (inter2 s s')
+pi2 [] rs {s'} = RNil
+pi2 (x :: xs) rs {s'} with (isElem x s')
+  pi2 (x :: xs) rs {s'} | (Yes prf) = ?pi2_rhs_1
+  pi2 (x :: xs) rs {s'} | (No contra) = ?pi2_rhs_2
+
   -- where
   -- -- TODO, make a Dec instead
   -- makeSub : (s : Schema) -> (s' : Schema) -> (s `Sub` s')
@@ -164,6 +231,12 @@ dif3 = diff [attrName] row1
 π2   : Row scAgenda
 π2   = pi scAgenda row1
 
+π3   : Row scAgenda
+π3   = pi2 scAgenda row1
+
+π4   : Row [attrDate]
+π4   = pi2 [attrDate] row1
+
 frg1 : (Row ([attrDate] `inter` scAgenda), Row [attrName,attrAddr])
 frg1 = frag [attrDate] row1
 
@@ -175,3 +248,10 @@ frg1 = frag [attrDate] row1
 
 fg'1 : (Row [attrDate], Row [attrName, attrAddr])
 fg'1 = frag' [attrDate] row1
+
+---------- Proofs ----------
+
+sql.row.makePrf_lemma_1 = proof
+  intros
+  rewrite sym (inter_lemmaNil xs)
+  exact value
