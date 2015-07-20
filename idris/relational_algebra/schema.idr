@@ -39,36 +39,30 @@ Schema = List Attr
 scAgenda : Schema
 scAgenda = [attrDate, attrName, attrAddr]
 
--- Utils
-inter: Schema -> Schema -> Schema
-inter Nil       ys = Nil
-inter (x :: xs) ys with (x `isElem` ys)
-  | (Yes _)  = x :: inter xs ys
-  | (No _)   = inter xs ys
+-- List utils
 
-inter_lemmaNilXS_Nil : (l: Schema) -> ([] `inter` l) = []
-inter_lemmaNilXS_Nil []        = Refl
-inter_lemmaNilXS_Nil (x :: xs) = inter_lemmaNilXS_Nil xs
+-- List Inclusion: assert that the elements of the first list are
+-- included in the second list.
+Include : List a -> List a -> Type
+Include xs ys = (z : _) -> Elem z xs -> Elem z ys
 
-inter_lemmaXSNil_Nil : (l: Schema) -> (l `inter` []) = []
-inter_lemmaXSNil_Nil []        = Refl
-inter_lemmaXSNil_Nil (x :: xs) = inter_lemmaXSNil_Nil xs
+-- Construct the proof that `(xs ∩ ys) ⊆ ys`
+xsInterYsIncYs : (Eq a, DecEq a) => (intersect, ys : List a) -> Include intersect ys
+xsInterYsIncYs zs ys = xsInterYsIncYs'
+  where
+  postulate lem1 : (Elem z ys -> Void) -> (Elem z zs) -> Void
 
--- inter_lemmaXSYS_YSXS : (xs,ys: Schema) -> (xs `inter` ys) = (ys `inter` xs)
--- inter_lemmaXSYS_YSXS [] []        = Refl
+  xsInterYsIncYs' : Include zs ys
+  xsInterYsIncYs' z zinzs with (isElem z ys)
+    xsInterYsIncYs' z zinzs | (Yes prf)   = prf
+    xsInterYsIncYs' z zinzs | (No contra) = void (lem1 contra zinzs)
 
--- inter_lem1 : (t:Attr) -> (ts : Schema) -> (p : t `Elem` ts) -> (inter [t] ts) = [t]
--- inter_lem1 t [] p = absurd p
--- inter_lem1 t (x :: xs) p with (t == x)
---   inter_lem1 t (x :: xs) (There p) | False = inter_lem1 t xs p
---   inter_lem1 t (t :: xs) Here | False = ?absurd1
---   inter_lem1 t (t :: xs) Here | True = ?inter_lem1_rhs_2
---   inter_lem1 t (x :: xs) (There p) | True = ?absurd2
+-- interProof : (Eq a, DecEq a) => (xs,ys : List a) -> Include (intersect xs ys) ys
+-- interProof xs ys = let zs = (intersect xs ys) in interProof'
+--   where
+--   postulate lem1 : (Elem z ys -> Void) -> (Elem z zs) -> Void
 
--- inter_lemNotIn : (t: Attr) -> (ts: Schema) -> (p: Elem t ts) -> (intersect [t] ts) = [t]
--- inter_lemNotIn t [] p = absurd p
--- inter_lemNotIn t (x :: xs) p with (p)
---   inter_lemNotIn t (t :: xs) _ | Here ?= (t :: (replace inter_lemIn (intersect [t] xs) t ts void) = [t] --?inter_lemNotIn_rhs_1
---   inter_lemNotIn t (x :: xs) _ | (There y) = ?inter_lemNotIn_rhs_2
-
--- inter_lemIn : (t: Attr) -> (ts: Schema) -> (p: (Elem t ts) -> Void) -> (intersect [t] ts) = []
+--   interProof' : Include zs ys
+--   interProof' z zinzs with (isElem z ys)
+--     interProof' z zinzs | (Yes prf) = prf
+--     interProof' z zinzs | (No contra) = void (lem1 contra zinzs)
