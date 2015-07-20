@@ -13,24 +13,24 @@ data Row : Schema -> Type where
 
 -- Operations
 head : Row $ t :: ts -> (type t)
-head (r |: rs) = r
+head (t |: ts) = t
 
 tail : Row $ t :: ts -> Row ts
-tail (r |: rs) = rs
+tail (t |: ts) = ts
 
-get : (t: Attr) -> Row s -> {auto p: t `Elem` s} -> (type t)
-get _ (r |: rs) {p=Here}     = r
-get t (r |: rs) {p=There p'} = get t rs {p=p'}
+get : (v: Attr) -> Row s -> {auto p: v `Elem` s} -> (type v)
+get _ (t |: ts) {p=Here}     = t
+get v (t |: ts) {p=There p'} = get v ts {p=p'}
 
 union : Row s -> Row s' -> Row (s ++ s')
-union RNil us = us
-union (v |: x) us = v |: union x us
+union RNil      us = us
+union (t |: ts) us = t |: union ts us
 
-delete : (t: Attr) -> Row s -> Row (t `delete` s)
-delete t RNil = RNil
-delete t (r |: rs) {s=(MkAttr n' t') :: _} with (t == (MkAttr n' t'))
-                                           | True = rs
-                                           | False = r |: (delete t rs)
+delete : (v: Attr) -> Row s -> Row (v `delete` s)
+delete v RNil = RNil
+delete v (t |: ts) {s=(MkAttr n' v') :: _} with (v == (MkAttr n' v'))
+  delete v (t |: ts) {s=(MkAttr n' v') :: _} | False = t |: delete v ts
+  delete v (t |: ts) {s=(MkAttr n' v') :: _} | True  = ts
 
 diff : (s': Schema) -> Row s -> Row (s \\ s')
 diff []          rs = rs
@@ -48,7 +48,8 @@ diff (t' :: ts') rs = diff ts' (delete t' rs)
                       let r = get (MkAttr n t) rs {p=prf} in
                       r |: rec
 
-frag : (s : Schema) -> Row s' -> (Row (s `intersect` s'), Row (s' \\ s))
+frag : (s : Schema) -> Row s' -> (Row (s `intersect` s'),
+                                  Row (s' \\ s))
 frag s rs = let left = π s rs in
             let right = diff s rs in
             (left, right)
@@ -62,12 +63,13 @@ data Sub : Schema -> Schema -> Type where
   Pop  : Sub ts ts' -> {auto p: t `Elem` ts'} -> Sub (t :: ts) ts'
 
 π' : (s' : Schema) -> Row s -> {auto p : s' `Sub` s} -> Row s'
-π' []                       rs = RNil
+π' []                       rs                    = RNil
 π' (t'@(MkAttr _ _) :: ts') rs {p=Pop x {p=elem}} =
                                     let r = get t' rs {p=elem} in
                                     r |: π' ts' rs {p=x}
 
-frag' : (s' : Schema) -> Row s -> {auto p : s' `Sub` s} -> (Row s', Row (s \\ s'))
+frag' : (s' : Schema) -> Row s -> {auto p : s' `Sub` s} -> (Row s',
+                                                            Row (s \\ s'))
 frag' s rs {p=p'} = let left = π' s rs {p=p'} in
                     let right = diff s rs in
                     (left, right)
