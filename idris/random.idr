@@ -9,7 +9,7 @@ Id = String
 data Term =                   -- terms:
           Var Id            -- variables
           | Abs Id Term     -- abstraction
-            | App Term Term   -- application
+          | App Term Term   -- application
 
 instance Eq Term where
   (Var x)     == (Var y)       = x == y

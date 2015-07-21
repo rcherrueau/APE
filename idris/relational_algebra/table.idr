@@ -34,6 +34,11 @@ diff s (r :: rs) = row.diff s r :: diff s rs
   σ p (r :: rs) | False = σ p rs
   σ p (r :: rs) | True  = r :: σ p rs
 
+-- Grouping
+group : Table (a :: s) -> List (type a)
+group [] = []
+group ((t |: _) :: rs) = t :: group rs
+
 -- Fragmentation
 frag : (s : Schema) -> Table s' -> (Table $ attrId :: (s `intersect` s'),
                                     Table $ attrId :: (s' \\ s))
@@ -47,15 +52,15 @@ frag s rs {s'} = let (left, right) = frag' in
           let right = diff s rs in
           (left, right)
 
-unfrag : Table $ attrId :: s -> Table $ attrId :: s' -> Table (s ++ s')
-unfrag []        us  = []
-unfrag (r :: rs) us  = let id = get attrId r {p=Here} in
+defrag : Table $ attrId :: s -> Table $ attrId :: s' -> Table (s ++ s')
+defrag []        us  = []
+defrag (r :: rs) us  = let id = get attrId r {p=Here} in
                        case σ (\u => head u == id) us of
-                         []        => unfrag rs us
+                         []        => defrag rs us
                          (::) u _ => let r' = row.diff [attrId] r in
                                      let u' = row.diff [attrId] u in
                                      let ru = union r' u' in
-                                     ru :: unfrag rs us
+                                     ru :: defrag rs us
 
 -- Tests
 tAgenda : Table scAgenda
@@ -70,12 +75,12 @@ pi2 = π [attrAddr] tAgenda
 sl1 : Table scAgenda
 sl1 = σ (\r => (get attrDate r) == "2015-07-08") tAgenda
 
+today : {auto p : Elem attrDate s} -> Row s -> Bool
+today r {p} = let date = get attrDate r {p=p} in
+                  date == "2015-07-08"
+
 sl2 : Table scAgenda
 sl2 = σ today tAgenda
-  where
-  today : {auto p : Elem attrDate s} -> Row s -> Bool
-  today r {p} = let date = get attrDate r {p=p} in
-  date == "2015-07-08"
 
 dif1 : Table scAgenda
 dif1 = diff [] tAgenda
@@ -89,5 +94,5 @@ dif3 = diff [attrName] tAgenda
 frg1 : (Table [attrId,attrDate], Table [attrId,attrName,attrAddr])
 frg1 = frag [attrDate] tAgenda
 
-ufg1 : Table scAgenda
-ufg1 = unfrag (fst frg1) (snd frg1)
+dfg1 : Table scAgenda
+dfg1 = defrag (fst frg1) (snd frg1)
