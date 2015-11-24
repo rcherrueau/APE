@@ -1,0 +1,54 @@
+body {
+    font-family: 'Fira Sans', sans-serif;
+    background-color: #fdf6e3;
+    color: #657b83;
+}
+
+nav, .jumbotron {
+    background-color: #073642;
+    background-color: #002b36;
+}
+
+.jumbotron h1 {
+    color: #2aa198;
+    color: #268bd2;
+    color: #b58900;
+    color: #dc322f;
+    color: #cb4b16;
+}
+
+h1, h2, h3, h4 {
+    color: #073642;
+}
+
+.jumbotron p {
+    font-size: 18px;
+}
+
+@media screen and (min-width: 768px) {
+    .navbar {
+        border-radius: 0px;
+        background-color: #073642;
+        border: none;
+        margin-bottom: 0;
+        font-weight: bold;
+    }
+
+    .navbar-header {
+        display: none;
+    }
+
+    .navbar-collapse {
+        padding-left: 0;
+    }
+
+    .navbar-inverse .navbar-nav > .active > a,
+    .navbar-inverse .navbar-nav > .active > a:focus,
+    .navbar-inverse .navbar-nav > .active > a:hover {
+        background-color: transparent;
+    }
+
+    .jumbotron {
+        padding-bottom : 98px;
+    }
+}
