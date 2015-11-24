@@ -74,6 +74,26 @@ frag' s rs {p=p'} = let left = π' s rs {p=p'} in
                     let right = diff s rs in
                     (left, right)
 
+
+π'' : (s : Schema) -> Row s' -> Row (intersect s s')
+π'' s rs {s'} = let zs = intersect s s' in π'
+  where
+  lem : (Include zs s' -> Void) -> Elem z zs -> Elem z s' -> Void
+  -- lem zsnins' zinzs zins' {z} = let zsins' = ?zsinz' in --z zinzs zins'
+  --                               zsnins'
+
+  π' : Row zs
+  π' {zs = []}                   = RNil
+  π' {zs = ((MkAttr n t) :: xs)} with (include ((MkAttr n t) :: xs) s')
+    π' {zs = ((MkAttr n t) :: xs)} | (Yes zsins') =
+                                           let prf = zsins' (MkAttr n t) Here in
+                                           let r = get (MkAttr n t) rs {p=prf} in
+                                           let rec = π' {zs=xs} in
+                                           r |: rec
+    π' {zs = ((MkAttr n t) :: xs)} | (No zsnins') = let inductHypo = π' {zs=xs} in
+                                                    let foo = zsnins' ?foocontra in
+                                                    ?π_rhs_2
+
 -- Tests
 row1 : Row scAgenda
 row1 = "2015-07-08" |: "Alice" |: 0 |: RNil

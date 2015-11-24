@@ -46,3 +46,12 @@ cloudApp = do frag [attrDate]
               qL <- queryL (\left => σ today left)
               qR <- queryR (\right => π [attrId,attrName]right)
               pure $ table.defrag qL qR
+
+
+cloudApp = do frag [date]
+              crypt [name]
+              qL <- queryL (\left => group [date] left)
+              qR <- queryR (\right => let r1 = σ bobName right in
+                                      let r2 = σ workPlace r1 in
+                                      π [id] r2)
+              pure $ count [date] $ table.defrag qL qR

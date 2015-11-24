@@ -17,7 +17,7 @@ function drawCmd(cmd, delay, id, dfr) {
     // Pipes the chain of animation and returns it
     return reduce(spans, function (dfr, span) {
         return dfr.pipe(function () {
-            return span.delay(delay).fadeIn(delay);
+            return span.delay(delay).fadeIn(0);
         });
     }, dfr);
 }
@@ -25,15 +25,15 @@ function drawCmd(cmd, delay, id, dfr) {
 // Blinks cursor animation in a defered object
 function blinkCursor(id, delay, dfr) {
     return dfr.pipe(function () {
-        return id.delay(delay).fadeOut(delay)
-                 .delay(delay).fadeIn(delay);
+        return id.delay(delay).fadeOut(0)
+                 .delay(delay).fadeIn(0);
     });
 }
 
 // Full cli animation
 function cli(cursorId, cmdId) {
     var cmd = cmdId.html();
-    var delay = 50;
+    var delay = 100;
 
     cmdId.empty();
     cmdId.removeClass("hidden");
@@ -61,7 +61,7 @@ $(document).ready(function() {
     // Makes the navbar fixed if window size is under 768px
     var size = 768;
     toggleNavFixed(size);
-    $(window).resize(toggleNavFixed(size));
+    $(window).resize(function () { toggleNavFixed(size) });
 
     // Animates the cmd prompt
     cli($('#cli-cursor'), $('#cli-cmd'));
