@@ -1,3 +1,4 @@
+#! /usr/bin/env racket
 ;; Generator for my personal homepage
 #lang racket/base
 
