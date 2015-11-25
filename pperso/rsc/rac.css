@@ -9,14 +9,6 @@ nav, .jumbotron {
     background-color: #002b36;
 }
 
-.jumbotron h1 {
-    color: #2aa198;
-    color: #268bd2;
-    color: #b58900;
-    color: #dc322f;
-    color: #cb4b16;
-}
-
 h1, h2, h3, h4 {
     color: #073642;
 }
@@ -49,6 +41,19 @@ h1, h2, h3, h4 {
     }
 
     .jumbotron {
-        padding-bottom : 98px;
+        padding-top: 0;
     }
+}
+
+/* Cli cmd */
+#cli {
+    color: #2aa198;
+    color: #268bd2;
+    color: #b58900;
+    color: #dc322f;
+    color: #cb4b16;
+}
+
+#cli-cursor {
+    padding-left: 2px;
 }
