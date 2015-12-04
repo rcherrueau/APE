@@ -83,6 +83,9 @@ bell = Bind (Bell $ Pure ())
 done : Free (Toy a) r
 done = Bind Done
 
+test : Free (Toy a) (List Nat)
+test = Bind (Bell $ Pure [1,2,3])
+
 subroutine' : Free (Toy Char) ()
 subroutine' = output 'A'
 
@@ -90,6 +93,44 @@ program' : Free (Toy Char) r
 program' = do subroutine'
               bell
               done
+
+prg5 : Free (Toy Char) r
+prg5 = output 'A' >>= (\a =>
+       test       >>= (\_ =>
+       ?val))
+
+Schema : Type
+Schema = String
+
+-- Keep interface as it
+data Term : (s1 : Type) -> (s2 : Type) -> a -> Type where
+  -- Frag   : (s : Schema) -> a -> Term s' (s,s') a -- prg6
+  Frag   : s -> a -> Term s' (s,s') a
+  -- UnFrag : Term (s,s') s a
+  -- Query  : (s -> r) -> a -> Term s s a
+  -- QueryL : (s -> r) -> a -> Term (s,s') (s,s') a
+  -- QueryR : (s' -> r) -> a -> Term (s,s') (s,s') a
+  MDone  : Term s1 s2 a
+
+-- prg6 : Term 'a' ("a",'a') a
+-- prg6 = Frag "a"
+
+prg6' : Term Char (String, Char) (Term Char (String, Char) a)
+prg6' = Frag "a" MDone
+-- prg6' = Frag "a" ?test
+
+-- data Term : a -> Type where
+--   Frag   : a -> Term a
+--   Query  : a -> Term a
+--   QueryR : a -> Term a
+--   QueryL : a -> Term a
+
+-- instance Functor (Term) where
+--   map m (Frag   x) = Frag (m x)
+--   map m (Query  x) = Query (m x)
+--   map m (QueryR x) = QueryR (m x)
+--   map m (QueryL x) = QueryL (m x)
+
 
 -- data Term : a -> Type where
 --   Lit :    Int -> Term Int
