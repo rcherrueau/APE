@@ -5,3 +5,6 @@
 	path = racket/proverif/fill-rastache
 	url = git@github.com:rcherrueau/rastache.git
 	branch = fill-rastache
+[submodule "idris/idris-free"]
+	path = idris/idris-free
+	url = git@github.com:idris-hackers/idris-free.git
