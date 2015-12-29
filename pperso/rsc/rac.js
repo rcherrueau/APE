@@ -33,7 +33,7 @@ function blinkCursor(id, delay, dfr) {
 // Full cli animation
 function cli(cursorId, cmdId) {
     var cmd = cmdId.html();
-    var delay = 100;
+    var delay = 90;
 
     cmdId.empty();
     cmdId.removeClass("hidden");

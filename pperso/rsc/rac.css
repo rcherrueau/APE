@@ -2,6 +2,7 @@ body {
     font-family: 'Fira Sans', sans-serif;
     background-color: #fdf6e3;
     color: #657b83;
+    font-weight: 300;
 }
 
 nav, .jumbotron {
@@ -10,14 +11,65 @@ nav, .jumbotron {
 }
 
 h1, h2, h3, h4 {
-    color: #073642;
+    color: #cb4b16;
+    font-weight: 300;
+}
+
+a {
+    color: #cb4b16;
+}
+
+a:hover {
+    color: #cb4b16;
+    background-color: #eee8d5;
 }
 
 .jumbotron p {
     font-size: 18px;
 }
 
+body > .container {
+    font-size: 18px;
+    font-weight: 300;
+}
+
+footer {
+    font-size: 12px;
+}
+
+/* Contact */
+#contact {
+    font-size: 12px;
+}
+
+#contact img {
+    margin-bottom: 10px;
+}
+
+/* Publications */
+ul.articles {
+    list-style-type: none;
+    padding-left: 0px;
+}
+
+ul.articles ul {
+    list-style-type: none;
+    padding-left: 30px;
+}
+
+ul.articles ul li {
+    border-left-width: thin;
+    border-left-style: solid;
+    border-left-color: #cb4b16;
+    padding-bottom: 5px;
+    padding-left: 10px;
+}
+
 @media screen and (min-width: 768px) {
+    .container {
+        /* width: 970px; */
+    }
+
     .navbar {
         border-radius: 0px;
         background-color: #073642;
@@ -45,13 +97,20 @@ h1, h2, h3, h4 {
     }
 }
 
+@media screen and (min-width: 992px) {
+    .container {
+        width: 970px;
+    }
+}
+
 /* Cli cmd */
 #cli {
     color: #2aa198;
     color: #268bd2;
-    color: #b58900;
+    color: #cb4b16;
     color: #dc322f;
     color: #cb4b16;
+    font-weight: normal;
 }
 
 #cli-cursor {

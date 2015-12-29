@@ -2,48 +2,18 @@
 ;; Generator for my personal homepage
 #lang racket/base
 
-(require rastache    ;; https://github.com/rcherrueau/rastache
+(require "pages.rkt"
+         rastache    ;; https://github.com/rcherrueau/rastache
          racket/file
          racket/port
-         racket/cmdline)
+         racket/cmdline
+         racket/match)
 
 ;; The mustache page template.
 (define template "mustache.html")
 
-;; A web page (and its constructor).
-;;
-;; name: name of the page, also in the title
-;; url: relative url of the page
-;; cmd: command to print into prompt
-;; content: filepath of the page content
-;; title: print `name` in the title
-(struct page (name url cmd content title?) #:transparent)
-(define (p name url cmd content [title? #t])
-  (page name url cmd content title?))
-
-;; List of all pages.
-(define pages
-  (list (p "Ronan-Alexandre Cherrueau"
-           "index.html"
-           "about"
-           "rsc/index.html"
-           #f)
-        (p "Projects"
-           "projects.html"
-           "projects"
-           "rsc/proj.html")
-        (p "Publications"
-           "publications.html"
-           "publications"
-           "rsc/publi.html")
-        (p "Teaching"
-           "teaching.html"
-           "teaching"
-           "rsc/teaching.html")))
-
 ;; The web page Mustache template compiled.
 (define tokens (make-parameter (rast-compile/open-file template)))
-
 
 ;; Constructs the mustache context for a specific page.
 ;; page -> ctx
@@ -55,67 +25,100 @@
                    (active . ,(if (equal? p page) #t #f)) })
          pages))
 
-  `#hash{ (name     . ,(page-name page))
-          (title    . ,(page-title? page))
-          (sections . ,sections)
-          (cmd      . ,(page-cmd page))
-          (content  . ,(file->string (page-content page))) })
+  (define is-publi-page? (equal? (page-url page) "publications.html"))
 
-;; Generates a specific page.
+  (define ctx
+  `#hash{ (name         . ,(page-name page))
+          (title        . ,(page-title? page))
+          (sections     . ,sections)
+          (cmd          . ,(page-cmd page))
+          (publications . ,(if is-publi-page? (page-other page) #f))
+          (debug        . ,(λ (ctx render) (displayln ctx))) })
+
+  (define ctx/content
+    (hash-set ctx
+              'content
+              (call-with-output-string
+               (λ (ostream)
+                 (let ([tokens (rast-compile/open-file (page-content page))])
+                   (rast-render tokens ctx ostream))))))
+
+  ctx/content)
+
+
+;; Generates a specific page and returns the url of the generated
+;; page.
+;; page -> page-url
 (define (make-page page)
   (call-with-output-file (page-url page) #:exists 'replace
     (λ (ostream)
-      (rast-render (tokens) (make-ctx page) ostream))))
+      (rast-render (tokens) (make-ctx page) ostream)))
 
-;; Generates all pages of the web site.
-(define (make-pages)
-  (for-each make-page pages))
+  (define p-url (page-url page))
+  (displayln (format "Generation of ~s" p-url))
+  p-url)
 
-;; Deamon to continuously update the generation.
-(define (daemon)
-  (define main-cust (make-custodian))
-
-  ;; When template changes: recompiles tokens and re-generates all
-  ;; pages
-  (define (handle-tplt)
-    (parameterize ([tokens (rast-compile/open-file template)])
-      (make-pages)
-      (displayln "Regenerated")))
-
-  ;; When content changes: regenerate the page.
-  (define (handle-page page)
-    (make-page page)
-    (displayln (format "~s Regenerated" (page-url page))))
-
-  ;; Observe files
-  (parameterize ([current-custodian main-cust])
-    (thread (λ ()
-              (let loop ()
-                (sync (filesystem-change-evt template))
-                (handle-tplt)
-                (loop))))
-
-    (for-each (λ (p)
-                (thread (λ ()
-                          (let loop ()
-                            (sync (filesystem-change-evt (page-content p)))
-                            (handle-page p)
-                            (loop)))))
-              pages))
-
-  ;; Shutdown on Ctrl-D
-  (displayln "Press Ctrl-D to quit")
-  (sync (eof-evt (current-input-port)))
-  (custodian-shutdown-all main-cust)
-  (displayln "Shutdown"))
 
 ;; Main program
 (module* main #f
-  (define daemon? (make-parameter #f))
-  (command-line
-   #:usage-help "Generator for my personal webpage"
-   #:once-any [("-d" "--daemon") "continuously update" (daemon? #t)])
+  ;; ----------------------------------------------------- utils
+  ;; Generates all pages of the web site and returns a list of
+  ;; generated pages.
+  ;; () -> '(page)
+  (define (make-pages) (map make-page pages))
 
+  ;; -------------------------------------------------- cmd-line
+  (define continuous?  (make-parameter #f))
+  (define the-url (make-parameter null))
+  (command-line
+   #:program "Personal webpages generator"
+   #:once-any
+   [("-c" "--continuous") "Continuously update of the webpages"
+                          (continuous? #t)]
+   [("-u" "--url")   url
+                     "The webpage to generate base on its <url>"
+                     (the-url url)])
+
+  ;; ------------------------------------------------------ main
   (cond
-    [(daemon?) (daemon)]
-    [else (make-pages)]))
+    [(continuous?)
+     (define main-cust (make-custodian))
+
+     ;; When template changes: recompiles tokens and re-generates all
+     ;; pages
+     (define (handle-tplt)
+       (parameterize ([tokens (rast-compile/open-file template)])
+         (make-pages)))
+
+     ;; When content changes: regenerate the page.
+     (define (handle-page page)
+       (make-page page))
+
+     ;; Observe files
+     (parameterize ([current-custodian main-cust])
+       (thread (λ ()
+                 (let loop ()
+                   (sync (filesystem-change-evt template))
+                   (handle-tplt)
+                   (loop))))
+
+       (for-each (λ (p)
+                   (thread (λ ()
+                             (let loop ()
+                               (sync (filesystem-change-evt (page-content p)))
+                               (handle-page p)
+                               (loop)))))
+                 pages))
+
+     ;; Shutdown on Ctrl-D
+     (displayln "Press Ctrl-D to quit")
+     (sync (eof-evt (current-input-port)))
+     (custodian-shutdown-all main-cust)
+     (displayln "Bye")]
+    [(not (null? (the-url)))
+     (let* ([eq-url? (λ (p) (equal? (the-url) (page-url p)))]
+            [p-filter (filter eq-url? pages)])
+       (match p-filter
+         [(list p _ ...) (exit (make-page p))]
+         [_ (error "Unknow url for the generation of the webpage")]))]
+    [else (exit (make-pages))]))
