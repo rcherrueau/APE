@@ -230,3 +230,7 @@ evalTest =
   && (eval $ App λS $ App λS λZ) == λ2
   && (eval $ App λS $ App λS $ App λS λZ) ==  λ3
   && (eval $ App (App λP $ App λS λZ) (App λS $ App λS λZ)) == λ3
+
+-- Local Variables:
+-- idris-load-packages: ("contrib")
+-- End:
