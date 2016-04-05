@@ -22,8 +22,8 @@ object list {
   case class Cons[A](head: A,
                      tail: List[A]) extends List[A]
   case object Nil extends List[Nothing] {
-    def head = throw new NoSuchElementException("VNil.head")
-    def tail = throw new NoSuchElementException("VNil.tail")
+    def head = throw new NoSuchElementException("Nil.head")
+    def tail = throw new NoSuchElementException("Nil.tail")
   }
 
   object List {
@@ -229,7 +229,7 @@ object nat {
   }
 
   // Constraints:
-  @implicitNotFound("${N1} is not lather than ${N2}")
+  @implicitNotFound("${N1} is not less than ${N2}")
   trait <[N1 <: Nat, N2 <: Nat]
   object < {
     implicit def lt_0SuccN[N <: Nat] = new <[_0, Succ[N]] {}
@@ -243,7 +243,7 @@ object nat {
     // implicitly [ _4 < _2 ] // No implicit found
   }
 
-  @implicitNotFound("${N1} is not lather than or equal to ${N2}")
+  @implicitNotFound("${N1} is not less than or equal to ${N2}")
   trait <=[N1 <: Nat, N2 <: Nat]
   object <= {
     implicit def lteq_0N[N <: Nat] = new <=[_0, N] {}
@@ -474,7 +474,7 @@ object ClientApp extends App {
 
     import utils.illTyped
 
-    // Note: Working with List
+    // Note: Working with scala List
     SEmpty[List]                       : Sized[Nothing, List, _0]
     SEmpty[List]                       : Sized[Int,     List, _0]
     SCons(1, SCons(2, SEmpty[List]))   : Sized[Int,     List, _2]
