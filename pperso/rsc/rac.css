@@ -33,13 +33,21 @@ body > .container {
     font-weight: 300;
 }
 
+body > .container a {
+    text-decoration: underline;
+}
+
+body > .container .articles a {
+    text-decoration: none;
+}
+
 footer {
     font-size: 12px;
 }
 
 /* Contact */
 #contact {
-    font-size: 12px;
+    font-size: 11px;
 }
 
 #contact img {
@@ -75,7 +83,6 @@ ul.articles ul li {
         background-color: #073642;
         border: none;
         margin-bottom: 0;
-        font-weight: bold;
     }
 
     .navbar-header {
@@ -99,7 +106,7 @@ ul.articles ul li {
 
 @media screen and (min-width: 992px) {
     .container {
-        width: 970px;
+        width: 940px;
     }
 }
 

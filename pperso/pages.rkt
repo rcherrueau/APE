@@ -99,18 +99,21 @@
            "index.html"
            "about"
            "rsc/index.html"
-           #:title #f)
-        (p "Projects"
-           "projects.html"
-           "projects"
-           "rsc/proj.html")
+           #:title #f
+           #:other
+           publications)
         (p "Publications"
            "publications.html"
            "publications"
            "rsc/publi.html"
            #:other
            publications)
-        (p "Teaching"
-           "teaching.html"
-           "teaching"
-           "rsc/teaching.html")))
+        (p "Projects"
+           "projects.html"
+           "projects"
+           "rsc/proj.html")
+        ;; (p "Teaching"
+        ;;    "teaching.html"
+        ;;    "teaching"
+        ;;    "rsc/teaching.html")
+        ))
