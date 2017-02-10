@@ -25,7 +25,7 @@
                     Rémi Douence and
                     Mario Südholt")
                     (title . "A Language for the Composition of
-                  Privacy-Enforcement Techniques")
+                      Privacy-Enforcement Techniques")
                     (booktitle . "IEEE International Symposium on
                       Recent Advances of Trust, Security and
                       Privacy in Computing and Communications
@@ -33,6 +33,7 @@
                     (pages . "519 &mdash; 524")
                     (address . "Helsinki, Finland")
                     (month . "August")
+                    (pdf-url . "https://hal.archives-ouvertes.fr/hal-01168303/document")
                     (url . "http://dx.doi.org/10.1109/Trustcom.2015.480") } ])
            (a2014 .
             [

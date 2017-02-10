@@ -24,6 +24,11 @@ a:hover {
     background-color: #eee8d5;
 }
 
+.jumbotron a:hover {
+    color: #cb4b16;
+    background-color: #073642;
+}
+
 ::-moz-selection {
 	background:#FF5E99;
 	color:#fff;
@@ -55,6 +60,10 @@ body > .container .articles a {
 
 footer {
     font-size: 12px;
+}
+
+body > .container footer a {
+    text-decoration: none;
 }
 
 /* Contact */

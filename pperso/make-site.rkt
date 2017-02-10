@@ -2,12 +2,13 @@
 ;; Generator for my personal homepage
 #lang racket/base
 
-(require "pages.rkt"
-         rastache    ;; https://github.com/rcherrueau/rastache
+(require "rsc/pages.rkt" ;; Provides `pages`
+         rastache        ;; https://github.com/rcherrueau/rastache
          racket/file
          racket/port
          racket/cmdline
-         racket/match)
+         racket/match
+         net/git-checkout)
 
 ;; The mustache page template.
 (define template "mustache.html")
@@ -45,7 +46,6 @@
 
   ctx/content)
 
-
 ;; Generates a specific page and returns the url of the generated
 ;; page.
 ;; page -> page-url
@@ -58,18 +58,17 @@
   (displayln (format "Generation of ~s" p-url))
   p-url)
 
+;; Generates all pages of the web site and returns a list of
+;; generated pages.
+;; () -> '(page)
+(define (make-pages) (map make-page pages))
 
 ;; Main program
 (module* main #f
-  ;; ----------------------------------------------------- utils
-  ;; Generates all pages of the web site and returns a list of
-  ;; generated pages.
-  ;; () -> '(page)
-  (define (make-pages) (map make-page pages))
-
   ;; -------------------------------------------------- cmd-line
   (define continuous?  (make-parameter #f))
   (define the-url (make-parameter null))
+  (define publish?  (make-parameter #f))
   (command-line
    #:program "Personal webpages generator"
    #:once-any
@@ -77,7 +76,10 @@
                           (continuous? #t)]
    [("-u" "--url")   url
                      "The webpage to generate base on its <url>"
-                     (the-url url)])
+                     (the-url url)]
+   [("-p" "--publish") "TODO: Publish webpages"
+                       (publish? #t)]
+   )
 
   ;; ------------------------------------------------------ main
   (cond
@@ -121,4 +123,11 @@
        (match p-filter
          [(list p _ ...) (exit (make-page p))]
          [_ (error "Unknow url for the generation of the webpage")]))]
+    [(publish?)
+     ;; TODO: implement the automatic publishing of the website
+     (git-checkout "github.com"
+                   "rcherrueau/rcherrueau.github.com.git"
+                   #:transport 'git
+                   #:dest-dir (find-system-path 'temp-dir))
+     ]
     [else (exit (make-pages))]))

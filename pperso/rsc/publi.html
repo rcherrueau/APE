@@ -5,7 +5,13 @@
       <ul>
           {{#publications.articles.a2015}}
           <li>
-              <a href="{{{url}}}">{{{title}}}</a>.
+              <a href="{{{url}}}">{{{title}}}</a>
+              {{#pdf-url}}
+              <a href="{{{pdf-url}}}">[pdf]</a>
+              {{/pdf-url}}
+              {{#slides-url}}
+              <a href="{{{slides-url}}}">[slides]</a>
+              {{/slides-url}}
               {{{authors}}}. In <em>{{{booktitle}}}</em>.
           </li>
           {{/publications.articles.a2015}}
@@ -16,7 +22,13 @@
 
           {{#publications.articles.a2014}}
           <li>
-              <a href="{{{url}}}">{{{title}}}</a>.
+              <a href="{{{url}}}">{{{title}}}</a>
+              {{#pdf-url}}
+              <a href="{{{pdf-url}}}">[pdf]</a>
+              {{/pdf-url}}
+              {{#slides-url}}
+              <a href="{{{slides-url}}}">[slides]</a>
+              {{/slides-url}}
               {{{authors}}}. In <em>{{{booktitle}}}</em>.
           </li>
           {{/publications.articles.a2014}}
@@ -26,14 +38,19 @@
       <ul>
           {{#publications.articles.a2013}}
           <li>
-              <a href="{{{url}}}">{{{title}}}</a>.
+              <a href="{{{url}}}">{{{title}}}</a>
+              {{#pdf-url}}
+              <a href="{{{pdf-url}}}">[pdf]</a>
+              {{/pdf-url}}
+              {{#slides-url}}
+              <a href="{{{slides-url}}}">[slides]</a>
+              {{/slides-url}}
               {{{authors}}}. In <em>{{{booktitle}}}</em>.
           </li>
           {{/publications.articles.a2013}}
       </ul>
   </li>
 </ul>
-
 
 <!-- <h2>Reports</h2> -->
 <!-- <ul> -->
