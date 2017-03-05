@@ -1,0 +1,1913 @@
+{
+  "info": {
+    "started": 0, 
+    "finished": 657, 
+    "name": "total"
+  }, 
+  "stats": {
+    "wsgi": {
+      "count": 7, 
+      "duration": 754
+    }, 
+    "db": {
+      "count": 32, 
+      "duration": 165
+    }
+  }, 
+  "children": [
+    {
+      "info": {
+        "exception": "None", 
+        "name": "wsgi", 
+        "service": "main", 
+        "started": 0, 
+        "meta.raw_payload.wsgi-stop": {
+          "info": {
+            "project": null, 
+            "host": "contrib-jessie", 
+            "service": null
+          }, 
+          "name": "wsgi-stop", 
+          "service": "main", 
+          "timestamp": "2017-03-02T16:57:46.258748", 
+          "trace_id": "82a70d18-761f-45c7-9ad9-3eb54b002a09", 
+          "project": "keystone", 
+          "parent_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1", 
+          "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+        }, 
+        "finished": 21, 
+        "project": "keystone", 
+        "host": "contrib-jessie", 
+        "meta.raw_payload.wsgi-start": {
+          "info": {
+            "project": null, 
+            "host": "contrib-jessie", 
+            "request": {
+              "path": "/v3", 
+              "scheme": "http", 
+              "method": "GET", 
+              "query": ""
+            }, 
+            "service": null
+          }, 
+          "name": "wsgi-start", 
+          "service": "main", 
+          "timestamp": "2017-03-02T16:57:46.237474", 
+          "trace_id": "82a70d18-761f-45c7-9ad9-3eb54b002a09", 
+          "project": "keystone", 
+          "parent_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1", 
+          "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+        }
+      }, 
+      "parent_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1", 
+      "trace_id": "82a70d18-761f-45c7-9ad9-3eb54b002a09", 
+      "children": []
+    }, 
+    {
+      "info": {
+        "exception": "None", 
+        "name": "wsgi", 
+        "service": "main", 
+        "started": 42, 
+        "meta.raw_payload.wsgi-stop": {
+          "info": {
+            "project": null, 
+            "host": "contrib-jessie", 
+            "service": null
+          }, 
+          "name": "wsgi-stop", 
+          "service": "main", 
+          "timestamp": "2017-03-02T16:57:46.428104", 
+          "trace_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+          "project": "keystone", 
+          "parent_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1", 
+          "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+        }, 
+        "finished": 190, 
+        "project": "keystone", 
+        "host": "contrib-jessie", 
+        "meta.raw_payload.wsgi-start": {
+          "info": {
+            "project": null, 
+            "host": "contrib-jessie", 
+            "request": {
+              "path": "/identity/v3/auth/tokens", 
+              "scheme": "http", 
+              "method": "POST", 
+              "query": ""
+            }, 
+            "service": null
+          }, 
+          "name": "wsgi-start", 
+          "service": "main", 
+          "timestamp": "2017-03-02T16:57:46.279490", 
+          "trace_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+          "project": "keystone", 
+          "parent_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1", 
+          "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+        }
+      }, 
+      "parent_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1", 
+      "trace_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+      "children": [
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {}, 
+                  "statement": "SELECT 1"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.310223", 
+              "trace_id": "b04bdf4e-2249-48ea-b987-2d4a992feb81", 
+              "project": "keystone", 
+              "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "main", 
+            "started": 72, 
+            "finished": 78, 
+            "project": "keystone", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.315807", 
+              "trace_id": "b04bdf4e-2249-48ea-b987-2d4a992feb81", 
+              "project": "keystone", 
+              "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+          "trace_id": "b04bdf4e-2249-48ea-b987-2d4a992feb81", 
+          "children": []
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {
+                    "param_1": "506750f5f59e455892fbc86497ace0e0"
+                  }, 
+                  "statement": "SELECT user.enabled AS user_enabled, user.id AS user_id, user.domain_id AS user_domain_id, user.extra AS user_extra, user.default_project_id AS user_default_project_id, user.created_at AS user_created_at, user.last_active_at AS user_last_active_at \nFROM user \nWHERE user.id = %(param_1)s"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.325308", 
+              "trace_id": "91151b3e-6daf-427f-818c-0e434cedb548", 
+              "project": "keystone", 
+              "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "main", 
+            "started": 87, 
+            "finished": 91, 
+            "project": "keystone", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.329348", 
+              "trace_id": "91151b3e-6daf-427f-818c-0e434cedb548", 
+              "project": "keystone", 
+              "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+          "trace_id": "91151b3e-6daf-427f-818c-0e434cedb548", 
+          "children": []
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {
+                    "param_1": "506750f5f59e455892fbc86497ace0e0"
+                  }, 
+                  "statement": "SELECT federated_user.id AS federated_user_id, federated_user.user_id AS federated_user_user_id, federated_user.idp_id AS federated_user_idp_id, federated_user.protocol_id AS federated_user_protocol_id, federated_user.unique_id AS federated_user_unique_id, federated_user.display_name AS federated_user_display_name, anon_1.user_id AS anon_1_user_id \nFROM (SELECT user.id AS user_id \nFROM user \nWHERE user.id = %(param_1)s) AS anon_1 INNER JOIN federated_user ON anon_1.user_id = federated_user.user_id ORDER BY anon_1.user_id"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.333561", 
+              "trace_id": "bdbda4cd-7b70-4554-8937-ded9f52db5cf", 
+              "project": "keystone", 
+              "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "main", 
+            "started": 96, 
+            "finished": 100, 
+            "project": "keystone", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.338462", 
+              "trace_id": "bdbda4cd-7b70-4554-8937-ded9f52db5cf", 
+              "project": "keystone", 
+              "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+          "trace_id": "bdbda4cd-7b70-4554-8937-ded9f52db5cf", 
+          "children": []
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {
+                    "param_1": "506750f5f59e455892fbc86497ace0e0"
+                  }, 
+                  "statement": "SELECT nonlocal_user.domain_id AS nonlocal_user_domain_id, nonlocal_user.name AS nonlocal_user_name, nonlocal_user.user_id AS nonlocal_user_user_id, anon_1.user_domain_id AS anon_1_user_domain_id, anon_1.user_id AS anon_1_user_id \nFROM (SELECT user.domain_id AS user_domain_id, user.id AS user_id \nFROM user \nWHERE user.id = %(param_1)s) AS anon_1 INNER JOIN nonlocal_user ON anon_1.user_domain_id = nonlocal_user.domain_id AND anon_1.user_id = nonlocal_user.user_id ORDER BY anon_1.user_domain_id, anon_1.user_id"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.347071", 
+              "trace_id": "89cbcb4f-026a-46d3-9b87-50dfac2159b5", 
+              "project": "keystone", 
+              "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "main", 
+            "started": 109, 
+            "finished": 115, 
+            "project": "keystone", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.352476", 
+              "trace_id": "89cbcb4f-026a-46d3-9b87-50dfac2159b5", 
+              "project": "keystone", 
+              "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+          "trace_id": "89cbcb4f-026a-46d3-9b87-50dfac2159b5", 
+          "children": []
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {
+                    "param_1": "506750f5f59e455892fbc86497ace0e0"
+                  }, 
+                  "statement": "SELECT user_option.user_id AS user_option_user_id, user_option.option_id AS user_option_option_id, user_option.option_value AS user_option_option_value, anon_1.user_id AS anon_1_user_id \nFROM (SELECT user.id AS user_id \nFROM user \nWHERE user.id = %(param_1)s) AS anon_1 INNER JOIN user_option ON anon_1.user_id = user_option.user_id ORDER BY anon_1.user_id"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.363990", 
+              "trace_id": "c9580388-4258-4b2d-849b-237d7cd5ba4b", 
+              "project": "keystone", 
+              "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "main", 
+            "started": 126, 
+            "finished": 134, 
+            "project": "keystone", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.372317", 
+              "trace_id": "c9580388-4258-4b2d-849b-237d7cd5ba4b", 
+              "project": "keystone", 
+              "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+          "trace_id": "c9580388-4258-4b2d-849b-237d7cd5ba4b", 
+          "children": []
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {
+                    "param_1": "506750f5f59e455892fbc86497ace0e0"
+                  }, 
+                  "statement": "SELECT local_user.id AS local_user_id, local_user.user_id AS local_user_user_id, local_user.domain_id AS local_user_domain_id, local_user.name AS local_user_name, local_user.failed_auth_count AS local_user_failed_auth_count, local_user.failed_auth_at AS local_user_failed_auth_at, anon_1.user_id AS anon_1_user_id, anon_1.user_domain_id AS anon_1_user_domain_id \nFROM (SELECT user.id AS user_id, user.domain_id AS user_domain_id \nFROM user \nWHERE user.id = %(param_1)s) AS anon_1 INNER JOIN local_user ON anon_1.user_id = local_user.user_id AND anon_1.user_domain_id = local_user.domain_id ORDER BY anon_1.user_id, anon_1.user_domain_id"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.391825", 
+              "trace_id": "f2e74801-16ed-47c4-816c-2b461e6f6e36", 
+              "project": "keystone", 
+              "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "main", 
+            "started": 154, 
+            "finished": 158, 
+            "project": "keystone", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.396150", 
+              "trace_id": "f2e74801-16ed-47c4-816c-2b461e6f6e36", 
+              "project": "keystone", 
+              "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+          "trace_id": "f2e74801-16ed-47c4-816c-2b461e6f6e36", 
+          "children": []
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {
+                    "param_1": "506750f5f59e455892fbc86497ace0e0"
+                  }, 
+                  "statement": "SELECT password.id AS password_id, password.local_user_id AS password_local_user_id, password.password AS password_password, password.created_at AS password_created_at, password.expires_at AS password_expires_at, password.self_service AS password_self_service, local_user_1.id AS local_user_1_id \nFROM (SELECT user.id AS user_id, user.domain_id AS user_domain_id \nFROM user \nWHERE user.id = %(param_1)s) AS anon_1 INNER JOIN local_user AS local_user_1 ON anon_1.user_id = local_user_1.user_id AND anon_1.user_domain_id = local_user_1.domain_id INNER JOIN password ON local_user_1.id = password.local_user_id ORDER BY local_user_1.id, password.created_at"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.399313", 
+              "trace_id": "d86f94a9-8eb0-451f-8e21-b3bc1fb3d0a6", 
+              "project": "keystone", 
+              "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "main", 
+            "started": 161, 
+            "finished": 168, 
+            "project": "keystone", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.405678", 
+              "trace_id": "d86f94a9-8eb0-451f-8e21-b3bc1fb3d0a6", 
+              "project": "keystone", 
+              "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "7527f954-d310-4e4b-a93d-2050060c3d32", 
+          "trace_id": "d86f94a9-8eb0-451f-8e21-b3bc1fb3d0a6", 
+          "children": []
+        }
+      ]
+    }, 
+    {
+      "info": {
+        "exception": "None", 
+        "name": "wsgi", 
+        "service": "main", 
+        "started": 208, 
+        "meta.raw_payload.wsgi-stop": {
+          "info": {
+            "project": null, 
+            "host": "contrib-jessie", 
+            "service": null
+          }, 
+          "name": "wsgi-stop", 
+          "service": "main", 
+          "timestamp": "2017-03-02T16:57:46.570106", 
+          "trace_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+          "project": "keystone", 
+          "parent_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1", 
+          "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+        }, 
+        "finished": 332, 
+        "project": "keystone", 
+        "host": "contrib-jessie", 
+        "meta.raw_payload.wsgi-start": {
+          "info": {
+            "project": null, 
+            "host": "contrib-jessie", 
+            "request": {
+              "path": "/identity/v3/auth/tokens", 
+              "scheme": "http", 
+              "method": "POST", 
+              "query": ""
+            }, 
+            "service": null
+          }, 
+          "name": "wsgi-start", 
+          "service": "main", 
+          "timestamp": "2017-03-02T16:57:46.445830", 
+          "trace_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+          "project": "keystone", 
+          "parent_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1", 
+          "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+        }
+      }, 
+      "parent_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1", 
+      "trace_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+      "children": [
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {}, 
+                  "statement": "SELECT 1"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.476770", 
+              "trace_id": "124a697c-2b26-4888-9426-a06f21319c56", 
+              "project": "keystone", 
+              "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "main", 
+            "started": 239, 
+            "finished": 241, 
+            "project": "keystone", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.478484", 
+              "trace_id": "124a697c-2b26-4888-9426-a06f21319c56", 
+              "project": "keystone", 
+              "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+          "trace_id": "124a697c-2b26-4888-9426-a06f21319c56", 
+          "children": []
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {
+                    "param_1": "506750f5f59e455892fbc86497ace0e0"
+                  }, 
+                  "statement": "SELECT user.enabled AS user_enabled, user.id AS user_id, user.domain_id AS user_domain_id, user.extra AS user_extra, user.default_project_id AS user_default_project_id, user.created_at AS user_created_at, user.last_active_at AS user_last_active_at \nFROM user \nWHERE user.id = %(param_1)s"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.481890", 
+              "trace_id": "088af642-8a5f-42e6-ad86-41c245a1cec0", 
+              "project": "keystone", 
+              "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "main", 
+            "started": 244, 
+            "finished": 248, 
+            "project": "keystone", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.486439", 
+              "trace_id": "088af642-8a5f-42e6-ad86-41c245a1cec0", 
+              "project": "keystone", 
+              "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+          "trace_id": "088af642-8a5f-42e6-ad86-41c245a1cec0", 
+          "children": []
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {
+                    "param_1": "506750f5f59e455892fbc86497ace0e0"
+                  }, 
+                  "statement": "SELECT federated_user.id AS federated_user_id, federated_user.user_id AS federated_user_user_id, federated_user.idp_id AS federated_user_idp_id, federated_user.protocol_id AS federated_user_protocol_id, federated_user.unique_id AS federated_user_unique_id, federated_user.display_name AS federated_user_display_name, anon_1.user_id AS anon_1_user_id \nFROM (SELECT user.id AS user_id \nFROM user \nWHERE user.id = %(param_1)s) AS anon_1 INNER JOIN federated_user ON anon_1.user_id = federated_user.user_id ORDER BY anon_1.user_id"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.490055", 
+              "trace_id": "1ed8c249-0360-4dc4-a1a2-183753074116", 
+              "project": "keystone", 
+              "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "main", 
+            "started": 252, 
+            "finished": 265, 
+            "project": "keystone", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.502578", 
+              "trace_id": "1ed8c249-0360-4dc4-a1a2-183753074116", 
+              "project": "keystone", 
+              "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+          "trace_id": "1ed8c249-0360-4dc4-a1a2-183753074116", 
+          "children": []
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {
+                    "param_1": "506750f5f59e455892fbc86497ace0e0"
+                  }, 
+                  "statement": "SELECT nonlocal_user.domain_id AS nonlocal_user_domain_id, nonlocal_user.name AS nonlocal_user_name, nonlocal_user.user_id AS nonlocal_user_user_id, anon_1.user_domain_id AS anon_1_user_domain_id, anon_1.user_id AS anon_1_user_id \nFROM (SELECT user.domain_id AS user_domain_id, user.id AS user_id \nFROM user \nWHERE user.id = %(param_1)s) AS anon_1 INNER JOIN nonlocal_user ON anon_1.user_domain_id = nonlocal_user.domain_id AND anon_1.user_id = nonlocal_user.user_id ORDER BY anon_1.user_domain_id, anon_1.user_id"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.506827", 
+              "trace_id": "1d83dd5d-4d00-4313-8324-934a74aafa66", 
+              "project": "keystone", 
+              "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "main", 
+            "started": 269, 
+            "finished": 271, 
+            "project": "keystone", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.509112", 
+              "trace_id": "1d83dd5d-4d00-4313-8324-934a74aafa66", 
+              "project": "keystone", 
+              "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+          "trace_id": "1d83dd5d-4d00-4313-8324-934a74aafa66", 
+          "children": []
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {
+                    "param_1": "506750f5f59e455892fbc86497ace0e0"
+                  }, 
+                  "statement": "SELECT user_option.user_id AS user_option_user_id, user_option.option_id AS user_option_option_id, user_option.option_value AS user_option_option_value, anon_1.user_id AS anon_1_user_id \nFROM (SELECT user.id AS user_id \nFROM user \nWHERE user.id = %(param_1)s) AS anon_1 INNER JOIN user_option ON anon_1.user_id = user_option.user_id ORDER BY anon_1.user_id"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.511684", 
+              "trace_id": "b2081de7-e732-4a2a-8c92-af1ff5b4bc93", 
+              "project": "keystone", 
+              "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "main", 
+            "started": 274, 
+            "finished": 276, 
+            "project": "keystone", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.513779", 
+              "trace_id": "b2081de7-e732-4a2a-8c92-af1ff5b4bc93", 
+              "project": "keystone", 
+              "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+          "trace_id": "b2081de7-e732-4a2a-8c92-af1ff5b4bc93", 
+          "children": []
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {
+                    "param_1": "506750f5f59e455892fbc86497ace0e0"
+                  }, 
+                  "statement": "SELECT local_user.id AS local_user_id, local_user.user_id AS local_user_user_id, local_user.domain_id AS local_user_domain_id, local_user.name AS local_user_name, local_user.failed_auth_count AS local_user_failed_auth_count, local_user.failed_auth_at AS local_user_failed_auth_at, anon_1.user_id AS anon_1_user_id, anon_1.user_domain_id AS anon_1_user_domain_id \nFROM (SELECT user.id AS user_id, user.domain_id AS user_domain_id \nFROM user \nWHERE user.id = %(param_1)s) AS anon_1 INNER JOIN local_user ON anon_1.user_id = local_user.user_id AND anon_1.user_domain_id = local_user.domain_id ORDER BY anon_1.user_id, anon_1.user_domain_id"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.519069", 
+              "trace_id": "085c8b5d-23fd-4a46-be4b-bd93414e343a", 
+              "project": "keystone", 
+              "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "main", 
+            "started": 281, 
+            "finished": 291, 
+            "project": "keystone", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.528575", 
+              "trace_id": "085c8b5d-23fd-4a46-be4b-bd93414e343a", 
+              "project": "keystone", 
+              "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+          "trace_id": "085c8b5d-23fd-4a46-be4b-bd93414e343a", 
+          "children": []
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {
+                    "param_1": "506750f5f59e455892fbc86497ace0e0"
+                  }, 
+                  "statement": "SELECT password.id AS password_id, password.local_user_id AS password_local_user_id, password.password AS password_password, password.created_at AS password_created_at, password.expires_at AS password_expires_at, password.self_service AS password_self_service, local_user_1.id AS local_user_1_id \nFROM (SELECT user.id AS user_id, user.domain_id AS user_domain_id \nFROM user \nWHERE user.id = %(param_1)s) AS anon_1 INNER JOIN local_user AS local_user_1 ON anon_1.user_id = local_user_1.user_id AND anon_1.user_domain_id = local_user_1.domain_id INNER JOIN password ON local_user_1.id = password.local_user_id ORDER BY local_user_1.id, password.created_at"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.537766", 
+              "trace_id": "26ab86ba-bce3-4f7c-b40a-b5c6c0cadf14", 
+              "project": "keystone", 
+              "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "main", 
+            "started": 300, 
+            "finished": 311, 
+            "project": "keystone", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "main", 
+              "timestamp": "2017-03-02T16:57:46.548581", 
+              "trace_id": "26ab86ba-bce3-4f7c-b40a-b5c6c0cadf14", 
+              "project": "keystone", 
+              "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "3caf34f1-fdcb-4b08-8f21-e955468dd5fd", 
+          "trace_id": "26ab86ba-bce3-4f7c-b40a-b5c6c0cadf14", 
+          "children": []
+        }
+      ]
+    }, 
+    {
+      "info": {
+        "exception": "None", 
+        "name": "wsgi", 
+        "service": "api", 
+        "started": 341, 
+        "meta.raw_payload.wsgi-stop": {
+          "info": {
+            "project": null, 
+            "host": "contrib-jessie", 
+            "service": null
+          }, 
+          "name": "wsgi-stop", 
+          "service": "api", 
+          "timestamp": "2017-03-02T16:57:46.728376", 
+          "trace_id": "183e49ca-bd62-4893-8a29-63120697ead4", 
+          "project": "glance", 
+          "parent_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1", 
+          "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+        }, 
+        "finished": 490, 
+        "project": "glance", 
+        "host": "contrib-jessie", 
+        "meta.raw_payload.wsgi-start": {
+          "info": {
+            "project": null, 
+            "host": "contrib-jessie", 
+            "request": {
+              "path": "/v2/images", 
+              "scheme": "http", 
+              "method": "GET", 
+              "query": ""
+            }, 
+            "service": null
+          }, 
+          "name": "wsgi-start", 
+          "service": "api", 
+          "timestamp": "2017-03-02T16:57:46.578746", 
+          "trace_id": "183e49ca-bd62-4893-8a29-63120697ead4", 
+          "project": "glance", 
+          "parent_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1", 
+          "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+        }
+      }, 
+      "parent_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1", 
+      "trace_id": "183e49ca-bd62-4893-8a29-63120697ead4", 
+      "children": [
+        {
+          "info": {
+            "exception": "None", 
+            "name": "wsgi", 
+            "service": "admin", 
+            "started": 363, 
+            "meta.raw_payload.wsgi-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "wsgi-stop", 
+              "service": "admin", 
+              "timestamp": "2017-03-02T16:57:46.687800", 
+              "trace_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+              "project": "keystone", 
+              "parent_id": "183e49ca-bd62-4893-8a29-63120697ead4", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "finished": 450, 
+            "project": "keystone", 
+            "host": "contrib-jessie", 
+            "meta.raw_payload.wsgi-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "request": {
+                  "path": "/identity_admin/v3/auth/tokens", 
+                  "scheme": "http", 
+                  "method": "GET", 
+                  "query": ""
+                }, 
+                "service": null
+              }, 
+              "name": "wsgi-start", 
+              "service": "admin", 
+              "timestamp": "2017-03-02T16:57:46.600581", 
+              "trace_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+              "project": "keystone", 
+              "parent_id": "183e49ca-bd62-4893-8a29-63120697ead4", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }
+          }, 
+          "parent_id": "183e49ca-bd62-4893-8a29-63120697ead4", 
+          "trace_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+          "children": [
+            {
+              "info": {
+                "meta.raw_payload.db-start": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "db": {
+                      "params": {}, 
+                      "statement": "SELECT 1"
+                    }, 
+                    "service": null
+                  }, 
+                  "name": "db-start", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.610901", 
+                  "trace_id": "b97c77f1-d99e-4e24-9f97-cf91574602df", 
+                  "project": "keystone", 
+                  "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "name": "db", 
+                "service": "admin", 
+                "started": 373, 
+                "finished": 375, 
+                "project": "keystone", 
+                "meta.raw_payload.db-stop": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "service": null
+                  }, 
+                  "name": "db-stop", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.612686", 
+                  "trace_id": "b97c77f1-d99e-4e24-9f97-cf91574602df", 
+                  "project": "keystone", 
+                  "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "host": "contrib-jessie", 
+                "exception": "None"
+              }, 
+              "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+              "trace_id": "b97c77f1-d99e-4e24-9f97-cf91574602df", 
+              "children": []
+            }, 
+            {
+              "info": {
+                "meta.raw_payload.db-start": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "db": {
+                      "params": {
+                        "project_id_1": "da446912062840fda2c5ea73fe25fe87", 
+                        "user_id_1": "eed3aa0a19934fe69334a342c5f6ca8d", 
+                        "issued_before_1": "2017-03-02T16:00:11.000000", 
+                        "audit_id_1": "RTefnvg6TymjppxasbRRpg"
+                      }, 
+                      "statement": "SELECT revocation_event.id AS revocation_event_id, revocation_event.domain_id AS revocation_event_domain_id, revocation_event.project_id AS revocation_event_project_id, revocation_event.user_id AS revocation_event_user_id, revocation_event.role_id AS revocation_event_role_id, revocation_event.trust_id AS revocation_event_trust_id, revocation_event.consumer_id AS revocation_event_consumer_id, revocation_event.access_token_id AS revocation_event_access_token_id, revocation_event.issued_before AS revocation_event_issued_before, revocation_event.expires_at AS revocation_event_expires_at, revocation_event.revoked_at AS revocation_event_revoked_at, revocation_event.audit_id AS revocation_event_audit_id, revocation_event.audit_chain_id AS revocation_event_audit_chain_id \nFROM revocation_event \nWHERE revocation_event.issued_before >= %(issued_before_1)s AND (revocation_event.user_id IS NULL OR revocation_event.user_id = %(user_id_1)s) AND (revocation_event.project_id IS NULL OR revocation_event.project_id = %(project_id_1)s) AND (revocation_event.audit_id IS NULL OR revocation_event.audit_id = %(audit_id_1)s)"
+                    }, 
+                    "service": null
+                  }, 
+                  "name": "db-start", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.615224", 
+                  "trace_id": "b6ea1193-bc4d-4f5c-b818-52b3f56dedfe", 
+                  "project": "keystone", 
+                  "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "name": "db", 
+                "service": "admin", 
+                "started": 377, 
+                "finished": 380, 
+                "project": "keystone", 
+                "meta.raw_payload.db-stop": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "service": null
+                  }, 
+                  "name": "db-stop", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.617619", 
+                  "trace_id": "b6ea1193-bc4d-4f5c-b818-52b3f56dedfe", 
+                  "project": "keystone", 
+                  "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "host": "contrib-jessie", 
+                "exception": "None"
+              }, 
+              "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+              "trace_id": "b6ea1193-bc4d-4f5c-b818-52b3f56dedfe", 
+              "children": []
+            }, 
+            {
+              "info": {
+                "meta.raw_payload.db-start": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "db": {
+                      "params": {}, 
+                      "statement": "SELECT 1"
+                    }, 
+                    "service": null
+                  }, 
+                  "name": "db-start", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.640026", 
+                  "trace_id": "5f97658a-66b0-493d-8d1d-21bdee0daeb1", 
+                  "project": "keystone", 
+                  "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "name": "db", 
+                "service": "admin", 
+                "started": 402, 
+                "finished": 407, 
+                "project": "keystone", 
+                "meta.raw_payload.db-stop": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "service": null
+                  }, 
+                  "name": "db-stop", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.644953", 
+                  "trace_id": "5f97658a-66b0-493d-8d1d-21bdee0daeb1", 
+                  "project": "keystone", 
+                  "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "host": "contrib-jessie", 
+                "exception": "None"
+              }, 
+              "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+              "trace_id": "5f97658a-66b0-493d-8d1d-21bdee0daeb1", 
+              "children": []
+            }, 
+            {
+              "info": {
+                "meta.raw_payload.db-start": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "db": {
+                      "params": {
+                        "project_id_1": "04299d8a505a4ef7b757c6cdd2dac1e9", 
+                        "user_id_1": "506750f5f59e455892fbc86497ace0e0", 
+                        "issued_before_1": "2017-03-02T16:57:46.000000", 
+                        "audit_id_1": "cT0HewApSeCckoT6uAAP1A"
+                      }, 
+                      "statement": "SELECT revocation_event.id AS revocation_event_id, revocation_event.domain_id AS revocation_event_domain_id, revocation_event.project_id AS revocation_event_project_id, revocation_event.user_id AS revocation_event_user_id, revocation_event.role_id AS revocation_event_role_id, revocation_event.trust_id AS revocation_event_trust_id, revocation_event.consumer_id AS revocation_event_consumer_id, revocation_event.access_token_id AS revocation_event_access_token_id, revocation_event.issued_before AS revocation_event_issued_before, revocation_event.expires_at AS revocation_event_expires_at, revocation_event.revoked_at AS revocation_event_revoked_at, revocation_event.audit_id AS revocation_event_audit_id, revocation_event.audit_chain_id AS revocation_event_audit_chain_id \nFROM revocation_event \nWHERE revocation_event.issued_before >= %(issued_before_1)s AND (revocation_event.user_id IS NULL OR revocation_event.user_id = %(user_id_1)s) AND (revocation_event.project_id IS NULL OR revocation_event.project_id = %(project_id_1)s) AND (revocation_event.audit_id IS NULL OR revocation_event.audit_id = %(audit_id_1)s)"
+                    }, 
+                    "service": null
+                  }, 
+                  "name": "db-start", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.647489", 
+                  "trace_id": "e528040d-0369-4ac4-ac5b-f6f16f4d1fd6", 
+                  "project": "keystone", 
+                  "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "name": "db", 
+                "service": "admin", 
+                "started": 410, 
+                "finished": 413, 
+                "project": "keystone", 
+                "meta.raw_payload.db-stop": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "service": null
+                  }, 
+                  "name": "db-stop", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.650694", 
+                  "trace_id": "e528040d-0369-4ac4-ac5b-f6f16f4d1fd6", 
+                  "project": "keystone", 
+                  "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "host": "contrib-jessie", 
+                "exception": "None"
+              }, 
+              "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+              "trace_id": "e528040d-0369-4ac4-ac5b-f6f16f4d1fd6", 
+              "children": []
+            }, 
+            {
+              "info": {
+                "meta.raw_payload.db-start": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "db": {
+                      "params": {}, 
+                      "statement": "SELECT 1"
+                    }, 
+                    "service": null
+                  }, 
+                  "name": "db-start", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.663868", 
+                  "trace_id": "b725e86e-9031-41a7-a905-bb2712afc494", 
+                  "project": "keystone", 
+                  "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "name": "db", 
+                "service": "admin", 
+                "started": 426, 
+                "finished": 433, 
+                "project": "keystone", 
+                "meta.raw_payload.db-stop": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "service": null
+                  }, 
+                  "name": "db-stop", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.671311", 
+                  "trace_id": "b725e86e-9031-41a7-a905-bb2712afc494", 
+                  "project": "keystone", 
+                  "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "host": "contrib-jessie", 
+                "exception": "None"
+              }, 
+              "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+              "trace_id": "b725e86e-9031-41a7-a905-bb2712afc494", 
+              "children": []
+            }, 
+            {
+              "info": {
+                "meta.raw_payload.db-start": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "db": {
+                      "params": {
+                        "project_id_1": "04299d8a505a4ef7b757c6cdd2dac1e9", 
+                        "user_id_1": "506750f5f59e455892fbc86497ace0e0", 
+                        "issued_before_1": "2017-03-02T16:57:46.000000", 
+                        "audit_id_1": "cT0HewApSeCckoT6uAAP1A"
+                      }, 
+                      "statement": "SELECT revocation_event.id AS revocation_event_id, revocation_event.domain_id AS revocation_event_domain_id, revocation_event.project_id AS revocation_event_project_id, revocation_event.user_id AS revocation_event_user_id, revocation_event.role_id AS revocation_event_role_id, revocation_event.trust_id AS revocation_event_trust_id, revocation_event.consumer_id AS revocation_event_consumer_id, revocation_event.access_token_id AS revocation_event_access_token_id, revocation_event.issued_before AS revocation_event_issued_before, revocation_event.expires_at AS revocation_event_expires_at, revocation_event.revoked_at AS revocation_event_revoked_at, revocation_event.audit_id AS revocation_event_audit_id, revocation_event.audit_chain_id AS revocation_event_audit_chain_id \nFROM revocation_event \nWHERE revocation_event.issued_before >= %(issued_before_1)s AND (revocation_event.user_id IS NULL OR revocation_event.user_id = %(user_id_1)s) AND (revocation_event.project_id IS NULL OR revocation_event.project_id = %(project_id_1)s) AND (revocation_event.audit_id IS NULL OR revocation_event.audit_id = %(audit_id_1)s)"
+                    }, 
+                    "service": null
+                  }, 
+                  "name": "db-start", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.675720", 
+                  "trace_id": "478131a9-b489-4440-bebc-2b1a090d6a75", 
+                  "project": "keystone", 
+                  "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "name": "db", 
+                "service": "admin", 
+                "started": 438, 
+                "finished": 445, 
+                "project": "keystone", 
+                "meta.raw_payload.db-stop": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "service": null
+                  }, 
+                  "name": "db-stop", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.682602", 
+                  "trace_id": "478131a9-b489-4440-bebc-2b1a090d6a75", 
+                  "project": "keystone", 
+                  "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "host": "contrib-jessie", 
+                "exception": "None"
+              }, 
+              "parent_id": "63a10266-ec5b-4c61-9ef4-a57d9495c413", 
+              "trace_id": "478131a9-b489-4440-bebc-2b1a090d6a75", 
+              "children": []
+            }
+          ]
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {}, 
+                  "statement": "SELECT 1"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "api", 
+              "timestamp": "2017-03-02T16:57:46.702842", 
+              "trace_id": "c1b20f76-f6c7-4b46-b3a7-a5632a47f8d3", 
+              "project": "glance", 
+              "parent_id": "183e49ca-bd62-4893-8a29-63120697ead4", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "api", 
+            "started": 465, 
+            "finished": 468, 
+            "project": "glance", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "api", 
+              "timestamp": "2017-03-02T16:57:46.705856", 
+              "trace_id": "c1b20f76-f6c7-4b46-b3a7-a5632a47f8d3", 
+              "project": "glance", 
+              "parent_id": "183e49ca-bd62-4893-8a29-63120697ead4", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "183e49ca-bd62-4893-8a29-63120697ead4", 
+          "trace_id": "c1b20f76-f6c7-4b46-b3a7-a5632a47f8d3", 
+          "children": []
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {
+                    "visibility_1": "community", 
+                    "param_1": 25, 
+                    "owner_1": "04299d8a505a4ef7b757c6cdd2dac1e9", 
+                    "status_6": "deactivated", 
+                    "status_5": "deleted", 
+                    "status_4": "pending_delete", 
+                    "status_3": "queued", 
+                    "status_2": "saving", 
+                    "status_1": "active"
+                  }, 
+                  "statement": "SELECT anon_1.images_created_at AS anon_1_images_created_at, anon_1.images_updated_at AS anon_1_images_updated_at, anon_1.images_deleted_at AS anon_1_images_deleted_at, anon_1.images_deleted AS anon_1_images_deleted, anon_1.images_id AS anon_1_images_id, anon_1.images_name AS anon_1_images_name, anon_1.images_disk_format AS anon_1_images_disk_format, anon_1.images_container_format AS anon_1_images_container_format, anon_1.images_size AS anon_1_images_size, anon_1.images_virtual_size AS anon_1_images_virtual_size, anon_1.images_status AS anon_1_images_status, anon_1.images_visibility AS anon_1_images_visibility, anon_1.images_checksum AS anon_1_images_checksum, anon_1.images_min_disk AS anon_1_images_min_disk, anon_1.images_min_ram AS anon_1_images_min_ram, anon_1.images_owner AS anon_1_images_owner, anon_1.images_protected AS anon_1_images_protected, image_properties_1.created_at AS image_properties_1_created_at, image_properties_1.updated_at AS image_properties_1_updated_at, image_properties_1.deleted_at AS image_properties_1_deleted_at, image_properties_1.deleted AS image_properties_1_deleted, image_properties_1.id AS image_properties_1_id, image_properties_1.image_id AS image_properties_1_image_id, image_properties_1.name AS image_properties_1_name, image_properties_1.value AS image_properties_1_value, image_tags_1.created_at AS image_tags_1_created_at, image_tags_1.updated_at AS image_tags_1_updated_at, image_tags_1.deleted_at AS image_tags_1_deleted_at, image_tags_1.deleted AS image_tags_1_deleted, image_tags_1.id AS image_tags_1_id, image_tags_1.image_id AS image_tags_1_image_id, image_tags_1.value AS image_tags_1_value, image_locations_1.created_at AS image_locations_1_created_at, image_locations_1.updated_at AS image_locations_1_updated_at, image_locations_1.deleted_at AS image_locations_1_deleted_at, image_locations_1.deleted AS image_locations_1_deleted, image_locations_1.id AS image_locations_1_id, image_locations_1.image_id AS image_locations_1_image_id, image_locations_1.value AS image_locations_1_value, image_locations_1.meta_data AS image_locations_1_meta_data, image_locations_1.status AS image_locations_1_status \nFROM (SELECT images.created_at AS images_created_at, images.updated_at AS images_updated_at, images.deleted_at AS images_deleted_at, images.deleted AS images_deleted, images.id AS images_id, images.name AS images_name, images.disk_format AS images_disk_format, images.container_format AS images_container_format, images.size AS images_size, images.virtual_size AS images_virtual_size, images.status AS images_status, images.visibility AS images_visibility, images.checksum AS images_checksum, images.min_disk AS images_min_disk, images.min_ram AS images_min_ram, images.owner AS images_owner, images.protected AS images_protected \nFROM images \nWHERE images.deleted = false AND images.status IN (%(status_1)s, %(status_2)s, %(status_3)s, %(status_4)s, %(status_5)s, %(status_6)s) AND (images.owner = %(owner_1)s OR images.visibility != %(visibility_1)s) ORDER BY images.created_at DESC, images.id DESC \n LIMIT %(param_1)s) AS anon_1 LEFT OUTER JOIN image_properties AS image_properties_1 ON anon_1.images_id = image_properties_1.image_id LEFT OUTER JOIN image_tags AS image_tags_1 ON anon_1.images_id = image_tags_1.image_id LEFT OUTER JOIN image_locations AS image_locations_1 ON anon_1.images_id = image_locations_1.image_id ORDER BY anon_1.images_created_at DESC, anon_1.images_id DESC"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "api", 
+              "timestamp": "2017-03-02T16:57:46.711599", 
+              "trace_id": "0ffc7414-1338-4932-bcad-6c611c96a4a5", 
+              "project": "glance", 
+              "parent_id": "183e49ca-bd62-4893-8a29-63120697ead4", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "api", 
+            "started": 474, 
+            "finished": 482, 
+            "project": "glance", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "api", 
+              "timestamp": "2017-03-02T16:57:46.719575", 
+              "trace_id": "0ffc7414-1338-4932-bcad-6c611c96a4a5", 
+              "project": "glance", 
+              "parent_id": "183e49ca-bd62-4893-8a29-63120697ead4", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "183e49ca-bd62-4893-8a29-63120697ead4", 
+          "trace_id": "0ffc7414-1338-4932-bcad-6c611c96a4a5", 
+          "children": []
+        }
+      ]
+    }, 
+    {
+      "info": {
+        "exception": "None", 
+        "name": "wsgi", 
+        "service": "api", 
+        "started": 503, 
+        "meta.raw_payload.wsgi-stop": {
+          "info": {
+            "project": null, 
+            "host": "contrib-jessie", 
+            "service": null
+          }, 
+          "name": "wsgi-stop", 
+          "service": "api", 
+          "timestamp": "2017-03-02T16:57:46.895447", 
+          "trace_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+          "project": "glance", 
+          "parent_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1", 
+          "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+        }, 
+        "finished": 657, 
+        "project": "glance", 
+        "host": "contrib-jessie", 
+        "meta.raw_payload.wsgi-start": {
+          "info": {
+            "project": null, 
+            "host": "contrib-jessie", 
+            "request": {
+              "path": "/v2/images", 
+              "scheme": "http", 
+              "method": "GET", 
+              "query": "marker=0d63cd87-dae7-4c91-8985-891435f85b65"
+            }, 
+            "service": null
+          }, 
+          "name": "wsgi-start", 
+          "service": "api", 
+          "timestamp": "2017-03-02T16:57:46.741207", 
+          "trace_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+          "project": "glance", 
+          "parent_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1", 
+          "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+        }
+      }, 
+      "parent_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1", 
+      "trace_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+      "children": [
+        {
+          "info": {
+            "exception": "None", 
+            "name": "wsgi", 
+            "service": "admin", 
+            "started": 508, 
+            "meta.raw_payload.wsgi-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "wsgi-stop", 
+              "service": "admin", 
+              "timestamp": "2017-03-02T16:57:46.816677", 
+              "trace_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+              "project": "keystone", 
+              "parent_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "finished": 579, 
+            "project": "keystone", 
+            "host": "contrib-jessie", 
+            "meta.raw_payload.wsgi-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "request": {
+                  "path": "/identity_admin/v3/auth/tokens", 
+                  "scheme": "http", 
+                  "method": "GET", 
+                  "query": ""
+                }, 
+                "service": null
+              }, 
+              "name": "wsgi-start", 
+              "service": "admin", 
+              "timestamp": "2017-03-02T16:57:46.745807", 
+              "trace_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+              "project": "keystone", 
+              "parent_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }
+          }, 
+          "parent_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+          "trace_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+          "children": [
+            {
+              "info": {
+                "meta.raw_payload.db-start": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "db": {
+                      "params": {}, 
+                      "statement": "SELECT 1"
+                    }, 
+                    "service": null
+                  }, 
+                  "name": "db-start", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.750536", 
+                  "trace_id": "92624590-15ae-496f-b789-90a64065f863", 
+                  "project": "keystone", 
+                  "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "name": "db", 
+                "service": "admin", 
+                "started": 513, 
+                "finished": 515, 
+                "project": "keystone", 
+                "meta.raw_payload.db-stop": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "service": null
+                  }, 
+                  "name": "db-stop", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.752570", 
+                  "trace_id": "92624590-15ae-496f-b789-90a64065f863", 
+                  "project": "keystone", 
+                  "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "host": "contrib-jessie", 
+                "exception": "None"
+              }, 
+              "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+              "trace_id": "92624590-15ae-496f-b789-90a64065f863", 
+              "children": []
+            }, 
+            {
+              "info": {
+                "meta.raw_payload.db-start": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "db": {
+                      "params": {
+                        "project_id_1": "da446912062840fda2c5ea73fe25fe87", 
+                        "user_id_1": "eed3aa0a19934fe69334a342c5f6ca8d", 
+                        "issued_before_1": "2017-03-02T16:00:11.000000", 
+                        "audit_id_1": "RTefnvg6TymjppxasbRRpg"
+                      }, 
+                      "statement": "SELECT revocation_event.id AS revocation_event_id, revocation_event.domain_id AS revocation_event_domain_id, revocation_event.project_id AS revocation_event_project_id, revocation_event.user_id AS revocation_event_user_id, revocation_event.role_id AS revocation_event_role_id, revocation_event.trust_id AS revocation_event_trust_id, revocation_event.consumer_id AS revocation_event_consumer_id, revocation_event.access_token_id AS revocation_event_access_token_id, revocation_event.issued_before AS revocation_event_issued_before, revocation_event.expires_at AS revocation_event_expires_at, revocation_event.revoked_at AS revocation_event_revoked_at, revocation_event.audit_id AS revocation_event_audit_id, revocation_event.audit_chain_id AS revocation_event_audit_chain_id \nFROM revocation_event \nWHERE revocation_event.issued_before >= %(issued_before_1)s AND (revocation_event.user_id IS NULL OR revocation_event.user_id = %(user_id_1)s) AND (revocation_event.project_id IS NULL OR revocation_event.project_id = %(project_id_1)s) AND (revocation_event.audit_id IS NULL OR revocation_event.audit_id = %(audit_id_1)s)"
+                    }, 
+                    "service": null
+                  }, 
+                  "name": "db-start", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.755097", 
+                  "trace_id": "9d8f2c8b-6f00-4791-961b-deb00bb20b29", 
+                  "project": "keystone", 
+                  "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "name": "db", 
+                "service": "admin", 
+                "started": 517, 
+                "finished": 521, 
+                "project": "keystone", 
+                "meta.raw_payload.db-stop": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "service": null
+                  }, 
+                  "name": "db-stop", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.758660", 
+                  "trace_id": "9d8f2c8b-6f00-4791-961b-deb00bb20b29", 
+                  "project": "keystone", 
+                  "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "host": "contrib-jessie", 
+                "exception": "None"
+              }, 
+              "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+              "trace_id": "9d8f2c8b-6f00-4791-961b-deb00bb20b29", 
+              "children": []
+            }, 
+            {
+              "info": {
+                "meta.raw_payload.db-start": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "db": {
+                      "params": {}, 
+                      "statement": "SELECT 1"
+                    }, 
+                    "service": null
+                  }, 
+                  "name": "db-start", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.772560", 
+                  "trace_id": "3d0f05ea-7798-490a-b20f-3dd75609264f", 
+                  "project": "keystone", 
+                  "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "name": "db", 
+                "service": "admin", 
+                "started": 535, 
+                "finished": 538, 
+                "project": "keystone", 
+                "meta.raw_payload.db-stop": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "service": null
+                  }, 
+                  "name": "db-stop", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.776163", 
+                  "trace_id": "3d0f05ea-7798-490a-b20f-3dd75609264f", 
+                  "project": "keystone", 
+                  "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "host": "contrib-jessie", 
+                "exception": "None"
+              }, 
+              "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+              "trace_id": "3d0f05ea-7798-490a-b20f-3dd75609264f", 
+              "children": []
+            }, 
+            {
+              "info": {
+                "meta.raw_payload.db-start": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "db": {
+                      "params": {
+                        "project_id_1": "04299d8a505a4ef7b757c6cdd2dac1e9", 
+                        "user_id_1": "506750f5f59e455892fbc86497ace0e0", 
+                        "issued_before_1": "2017-03-02T16:57:46.000000", 
+                        "audit_id_1": "cT0HewApSeCckoT6uAAP1A"
+                      }, 
+                      "statement": "SELECT revocation_event.id AS revocation_event_id, revocation_event.domain_id AS revocation_event_domain_id, revocation_event.project_id AS revocation_event_project_id, revocation_event.user_id AS revocation_event_user_id, revocation_event.role_id AS revocation_event_role_id, revocation_event.trust_id AS revocation_event_trust_id, revocation_event.consumer_id AS revocation_event_consumer_id, revocation_event.access_token_id AS revocation_event_access_token_id, revocation_event.issued_before AS revocation_event_issued_before, revocation_event.expires_at AS revocation_event_expires_at, revocation_event.revoked_at AS revocation_event_revoked_at, revocation_event.audit_id AS revocation_event_audit_id, revocation_event.audit_chain_id AS revocation_event_audit_chain_id \nFROM revocation_event \nWHERE revocation_event.issued_before >= %(issued_before_1)s AND (revocation_event.user_id IS NULL OR revocation_event.user_id = %(user_id_1)s) AND (revocation_event.project_id IS NULL OR revocation_event.project_id = %(project_id_1)s) AND (revocation_event.audit_id IS NULL OR revocation_event.audit_id = %(audit_id_1)s)"
+                    }, 
+                    "service": null
+                  }, 
+                  "name": "db-start", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.786502", 
+                  "trace_id": "fb82e10d-aa40-45fb-b762-8ffc62c8fb21", 
+                  "project": "keystone", 
+                  "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "name": "db", 
+                "service": "admin", 
+                "started": 549, 
+                "finished": 552, 
+                "project": "keystone", 
+                "meta.raw_payload.db-stop": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "service": null
+                  }, 
+                  "name": "db-stop", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.790367", 
+                  "trace_id": "fb82e10d-aa40-45fb-b762-8ffc62c8fb21", 
+                  "project": "keystone", 
+                  "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "host": "contrib-jessie", 
+                "exception": "None"
+              }, 
+              "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+              "trace_id": "fb82e10d-aa40-45fb-b762-8ffc62c8fb21", 
+              "children": []
+            }, 
+            {
+              "info": {
+                "meta.raw_payload.db-start": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "db": {
+                      "params": {}, 
+                      "statement": "SELECT 1"
+                    }, 
+                    "service": null
+                  }, 
+                  "name": "db-start", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.802481", 
+                  "trace_id": "0b1b7401-749e-4b63-baff-274f4f22d19d", 
+                  "project": "keystone", 
+                  "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "name": "db", 
+                "service": "admin", 
+                "started": 565, 
+                "finished": 568, 
+                "project": "keystone", 
+                "meta.raw_payload.db-stop": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "service": null
+                  }, 
+                  "name": "db-stop", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.805524", 
+                  "trace_id": "0b1b7401-749e-4b63-baff-274f4f22d19d", 
+                  "project": "keystone", 
+                  "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "host": "contrib-jessie", 
+                "exception": "None"
+              }, 
+              "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+              "trace_id": "0b1b7401-749e-4b63-baff-274f4f22d19d", 
+              "children": []
+            }, 
+            {
+              "info": {
+                "meta.raw_payload.db-start": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "db": {
+                      "params": {
+                        "project_id_1": "04299d8a505a4ef7b757c6cdd2dac1e9", 
+                        "user_id_1": "506750f5f59e455892fbc86497ace0e0", 
+                        "issued_before_1": "2017-03-02T16:57:46.000000", 
+                        "audit_id_1": "cT0HewApSeCckoT6uAAP1A"
+                      }, 
+                      "statement": "SELECT revocation_event.id AS revocation_event_id, revocation_event.domain_id AS revocation_event_domain_id, revocation_event.project_id AS revocation_event_project_id, revocation_event.user_id AS revocation_event_user_id, revocation_event.role_id AS revocation_event_role_id, revocation_event.trust_id AS revocation_event_trust_id, revocation_event.consumer_id AS revocation_event_consumer_id, revocation_event.access_token_id AS revocation_event_access_token_id, revocation_event.issued_before AS revocation_event_issued_before, revocation_event.expires_at AS revocation_event_expires_at, revocation_event.revoked_at AS revocation_event_revoked_at, revocation_event.audit_id AS revocation_event_audit_id, revocation_event.audit_chain_id AS revocation_event_audit_chain_id \nFROM revocation_event \nWHERE revocation_event.issued_before >= %(issued_before_1)s AND (revocation_event.user_id IS NULL OR revocation_event.user_id = %(user_id_1)s) AND (revocation_event.project_id IS NULL OR revocation_event.project_id = %(project_id_1)s) AND (revocation_event.audit_id IS NULL OR revocation_event.audit_id = %(audit_id_1)s)"
+                    }, 
+                    "service": null
+                  }, 
+                  "name": "db-start", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.810019", 
+                  "trace_id": "18cbdfa3-8d90-454c-9256-d0c51e2c6b37", 
+                  "project": "keystone", 
+                  "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "name": "db", 
+                "service": "admin", 
+                "started": 572, 
+                "finished": 575, 
+                "project": "keystone", 
+                "meta.raw_payload.db-stop": {
+                  "info": {
+                    "project": null, 
+                    "host": "contrib-jessie", 
+                    "service": null
+                  }, 
+                  "name": "db-stop", 
+                  "service": "admin", 
+                  "timestamp": "2017-03-02T16:57:46.813466", 
+                  "trace_id": "18cbdfa3-8d90-454c-9256-d0c51e2c6b37", 
+                  "project": "keystone", 
+                  "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+                  "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+                }, 
+                "host": "contrib-jessie", 
+                "exception": "None"
+              }, 
+              "parent_id": "d649e1cf-5b7a-48d4-bd73-a4f1cd32da65", 
+              "trace_id": "18cbdfa3-8d90-454c-9256-d0c51e2c6b37", 
+              "children": []
+            }
+          ]
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {}, 
+                  "statement": "SELECT 1"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "api", 
+              "timestamp": "2017-03-02T16:57:46.830236", 
+              "trace_id": "36152199-fc10-4445-a4eb-2016b614b828", 
+              "project": "glance", 
+              "parent_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "api", 
+            "started": 592, 
+            "finished": 598, 
+            "project": "glance", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "api", 
+              "timestamp": "2017-03-02T16:57:46.835656", 
+              "trace_id": "36152199-fc10-4445-a4eb-2016b614b828", 
+              "project": "glance", 
+              "parent_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+          "trace_id": "36152199-fc10-4445-a4eb-2016b614b828", 
+          "children": []
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {
+                    "id_1": "0d63cd87-dae7-4c91-8985-891435f85b65"
+                  }, 
+                  "statement": "SELECT images.created_at AS images_created_at, images.updated_at AS images_updated_at, images.deleted_at AS images_deleted_at, images.deleted AS images_deleted, images.id AS images_id, images.name AS images_name, images.disk_format AS images_disk_format, images.container_format AS images_container_format, images.size AS images_size, images.virtual_size AS images_virtual_size, images.status AS images_status, images.visibility AS images_visibility, images.checksum AS images_checksum, images.min_disk AS images_min_disk, images.min_ram AS images_min_ram, images.owner AS images_owner, images.protected AS images_protected, image_properties_1.created_at AS image_properties_1_created_at, image_properties_1.updated_at AS image_properties_1_updated_at, image_properties_1.deleted_at AS image_properties_1_deleted_at, image_properties_1.deleted AS image_properties_1_deleted, image_properties_1.id AS image_properties_1_id, image_properties_1.image_id AS image_properties_1_image_id, image_properties_1.name AS image_properties_1_name, image_properties_1.value AS image_properties_1_value, image_locations_1.created_at AS image_locations_1_created_at, image_locations_1.updated_at AS image_locations_1_updated_at, image_locations_1.deleted_at AS image_locations_1_deleted_at, image_locations_1.deleted AS image_locations_1_deleted, image_locations_1.id AS image_locations_1_id, image_locations_1.image_id AS image_locations_1_image_id, image_locations_1.value AS image_locations_1_value, image_locations_1.meta_data AS image_locations_1_meta_data, image_locations_1.status AS image_locations_1_status \nFROM images LEFT OUTER JOIN image_properties AS image_properties_1 ON images.id = image_properties_1.image_id LEFT OUTER JOIN image_locations AS image_locations_1 ON images.id = image_locations_1.image_id \nWHERE images.id = %(id_1)s"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "api", 
+              "timestamp": "2017-03-02T16:57:46.842408", 
+              "trace_id": "127574ff-c71c-4181-a26e-92ff8118aeb1", 
+              "project": "glance", 
+              "parent_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "api", 
+            "started": 604, 
+            "finished": 616, 
+            "project": "glance", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "api", 
+              "timestamp": "2017-03-02T16:57:46.853976", 
+              "trace_id": "127574ff-c71c-4181-a26e-92ff8118aeb1", 
+              "project": "glance", 
+              "parent_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+          "trace_id": "127574ff-c71c-4181-a26e-92ff8118aeb1", 
+          "children": []
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {}, 
+                  "statement": "SELECT 1"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "api", 
+              "timestamp": "2017-03-02T16:57:46.873850", 
+              "trace_id": "78d6459e-fbf1-44da-9f2e-b31b1066f02b", 
+              "project": "glance", 
+              "parent_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "api", 
+            "started": 636, 
+            "finished": 639, 
+            "project": "glance", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "api", 
+              "timestamp": "2017-03-02T16:57:46.877357", 
+              "trace_id": "78d6459e-fbf1-44da-9f2e-b31b1066f02b", 
+              "project": "glance", 
+              "parent_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+          "trace_id": "78d6459e-fbf1-44da-9f2e-b31b1066f02b", 
+          "children": []
+        }, 
+        {
+          "info": {
+            "meta.raw_payload.db-start": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "db": {
+                  "params": {
+                    "visibility_1": "community", 
+                    "param_5": 25, 
+                    "param_4": "0d63cd87-dae7-4c91-8985-891435f85b65", 
+                    "param_1": "2017-03-02T16:00:08.000000", 
+                    "param_3": "", 
+                    "param_2": "2017-03-02T16:00:08.000000", 
+                    "owner_1": "04299d8a505a4ef7b757c6cdd2dac1e9", 
+                    "status_6": "deactivated", 
+                    "status_5": "deleted", 
+                    "status_4": "pending_delete", 
+                    "status_3": "queued", 
+                    "status_2": "saving", 
+                    "status_1": "active"
+                  }, 
+                  "statement": "SELECT anon_1.images_created_at AS anon_1_images_created_at, anon_1.images_updated_at AS anon_1_images_updated_at, anon_1.images_deleted_at AS anon_1_images_deleted_at, anon_1.images_deleted AS anon_1_images_deleted, anon_1.images_id AS anon_1_images_id, anon_1.images_name AS anon_1_images_name, anon_1.images_disk_format AS anon_1_images_disk_format, anon_1.images_container_format AS anon_1_images_container_format, anon_1.images_size AS anon_1_images_size, anon_1.images_virtual_size AS anon_1_images_virtual_size, anon_1.images_status AS anon_1_images_status, anon_1.images_visibility AS anon_1_images_visibility, anon_1.images_checksum AS anon_1_images_checksum, anon_1.images_min_disk AS anon_1_images_min_disk, anon_1.images_min_ram AS anon_1_images_min_ram, anon_1.images_owner AS anon_1_images_owner, anon_1.images_protected AS anon_1_images_protected, image_properties_1.created_at AS image_properties_1_created_at, image_properties_1.updated_at AS image_properties_1_updated_at, image_properties_1.deleted_at AS image_properties_1_deleted_at, image_properties_1.deleted AS image_properties_1_deleted, image_properties_1.id AS image_properties_1_id, image_properties_1.image_id AS image_properties_1_image_id, image_properties_1.name AS image_properties_1_name, image_properties_1.value AS image_properties_1_value, image_tags_1.created_at AS image_tags_1_created_at, image_tags_1.updated_at AS image_tags_1_updated_at, image_tags_1.deleted_at AS image_tags_1_deleted_at, image_tags_1.deleted AS image_tags_1_deleted, image_tags_1.id AS image_tags_1_id, image_tags_1.image_id AS image_tags_1_image_id, image_tags_1.value AS image_tags_1_value, image_locations_1.created_at AS image_locations_1_created_at, image_locations_1.updated_at AS image_locations_1_updated_at, image_locations_1.deleted_at AS image_locations_1_deleted_at, image_locations_1.deleted AS image_locations_1_deleted, image_locations_1.id AS image_locations_1_id, image_locations_1.image_id AS image_locations_1_image_id, image_locations_1.value AS image_locations_1_value, image_locations_1.meta_data AS image_locations_1_meta_data, image_locations_1.status AS image_locations_1_status \nFROM (SELECT images.created_at AS images_created_at, images.updated_at AS images_updated_at, images.deleted_at AS images_deleted_at, images.deleted AS images_deleted, images.id AS images_id, images.name AS images_name, images.disk_format AS images_disk_format, images.container_format AS images_container_format, images.size AS images_size, images.virtual_size AS images_virtual_size, images.status AS images_status, images.visibility AS images_visibility, images.checksum AS images_checksum, images.min_disk AS images_min_disk, images.min_ram AS images_min_ram, images.owner AS images_owner, images.protected AS images_protected \nFROM images \nWHERE images.deleted = false AND images.status IN (%(status_1)s, %(status_2)s, %(status_3)s, %(status_4)s, %(status_5)s, %(status_6)s) AND (images.owner = %(owner_1)s OR images.visibility != %(visibility_1)s) AND (CASE WHEN (images.created_at IS NOT NULL) THEN images.created_at END < %(param_1)s OR CASE WHEN (images.created_at IS NOT NULL) THEN images.created_at END = %(param_2)s AND CASE WHEN (images.id IS NOT NULL) THEN images.id ELSE %(param_3)s END < %(param_4)s) ORDER BY images.created_at DESC, images.id DESC \n LIMIT %(param_5)s) AS anon_1 LEFT OUTER JOIN image_properties AS image_properties_1 ON anon_1.images_id = image_properties_1.image_id LEFT OUTER JOIN image_tags AS image_tags_1 ON anon_1.images_id = image_tags_1.image_id LEFT OUTER JOIN image_locations AS image_locations_1 ON anon_1.images_id = image_locations_1.image_id ORDER BY anon_1.images_created_at DESC, anon_1.images_id DESC"
+                }, 
+                "service": null
+              }, 
+              "name": "db-start", 
+              "service": "api", 
+              "timestamp": "2017-03-02T16:57:46.883543", 
+              "trace_id": "4be4cb1d-e746-4950-98c7-9d7e4ef75068", 
+              "project": "glance", 
+              "parent_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "name": "db", 
+            "service": "api", 
+            "started": 646, 
+            "finished": 651, 
+            "project": "glance", 
+            "meta.raw_payload.db-stop": {
+              "info": {
+                "project": null, 
+                "host": "contrib-jessie", 
+                "service": null
+              }, 
+              "name": "db-stop", 
+              "service": "api", 
+              "timestamp": "2017-03-02T16:57:46.889122", 
+              "trace_id": "4be4cb1d-e746-4950-98c7-9d7e4ef75068", 
+              "project": "glance", 
+              "parent_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+              "base_id": "b3a99f01-3a73-4576-af21-1dd3e815c0a1"
+            }, 
+            "host": "contrib-jessie", 
+            "exception": "None"
+          }, 
+          "parent_id": "504bdd99-a30f-4850-9e81-060fbbc747a9", 
+          "trace_id": "4be4cb1d-e746-4950-98c7-9d7e4ef75068", 
+          "children": []
+        }
+      ]
+    }
+  ]
+}
