@@ -7,7 +7,7 @@ _ = let ghc = haskellPackages.ghcWithHoogle (pkgs: with pkgs; [
                                      # inside this nix-shell.
 
   #nix-env -qaP -A nixos.haskellPackages|fgrep aeson
-  aeson
+  cabal-install aeson extra HUnit
 ]);
 in stdenv.mkDerivation {
   name = "osprofiler-diff";
