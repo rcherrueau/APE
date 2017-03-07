@@ -13,7 +13,8 @@ import System.Exit (exitSuccess, exitFailure)
 
 import Data.OSPDiff
 import Data.Aeson (decode, FromJSON)
-
+import Data.Aeson.Parser
+import Data.Aeson.Types (parse)
 
 
 -- Utils
@@ -116,26 +117,65 @@ mkTinfohttp s = unwords [ "{\"exception\": \"None\","
                          ,   " \"parent_id\": \"88ab1f1c-a9cf-437f-837e-0c14bf986708\", "
                          ,   " \"base_id\": \"88ab1f1c-a9cf-437f-837e-0c14bf986708\"}}"]
 
+mkTinfodb :: String -> String
+mkTinfodb s = unwords [ "{\"meta.raw_payload.db-start\": "
+                      ,   "{\"info\": "
+                      ,     "{\"project\": null, "
+                      ,     " \"host\": \"contrib-jessie\", "
+                      ,     " \"db\": ", s , ", "
+                      ,     " \"service\": null}, "
+                      ,   " \"name\": \"db-start\", "
+                      ,   " \"service\": \"main\", "
+                      ,   " \"timestamp\": \"2017-03-03T14:14:01.063490\", "
+                      ,   " \"trace_id\": \"ebc3e79e-74d7-4ea9-8374-ea5f368db916\", "
+                      ,   " \"project\": \"keystone\", "
+                      ,   " \"parent_id\": \"84e863c2-66e0-471b-987f-194e6cf53e97\", "
+                      ,   " \"base_id\": \"88ab1f1c-a9cf-437f-837e-0c14bf986708\"}, "
+                      , " \"name\": \"db\", "
+                      , " \"service\": \"main\", "
+                      , " \"started\": 55, "
+                      , " \"finished\": 58, "
+                      , " \"project\": \"keystone\", "
+                      , " \"meta.raw_payload.db-stop\": "
+                      ,   "{\"info\": {\"project\": null, "
+                      ,     " \"host\": \"contrib-jessie\", "
+                      ,     " \"service\": null}, "
+                      ,   " \"name\": \"db-stop\", "
+                      ,   " \"service\": \"main\", "
+                      ,   " \"timestamp\": \"2017-03-03T14:14:01.067126\", "
+                      ,   " \"trace_id\": \"ebc3e79e-74d7-4ea9-8374-ea5f368db916\", "
+                      ,   " \"project\": \"keystone\", "
+                      ,   " \"parent_id\": \"84e863c2-66e0-471b-987f-194e6cf53e97\", "
+                      ,   " \"base_id\": \"88ab1f1c-a9cf-437f-837e-0c14bf986708\"}, "
+                      , " \"host\": \"contrib-jessie\", "
+                      , " \"exception\": \"None\"}"]
+
+
 tinfohttpreq = mkTinfohttp httpreq
 tinfohttpreqquery = mkTinfohttp httpreqquery
+tinfodbreq = mkTinfodb dbreq
+tinfodbreqparams = mkTinfodb dbreqparams
 
 testsTraceInfo :: Test
 testsTraceInfo = TestLabel "TraceInfo Parsing" $
   TestList
-  -- FIXME: I Cannot use assertOSP since traceInfo uses parseJSONInfo
-  -- rather than paserJSON
   [ TestCase $ assertOSP tinfohttpreq
                          (TraceInfo "keystone" "main" (HTTPReq "/v3" Get ""))
   , TestCase $ assertOSP tinfohttpreqquery
-                         (TraceInfo "keystone" "main" (HTTPReq "/v2/images" Post "limit=20"))
+                         (TraceInfo "keystone" "main"
+                          (HTTPReq "/v2/images" Post "limit=20"))
+  , TestCase $ assertOSP tinfodbreq (DBReq "SELECT 1" H.empty)
+  , TestCase $ assertOSP tinfodbreqparams (DBReq "SELECT 1"
+        (H.fromList [ ("project_id_1", "b59f058989c24cd28aad3fc1357df339")
+                    , ("user_id_1", "b8c739fdb5d04d35ae9055393077553f")
+                    , ("issued_before_1", "2017-03-03T14:14:01.000000")
+                    , ("audit_id_1", "yVVzGy1XRoiHIj-C7GZRBQ")]))
   ]
-
-
 
 
 -- Test Main
 testsAll :: Test
-testsAll = TestList [ testsHTTP, testsHTTPReq, testsDBReq ]
+testsAll = TestList [ testsHTTP, testsHTTPReq, testsDBReq, testsTraceInfo ]
 
 main :: IO ()
 main = do
@@ -143,6 +183,3 @@ main = do
   if errors c + failures c == 0
     then exitSuccess
     else exitFailure
-
--- testTInfoDBReq :: BLI.ByteString
--- testTInfoDBReq = packJSON "{\"meta.raw_payload.db-start\": {\"info\": {\"project\": null, \"host\": \"contrib-jessie\", \"db\": {\"params\": {}, \"statement\": \"SELECT 1\"}, \"service\": null}, \"name\": \"db-start\", \"service\": \"main\", \"timestamp\": \"2017-03-03T14:14:01.063490\", \"trace_id\": \"ebc3e79e-74d7-4ea9-8374-ea5f368db916\", \"project\": \"keystone\", \"parent_id\": \"84e863c2-66e0-471b-987f-194e6cf53e97\", \"base_id\": \"88ab1f1c-a9cf-437f-837e-0c14bf986708\"}, \"name\": \"db\", \"service\": \"main\", \"started\": 55, \"finished\": 58, \"project\": \"keystone\", \"meta.raw_payload.db-stop\": {\"info\": {\"project\": null, \"host\": \"contrib-jessie\", \"service\": null}, \"name\": \"db-stop\", \"service\": \"main\", \"timestamp\": \"2017-03-03T14:14:01.067126\", \"trace_id\": \"ebc3e79e-74d7-4ea9-8374-ea5f368db916\", \"project\": \"keystone\", \"parent_id\": \"84e863c2-66e0-471b-987f-194e6cf53e97\", \"base_id\": \"88ab1f1c-a9cf-437f-837e-0c14bf986708\"}, \"host\": \"contrib-jessie\", \"exception\": \"None\"}"

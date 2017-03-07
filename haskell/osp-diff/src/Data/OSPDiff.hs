@@ -6,10 +6,8 @@ import Prelude
 
 import Control.Applicative (empty)
 import Control.Monad
-import Data.Maybe (fromMaybe)
 import Data.Aeson
-import Data.Aeson.Parser
-import Data.Aeson.Types (Parser, parse)
+import Data.Aeson.Types (Parser)
 import Data.Text (Text)
 import Data.HashMap.Lazy as H (HashMap, lookup)
 
@@ -21,16 +19,7 @@ lookupE (Object v) key = case H.lookup key v of
 lookupE _          _   = Left "not an object"
 
 (.:*) :: (FromJSON a) => Value -> [Text] -> Parser a
-(.:*) hm = parseJSON <=< foldM ((either fail return .) . lookupE) hm
-
-data TraceType = T_DB | T_WSGI
-
-traceType :: Object -> TraceType
-traceType v = case H.lookup "info" v of
-  Just (Object v') -> case H.lookup "name" v' of
-    Just (String n) -> case n of
-      "wsgi" -> T_WSGI
-      "db"   -> T_DB
+(.:*) v = parseJSON <=< foldM ((either fail return .) . lookupE) v
 
 data HTTP = Post | Get | Update | Delete deriving (Show, Eq)
 
@@ -67,20 +56,27 @@ instance FromJSON DBReq where
     <*> v .: "params"
   parseJSON _          = empty
 
+class (FromJSON a, Show a, Eq a) => InfoPath a where
+  infoPath :: Value -> Parser a
+
+instance InfoPath HTTPReq where
+  infoPath v = v .:* [ "meta.raw_payload.wsgi-start", "info", "request" ]
+
+instance InfoPath DBReq where
+  infoPath v = v .:* [ "meta.raw_payload.db-start", "info", "db" ]
+
 data (Show a, Eq a) => TraceInfo a = TraceInfo
   { project  :: String
   , service  :: String
   , req      :: a
   } deriving (Show, Eq)
 
-parseJSONTInfo :: (Show a, Eq a, FromJSON a) => TraceType -> Value -> Parser (TraceInfo a)
-parseJSONTInfo t o@(Object v) = TraceInfo <$>
-        v .: "project"
-    <*> v .: "service"
-    <*> o .:* (case t of
-                 T_WSGI -> [ "meta.raw_payload.wsgi-start", "info", "request" ]
-                 T_DB   -> [ "meta.raw_payload.db-start", "info", "db" ])
-parseJSONTInfo _ _          = empty
+instance (InfoPath a, FromJSON a) => FromJSON (TraceInfo a) where
+  parseJSON o@(Object v) = TraceInfo <$>
+        v .:  "project"
+    <*> v .:  "service"
+    <*> infoPath o
+  parseJSON _            = empty
 
 data Trace = Wsgi (TraceInfo HTTPReq) [Trace]
            | DB (TraceInfo DBReq) [Trace]
@@ -89,26 +85,17 @@ data Trace = Wsgi (TraceInfo HTTPReq) [Trace]
 instance FromJSON Trace where
   parseJSON (Object v) = do
     c <- parseJSON =<< v .: "children"
-    -- TODO: make it fail rather than return an (Object v)
-    let v' = fromMaybe (Object v) (H.lookup "info" v)
-    case traceType v of
-      T_WSGI -> do
-        i <- parseJSONTInfo (traceType v) v'
+    -- FIXME: get the info object
+    -- v' <- parseJSON =<< v .: "info" :: Parser String
+    -- (.:*) v = parseJSON <=< foldM ((either fail return .) . lookupE) v
+    let v' = undefined :: Object
+    n  <- parseJSON =<< v' .: "name" :: Parser String
+    case n of
+      "wsgi" -> do
+        i <- parseJSON (Object v')
         pure $ Wsgi i c
-      T_DB   -> do
-        i <- parseJSONTInfo (traceType v) v'
+      "db"   -> do
+        i <- parseJSON (Object v')
         pure $ DB i c
+      _      -> empty
   parseJSON _          = empty
-
--- testHTTPReq = "{\"path\": \"/v3\", \"scheme\": \"http\", \"method\": \"GET\", \"query\": \"\"}"
-
--- main :: IO ()
--- main = do
---   print (decode testHTTPReq :: Maybe HTTPReq)
---   print (decode testDBReq1 :: Maybe DBReq)
---   print (decode testDBReq2 :: Maybe DBReq)
---   print (decodeWith json' (parse $ parseJSONTInfo T_WSGI) testTInfoHttpReq :: Maybe (TraceInfo HTTPReq))
---   print (decodeWith json' (parse $ parseJSONTInfo T_DB) testTInfoDBReq :: Maybe (TraceInfo DBReq))
---   json <- BS.readFile "flavor-list-real.json"
---   print (decode json :: Maybe [Trace])
---   putStrLn "lala"
