@@ -2,7 +2,7 @@ module Main (main) where
 
 import Prelude
 
-import qualified Data.ByteString.Lazy as BS (pack)
+import qualified Data.ByteString.Lazy as BS (pack,readFile)
 import qualified Data.ByteString.Internal as BI (c2w)
 import qualified Data.ByteString.Lazy.Internal as BLI (ByteString)
 
@@ -12,15 +12,25 @@ import Test.HUnit
 import System.Exit (exitSuccess, exitFailure)
 
 import Data.OSPDiff
-import Data.Aeson (decode, FromJSON)
+import Data.Aeson (decode, FromJSON, Value(..))
+import Data.Text (pack)
+import Data.Maybe
 
 
 -- Utils
+mkStrValue :: String -> Value
+mkStrValue = String . pack
+
 assertOSP :: (Show a, Eq a, FromJSON a) => String -> a -> Assertion
 assertOSP json res = assertEqual json (Just res) (decode (packJSON json))
   where
     packJSON :: String -> BLI.ByteString
     packJSON s = BS.pack $ map BI.c2w s
+
+assertParsable :: String -> Assertion
+assertParsable file = do json <- BS.readFile file
+                         let res = decode json :: Maybe [Trace]
+                         assertBool ("For " ++ file) (isJust res)
 
 
 -- HTTP Code Parsing Tests
@@ -48,8 +58,7 @@ httpreqquery = unwords [ "{\"path\": \"/v2/images\","
                        , " \"query\": \"limit=20\"}"]
 
 testsHTTPReq :: Test
-testsHTTPReq = TestLabel "HTTP Request Parsing" $
-  TestList
+testsHTTPReq = TestLabel "HTTP Request Parsing" $ TestList
   [ TestCase $ assertOSP httpreq
                          (HTTPReq "/v3" Get "")
   , TestCase $ assertOSP httpreqquery
@@ -70,15 +79,14 @@ dbreqparams = unwords [ "{\"params\": "
                       , " \"statement\": \"SELECT 1\"}"]
 
 testsDBReq :: Test
-testsDBReq = TestLabel "DB Request Parsing" $
-  TestList
+testsDBReq = TestLabel "DB Request Parsing" $ TestList
   [ TestCase $ assertOSP dbreq (DBReq "SELECT 1" H.empty)
   , TestCase $ assertOSP dbreqparams
       (DBReq "SELECT 1"
-        (H.fromList [ ("project_id_1", "b59f058989c24cd28aad3fc1357df339")
-                    , ("user_id_1", "b8c739fdb5d04d35ae9055393077553f")
-                    , ("issued_before_1", "2017-03-03T14:14:01.000000")
-                    , ("audit_id_1", "yVVzGy1XRoiHIj-C7GZRBQ")]))
+        (H.fromList [ ("project_id_1", mkStrValue "b59f058989c24cd28aad3fc1357df339")
+                    , ("user_id_1", mkStrValue "b8c739fdb5d04d35ae9055393077553f")
+                    , ("issued_before_1", mkStrValue "2017-03-03T14:14:01.000000")
+                    , ("audit_id_1", mkStrValue "yVVzGy1XRoiHIj-C7GZRBQ")]))
   ]
 
 
@@ -154,8 +162,7 @@ tinfodbreq = mkTinfodb dbreq
 tinfodbreqparams = mkTinfodb dbreqparams
 
 testsTraceInfo :: Test
-testsTraceInfo = TestLabel "TraceInfo Parsing" $
-  TestList
+testsTraceInfo = TestLabel "TraceInfo Parsing" $ TestList
   [ TestCase $ assertOSP tinfohttpreq
                          (TraceInfo "keystone" "main" (HTTPReq "/v3" Get ""))
   , TestCase $ assertOSP tinfohttpreqquery
@@ -166,16 +173,25 @@ testsTraceInfo = TestLabel "TraceInfo Parsing" $
   , TestCase $ assertOSP tinfodbreqparams
                          (TraceInfo "keystone" "main"
                            (DBReq "SELECT 1"
-        (H.fromList [ ("project_id_1", "b59f058989c24cd28aad3fc1357df339")
-                    , ("user_id_1", "b8c739fdb5d04d35ae9055393077553f")
-                    , ("issued_before_1", "2017-03-03T14:14:01.000000")
-                    , ("audit_id_1", "yVVzGy1XRoiHIj-C7GZRBQ")])))
+        (H.fromList [ ("project_id_1", mkStrValue "b59f058989c24cd28aad3fc1357df339")
+                    , ("user_id_1", mkStrValue "b8c739fdb5d04d35ae9055393077553f")
+                    , ("issued_before_1", mkStrValue "2017-03-03T14:14:01.000000")
+                    , ("audit_id_1", mkStrValue "yVVzGy1XRoiHIj-C7GZRBQ")])))
+  ]
+
+
+-- Trace Parsing Test
+testsTrace :: Test
+testsTrace = TestLabel "Trace Parsing" $ TestList
+  [ TestCase $ assertParsable "test/rsc/flavor-list-fake.json"
+  , TestCase $ assertParsable "test/rsc/flavor-list-real.json"
   ]
 
 
 -- Test Main
 testsAll :: Test
-testsAll = TestList [ testsHTTP, testsHTTPReq, testsDBReq, testsTraceInfo ]
+testsAll = TestList [ testsHTTP, testsHTTPReq, testsDBReq,
+                      testsTraceInfo, testsTrace ]
 
 main :: IO ()
 main = do

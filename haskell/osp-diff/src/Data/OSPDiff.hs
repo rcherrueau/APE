@@ -47,7 +47,7 @@ instance FromJSON HTTPReq where
 
 data DBReq = DBReq
   { stmt   :: String
-  , params :: HashMap String String -- [(Key, Value)]
+  , params :: HashMap String Value
   } deriving (Show, Eq)
 
 instance FromJSON DBReq where
@@ -56,14 +56,14 @@ instance FromJSON DBReq where
     <*> v .: "params"
   parseJSON _          = empty
 
-class (FromJSON a, Show a, Eq a) => InfoPath a where
-  infoPath :: Value -> Parser a
+class (FromJSON a, Show a, Eq a) => ReqPath a where
+  reqPath :: Value -> Parser a
 
-instance InfoPath HTTPReq where
-  infoPath v = v .:* [ "meta.raw_payload.wsgi-start", "info", "request" ]
+instance ReqPath HTTPReq where
+  reqPath = flip (.:*) [ "meta.raw_payload.wsgi-start", "info", "request" ]
 
-instance InfoPath DBReq where
-  infoPath v = v .:* [ "meta.raw_payload.db-start", "info", "db" ]
+instance ReqPath DBReq where
+  reqPath = flip (.:*) [ "meta.raw_payload.db-start", "info", "db" ]
 
 data (Show a, Eq a) => TraceInfo a = TraceInfo
   { project  :: String
@@ -71,11 +71,11 @@ data (Show a, Eq a) => TraceInfo a = TraceInfo
   , req      :: a
   } deriving (Show, Eq)
 
-instance (InfoPath a, FromJSON a) => FromJSON (TraceInfo a) where
+instance (ReqPath a, FromJSON a) => FromJSON (TraceInfo a) where
   parseJSON o@(Object v) = TraceInfo <$>
-        v .:  "project"
-    <*> v .:  "service"
-    <*> infoPath o
+        v .: "project"
+    <*> v .: "service"
+    <*> reqPath o
   parseJSON _            = empty
 
 data Trace = Wsgi (TraceInfo HTTPReq) [Trace]
@@ -84,12 +84,9 @@ data Trace = Wsgi (TraceInfo HTTPReq) [Trace]
 
 instance FromJSON Trace where
   parseJSON (Object v) = do
-    c <- parseJSON =<< v .: "children"
-    -- FIXME: get the info object
-    -- v' <- parseJSON =<< v .: "info" :: Parser String
-    -- (.:*) v = parseJSON <=< foldM ((either fail return .) . lookupE) v
-    let v' = undefined :: Object
-    n  <- parseJSON =<< v' .: "name" :: Parser String
+    c  <- parseJSON =<< v  .: "children" -- :: Parser [Trace]
+    v' <- parseJSON =<< v  .: "info"     -- :: Parser Object
+    n  <- parseJSON =<< v' .: "name"     :: Parser String
     case n of
       "wsgi" -> do
         i <- parseJSON (Object v')
