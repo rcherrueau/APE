@@ -185,6 +185,14 @@ testsTrace :: Test
 testsTrace = TestLabel "Trace Parsing" $ TestList
   [ TestCase $ assertParsable "test/rsc/flavor-list-fake.json"
   , TestCase $ assertParsable "test/rsc/flavor-list-real.json"
+  , TestCase $ assertParsable "test/rsc/hypervisor-list-fake.json"
+  , TestCase $ assertParsable "test/rsc/hypervisor-list-real.json"
+  , TestCase $ assertParsable "test/rsc/image-list-fake.json"
+  , TestCase $ assertParsable "test/rsc/image-list-real.json"
+  , TestCase $ assertParsable "test/rsc/server-create-fake.json"
+  , TestCase $ assertParsable "test/rsc/server-create-real.json"
+  , TestCase $ assertParsable "test/rsc/server-show-fake.json"
+  , TestCase $ assertParsable "test/rsc/server-show-real.json"
   ]
 
 

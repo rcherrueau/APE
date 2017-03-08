@@ -11,15 +11,12 @@ import Data.Aeson.Types (Parser)
 import Data.Text (Text)
 import Data.HashMap.Lazy as H (HashMap, lookup)
 
--- http://stackoverflow.com/a/18003411
-lookupE :: Value -> Text -> Either String Value
-lookupE (Object v) key = case H.lookup key v of
-  Nothing -> Left $ "key " ++ show key ++ " not present"
-  Just v' -> Right v'
-lookupE _          _   = Left "not an object"
-
 (.:*) :: (FromJSON a) => Value -> [Text] -> Parser a
-(.:*) v = parseJSON <=< foldM ((either fail return .) . lookupE) v
+(.:*) v = parseJSON <=< foldM ((maybe empty return .) . lookupE) v
+  where
+    lookupE :: Value -> Text -> Maybe Value
+    lookupE (Object v) key = H.lookup key v
+    lookupE _          _   = Nothing
 
 data HTTP = Post | Get | Update | Delete deriving (Show, Eq)
 
