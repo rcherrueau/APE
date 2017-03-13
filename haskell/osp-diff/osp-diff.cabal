@@ -49,28 +49,28 @@ library
   hs-source-dirs: src
   default-language: Haskell2010
   exposed-modules:
-    Data.OSPDiff
+    Data.OSPDiff.Trace
   build-depends: HUnit, aeson, base, extra, bytestring, text, unordered-containers
 
 
-executable osp-diff
-  -- .hs or .lhs file containing the Main module.
-  main-is: Main.hs
+-- executable osp-diff
+--   -- .hs or .lhs file containing the Main module.
+--   main-is: Main.hs
 
-  -- Modules included in this executable, other than Main.
-  -- other-modules:
+--   -- Modules included in this executable, other than Main.
+--   -- other-modules:
 
-  -- LANGUAGE extensions used by modules in this package.
-  other-extensions: OverloadedStrings
+--   -- LANGUAGE extensions used by modules in this package.
+--   other-extensions: OverloadedStrings
 
-  -- Other library packages from which modules are imported.
-  build-depends: HUnit, aeson, base, extra, bytestring, text, unordered-containers
+--   -- Other library packages from which modules are imported.
+--   build-depends: HUnit, aeson, base, extra, bytestring, text, unordered-containers
 
-  -- Directories containing source files.
-  hs-source-dirs: src
+--   -- Directories containing source files.
+--   hs-source-dirs: src
 
-  -- Base language which the package is written in.
-  default-language: Haskell2010
+--   -- Base language which the package is written in.
+--   default-language: Haskell2010
 
 test-suite tests
   type: exitcode-stdio-1.0

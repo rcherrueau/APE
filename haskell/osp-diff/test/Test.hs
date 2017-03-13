@@ -11,8 +11,8 @@ import qualified Data.HashMap.Lazy as H (empty, fromList)
 import Test.HUnit
 import System.Exit (exitSuccess, exitFailure)
 
-import Data.OSPDiff
-import Data.Aeson (decode, eitherDecode, FromJSON, Value(..))
+import Data.OSPDiff.Trace
+import Data.Aeson (decode, FromJSON, Value(..))
 import Data.Text (pack)
 
 
@@ -29,8 +29,8 @@ assertOSP json res = assertEqual json (Just res) (decode (packJSON json))
 assertParsable :: String -> Assertion
 assertParsable file = do
   json <- BS.readFile file
-  let res  = eitherDecode json :: Either String [Trace]
-  let msg  = "For " ++ file ++ either (" -- error: " ++)
+  let res  = eitherDecodeTrace json :: Either String [Trace]
+  let msg  = "For " ++ file ++ either (" -- " ++)
                                       (const " -- OK") res
   let test = either (const False) (const True) res
   assertBool msg test
@@ -200,8 +200,6 @@ testsTrace = TestLabel "Trace Parsing" $ TestList $
   , "test/rsc/image-list-real.json"
   , "test/rsc/server-create-fake.json"
   , "test/rsc/server-create-real.json"
-  , "test/rsc/server-show-fake.json"
-  , "test/rsc/server-show-real.json"
   ]
 
 
