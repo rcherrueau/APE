@@ -32,8 +32,8 @@ assertParsable file = do
   let res  = eitherDecodeTrace json :: Either String [Trace]
   let msg  = "For " ++ file ++ either (" -- " ++)
                                       (const " -- OK") res
-  let test = either (const False) (const True) res
-  assertBool msg test
+  let theTest = either (const False) (const True) res
+  assertBool msg theTest
 
 
 -- HTTP Code Parsing Tests
@@ -48,11 +48,13 @@ testsHTTP = TestLabel "HTTP Code Parsing" $
 
 
 -- HTTP Request Parsing Tests
+httpreq :: String
 httpreq = unwords [ "{\"path\": \"/v3\","
                   , " \"scheme\": \"http\","
                   , " \"method\": \"GET\","
                   , " \"query\": \"\"}" ]
 
+httpreqquery :: String
 httpreqquery = unwords [ "{\"path\": \"/v2/images\","
                        , " \"scheme\": \"http\","
                        , " \"method\": \"POST\", "
@@ -68,8 +70,10 @@ testsHTTPReq = TestLabel "HTTP Request Parsing" $ TestList
 
 
 -- DB Request Parsing Tests
+dbreq :: String
 dbreq = "{\"params\": {}, \"statement\": \"SELECT 1\"}"
 
+dbreqparams :: String
 dbreqparams = unwords [ "{\"params\": "
                       ,    "{\"project_id_1\": \"b59f058989c24cd28aad3fc1357df339\","
                       ,    " \"user_id_1\": \"b8c739fdb5d04d35ae9055393077553f\","
@@ -90,6 +94,7 @@ testsDBReq = TestLabel "DB Request Parsing" $ TestList
 
 
 -- Python Request Parsing Test
+cptPythonReq :: String
 cptPythonReq = "{\"args\": \"(<nova.compute.api.API object at 0x7feed4bca690>, <nova.context.RequestContext object at 0x7feed394cad0>, u'1fbf7f34-0aff-41b2-9611-4aaba19cca3a')\", \"name\": \"nova.compute.api.API.get\", \"kwargs\": \"{'expected_attrs': ['flavor', 'info_cache', 'metadata', 'numa_topology', 'pci_devices']}\"}"
 
 testsPythonReq :: Test
@@ -164,9 +169,16 @@ mkTinfodb s = unwords [ "{\"meta.raw_payload.db-start\": "
                       , " \"host\": \"contrib-jessie\", "
                       , " \"exception\": \"None\"}" ]
 
+tinfohttpreq :: String
 tinfohttpreq = mkTinfohttp httpreq
+
+tinfohttpreqquery :: String
 tinfohttpreqquery = mkTinfohttp httpreqquery
+
+tinfodbreq :: String
 tinfodbreq = mkTinfodb dbreq
+
+tinfodbreqparams :: String
 tinfodbreqparams = mkTinfodb dbreqparams
 
 testsTraceInfo :: Test
