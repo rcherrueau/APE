@@ -15,8 +15,6 @@ import Data.Text (Text, isSuffixOf)
 import qualified Data.HashMap.Lazy as H (lookup, keys)
 import qualified Data.ByteString.Lazy.Internal as BLI (ByteString)
 
-import Debug.Trace
-
 
 -- ADTs
 data HTTP = Post | Get | Update | Delete deriving (Show, Eq)
@@ -53,6 +51,7 @@ data Trace = Wsgi (TraceInfo HTTPReq) [Trace]
            | NovaImage (TraceInfo PythonReq) [Trace]
            | NovaVirt (TraceInfo PythonReq) [Trace]
            | NeutronApi (TraceInfo PythonReq) [Trace]
+           deriving Show
 
 
 -- Utils
@@ -71,14 +70,7 @@ data Trace = Wsgi (TraceInfo HTTPReq) [Trace]
                             H.lookup k o'
 
 (.:*-?) :: (FromJSON a) => Object -> Text -> Parser (Maybe a)
-(.:*-?) o s = case lookupRE o s of
-                Just v -> do r <- parseJSON v
-                             pure (Just r)
-                Nothing -> pure Nothing
-  where
-    lookupRE :: Object -> Text -> Maybe Value
-    lookupRE o' suffix = do k <- find (isSuffixOf suffix) (H.keys o')
-                            H.lookup k o'
+(.:*-?) o s = (<=<) (pure . Just) (.:*- s) o <|> pure Nothing
 
 class (FromJSON a, Show a, Eq a) => ReqPath a where
   reqPath :: Value -> Parser a
@@ -96,10 +88,10 @@ instance ReqPath DBReq where
 
 instance ReqPath PythonReq where
   reqPath v =
-    let rpc        = v .:+ [ "meta.raw_payload.rpc-start", "info", "function" ]
+    let rpc        = v .:+ [ "meta.raw_payload.rpc-start",         "info", "function" ]
         computeApi = v .:+ [ "meta.raw_payload.compute_api-start", "info", "function" ]
-        novaImage  = v .:+ [ "meta.raw_payload.nova_image-start", "info", "function" ]
-        novaVirt   = v .:+ [ "meta.raw_payload.vif_driver-start", "info", "function" ]
+        novaImage  = v .:+ [ "meta.raw_payload.nova_image-start",  "info", "function" ]
+        novaVirt   = v .:+ [ "meta.raw_payload.vif_driver-start",  "info", "function" ]
         neutronApi = v .:+ [ "meta.raw_payload.neutron_api-start", "info", "function" ]
     in rpc <|> computeApi <|> novaImage <|> novaVirt <|> neutronApi
 
