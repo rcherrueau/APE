@@ -184,14 +184,20 @@ tinfodbreqparams = mkTinfodb dbreqparams
 testsTraceInfo :: Test
 testsTraceInfo = TestLabel "TraceInfo Parsing" $ TestList
   [ TestCase $ assertOSP tinfohttpreq
-                         (TraceInfo "keystone" "main" (HTTPReq "/v3" Get ""))
+                         (TraceInfo "keystone" "main"
+                           "2017-03-03T14:14:01.008331" (Just "2017-03-03T14:14:01.013634")
+                           (HTTPReq "/v3" Get ""))
   , TestCase $ assertOSP tinfohttpreqquery
                          (TraceInfo "keystone" "main"
+                           "2017-03-03T14:14:01.008331" (Just "2017-03-03T14:14:01.013634")
                           (HTTPReq "/v2/images" Post "limit=20"))
   , TestCase $ assertOSP tinfodbreq
-                         (TraceInfo "keystone" "main" (DBReq "SELECT 1" (Object H.empty)))
+                         (TraceInfo "keystone" "main"
+                          "2017-03-03T14:14:01.063490" (Just "2017-03-03T14:14:01.067126")
+                          (DBReq "SELECT 1" (Object H.empty)))
   , TestCase $ assertOSP tinfodbreqparams
                          (TraceInfo "keystone" "main"
+                           "2017-03-03T14:14:01.063490" (Just "2017-03-03T14:14:01.067126")
                            (DBReq "SELECT 1"
         (Object $ H.fromList [ (pack "project_id_1", mkStrValue "b59f058989c24cd28aad3fc1357df339")
                              , (pack "user_id_1", mkStrValue "b8c739fdb5d04d35ae9055393077553f")
@@ -201,8 +207,8 @@ testsTraceInfo = TestLabel "TraceInfo Parsing" $ TestList
 
 
 -- Trace Parsing Test
-testsTrace :: Test
-testsTrace = TestLabel "Trace Parsing" $ TestList $
+testsTraces :: Test
+testsTraces = TestLabel "Trace Parsing" $ TestList $
   map (TestCase . assertParsable)
   [ "test/rsc/flavor-list-fake.json"
   , "test/rsc/flavor-list-real.json"
@@ -218,7 +224,7 @@ testsTrace = TestLabel "Trace Parsing" $ TestList $
 -- Test Main
 testsAll :: Test
 testsAll = TestList [ testsHTTP, testsHTTPReq, testsDBReq,
-                      testsPythonReq, testsTraceInfo, testsTrace ]
+                      testsPythonReq, testsTraceInfo, testsTraces ]
 
 main :: IO ()
 main = do
