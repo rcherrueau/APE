@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Data.OSPDiff.Trace where
 
@@ -12,8 +13,10 @@ import Data.Aeson.Internal (JSONPath, iparse, formatError)
 import Data.Aeson.Types (Parser, parse)
 import Data.Aeson.Parser (decodeWith, eitherDecodeWith, json)
 import Data.Text (Text, isSuffixOf)
+import Data.Time (UTCTime)
 import qualified Data.HashMap.Lazy as H (lookup, keys)
 import qualified Data.ByteString.Lazy.Internal as BLI (ByteString)
+import qualified Data.ByteString.Lazy as BS (pack, readFile, writeFile)
 
 
 -- ADTs
@@ -39,7 +42,7 @@ data PythonReq = PythonReq
 data (Show a, Eq a) => TraceInfo a = TraceInfo
   { project  :: String
   , service  :: String
-  , start    :: String
+  , start    :: UTCTime
   , stop     :: Maybe String
   , req      :: a
   } deriving (Show, Eq)
@@ -129,11 +132,10 @@ instance (ReqPath a, FromJSON a) => FromJSON (TraceInfo a) where
   parseJSON v@(Object o) = TraceInfo <$>
         o .: "project"
     <*> o .: "service"
-    <*> (>=>) (.:*-  "-start") (.: "timestamp") o
-    <*> (>=>) (.:*-? "-stop")  (maybe (pure Nothing) (.: "timestamp")) o
+    <*> ((.: "timestamp") <=< (.:*-  "-start")) o
+    <*> (maybe (pure Nothing) (.: "timestamp") <=< (.:*-? "-stop"))  o
     <*> reqPath v
   parseJSON _            = empty
-
 
 instance FromJSON Trace where
   parseJSON (Object o)
@@ -156,6 +158,37 @@ instance FromJSON Trace where
   parseJSON _          = empty
 
 
+seqdiag :: Trace -> String
+seqdiag t = concat $ seqdiag' serviceName t (getChildren t)
+  where
+    seqdiag' :: (Trace -> String) -> Trace -> [Trace] -> [String]
+    seqdiag' f t = map (\t' -> f t ++ " => " ++ f t' ++
+                         if null (getChildren t') then ";\n"
+                         else " {\n " ++ seqdiag t' ++ " } ")
+
+    serviceName :: Trace -> String
+    serviceName (Wsgi       ti _) = project ti ++ ":WSGI"
+    serviceName (DB         ti _) = project ti ++ ":DB"
+    serviceName (RPC        ti _) = project ti ++ ":RPC"
+    serviceName (ComputeApi ti _) = project ti ++ ":ComputeApi"
+    serviceName (NovaImage  ti _) = project ti ++ ":NovaImage"
+    serviceName (NovaVirt   ti _) = project ti ++ ":NovaVirt"
+    serviceName (NeutronApi ti _) = project ti ++ ":NeutronApi"
+
+
+    getChildren :: Trace -> [Trace]
+    getChildren (Wsgi _ ts) = ts
+    getChildren (DB _ ts) = ts
+    getChildren (RPC _ ts) = ts
+    getChildren (ComputeApi _ ts) = ts
+    getChildren (NovaImage _ ts) = ts
+    getChildren (NovaVirt _ ts) = ts
+    getChildren (NeutronApi _ ts) = ts
+
+seqdiagTop :: [Trace] -> String
+seqdiagTop ts = "seqdiag {\n" ++ concat (map seqdiag ts) ++ "\n}"
+
+
 -- API
 decodeTrace :: BLI.ByteString -> Maybe [Trace]
 decodeTrace = decodeWith json (parse parserTopTrace)
@@ -165,3 +198,8 @@ eitherDecodeTrace = eitherFormatError . eitherDecodeWith json (iparse parserTopT
   where
     eitherFormatError :: Either (JSONPath, String) a -> Either String a
     eitherFormatError = either (Left . uncurry formatError) Right
+
+main :: IO ()
+main = do
+  json <- BS.readFile "test/rsc/server-create-real.json"
+  writeFile "/tmp/test" (maybe "nothing" seqdiagTop (decodeTrace json))

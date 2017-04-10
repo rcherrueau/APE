@@ -12,8 +12,9 @@ import Test.HUnit
 import System.Exit (exitSuccess, exitFailure)
 
 import Data.OSPDiff.Trace
-import Data.Aeson (decode, FromJSON, Value(..))
+import Data.Aeson (encode, decode, FromJSON, Value(..))
 import Data.Text (pack)
+import Data.Time (UTCTime(..), getCurrentTime, utctDay, utctDayTime, fromGregorian, toGregorian, picosecondsToDiffTime, diffTimeToPicoseconds)
 
 
 -- Utils
@@ -181,23 +182,32 @@ tinfodbreq = mkTinfodb dbreq
 tinfodbreqparams :: String
 tinfodbreqparams = mkTinfodb dbreqparams
 
+-- (2017,3,3), 51241008331000000
+-- 5124106349000000
+mkUTC :: Integer -> Int -> Int -> Integer -> UTCTime
+mkUTC y m d t = UTCTime (fromGregorian y m d) (picosecondsToDiffTime t)
+
 testsTraceInfo :: Test
 testsTraceInfo = TestLabel "TraceInfo Parsing" $ TestList
   [ TestCase $ assertOSP tinfohttpreq
                          (TraceInfo "keystone" "main"
-                           "2017-03-03T14:14:01.008331" (Just "2017-03-03T14:14:01.013634")
+                           "2017-03-03t14:14:01.008331" -- (mkUTC 2017 3 3 51241008331000000)
+                           (Just "2017-03-03T14:14:01.013634")
                            (HTTPReq "/v3" Get ""))
   , TestCase $ assertOSP tinfohttpreqquery
                          (TraceInfo "keystone" "main"
-                           "2017-03-03T14:14:01.008331" (Just "2017-03-03T14:14:01.013634")
-                          (HTTPReq "/v2/images" Post "limit=20"))
+                           "2017-03-03t14:14:01.008331" -- (mkUTC 2017 3 3 51241008331000000)
+                           (Just "2017-03-03T14:14:01.013634")
+                           (HTTPReq "/v2/images" Post "limit=20"))
   , TestCase $ assertOSP tinfodbreq
                          (TraceInfo "keystone" "main"
-                          "2017-03-03T14:14:01.063490" (Just "2017-03-03T14:14:01.067126")
-                          (DBReq "SELECT 1" (Object H.empty)))
+                           "2017-03-03T14:14:01.063490" -- (mkUTC 2017 3 3 5124106349000000)
+                           (Just "2017-03-03T14:14:01.067126")
+                           (DBReq "SELECT 1" (Object H.empty)))
   , TestCase $ assertOSP tinfodbreqparams
                          (TraceInfo "keystone" "main"
-                           "2017-03-03T14:14:01.063490" (Just "2017-03-03T14:14:01.067126")
+                           "2017-03-03T14:14:01.063490" -- (mkUTC 2017 3 3 5124106349000000)
+                           (Just "2017-03-03T14:14:01.067126")
                            (DBReq "SELECT 1"
         (Object $ H.fromList [ (pack "project_id_1", mkStrValue "b59f058989c24cd28aad3fc1357df339")
                              , (pack "user_id_1", mkStrValue "b8c739fdb5d04d35ae9055393077553f")
@@ -226,9 +236,22 @@ testsAll :: Test
 testsAll = TestList [ testsHTTP, testsHTTPReq, testsDBReq,
                       testsPythonReq, testsTraceInfo, testsTraces ]
 
+-- getUTCTime :: Maybe UTCTime
+-- getUTCTime = do
+--   l <- decode (encode [ "2017-03-03T14:14:01.063490Z" ]) :: Maybe [ UTCTime ]
+--   let r = head l
+--   pure r
+
+
+
 main :: IO ()
 main = do
   c <- runTestTT testsAll
   if errors c + failures c == 0
     then exitSuccess
     else exitFailure
+-- main = do
+--   utc <- maybe getCurrentTime pure getUTCTime
+--   putStrLn (show $ toGregorian (utctDay utc))
+--   putStrLn (show $ diffTimeToPicoseconds (utctDayTime utc))
+--   pure ()
