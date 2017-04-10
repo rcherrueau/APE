@@ -50,7 +50,7 @@ library
   default-language: Haskell2010
   exposed-modules:
     Data.OSPDiff.Trace
-  build-depends: HUnit, aeson, base, bytestring, extra, text, time >= 1.6.0.1, unordered-containers
+  build-depends: HUnit, aeson, base, bytestring, extra, text, unordered-containers
 
 
 -- executable osp-diff
@@ -76,5 +76,5 @@ test-suite tests
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Test.hs
-  build-depends: HUnit, aeson, base, bytestring, extra, osp-diff, text, time >= 1.6.0.1, unordered-containers
+  build-depends: HUnit, aeson, base, bytestring, extra, osp-diff, text, unordered-containers
   default-language: Haskell2010

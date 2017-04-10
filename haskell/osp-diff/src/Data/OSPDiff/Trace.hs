@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Data.OSPDiff.Trace where
 
@@ -13,7 +12,6 @@ import Data.Aeson.Internal (JSONPath, iparse, formatError)
 import Data.Aeson.Types (Parser, parse)
 import Data.Aeson.Parser (decodeWith, eitherDecodeWith, json)
 import Data.Text (Text, isSuffixOf)
-import Data.Time (UTCTime)
 import qualified Data.HashMap.Lazy as H (lookup, keys)
 import qualified Data.ByteString.Lazy.Internal as BLI (ByteString)
 import qualified Data.ByteString.Lazy as BS (pack, readFile, writeFile)
@@ -42,11 +40,12 @@ data PythonReq = PythonReq
 data (Show a, Eq a) => TraceInfo a = TraceInfo
   { project  :: String
   , service  :: String
-  , start    :: UTCTime
+  , start    :: String
   , stop     :: Maybe String
   , req      :: a
   } deriving (Show, Eq)
 
+-- | An OSProfiler Trace represented as a Haskell value.
 data Trace = Wsgi (TraceInfo HTTPReq) [Trace]
            | DB (TraceInfo DBReq) [Trace]
            | RPC (TraceInfo PythonReq) [Trace]
@@ -54,10 +53,15 @@ data Trace = Wsgi (TraceInfo HTTPReq) [Trace]
            | NovaImage (TraceInfo PythonReq) [Trace]
            | NovaVirt (TraceInfo PythonReq) [Trace]
            | NeutronApi (TraceInfo PythonReq) [Trace]
+           | Root [Trace]
            deriving Show
 
 
 -- Utils
+
+-- | Retrieve the value associated with the path of key of an 'Value'.
+-- The result is 'empty' if the path '[Text]' is not present or the
+-- value cannot be converted to the desired type.
 (.:+) :: (FromJSON a) => Value -> [Text] -> Parser a
 (.:+) v = parseJSON <=< foldM ((maybe empty pure .) . lookupE) v
   where
@@ -65,6 +69,9 @@ data Trace = Wsgi (TraceInfo HTTPReq) [Trace]
     lookupE (Object v') key = H.lookup key v'
     lookupE _           _   = Nothing
 
+-- | Retrieve the value associated with the ended key of an 'Object'.
+-- The result is 'empty' if there is no key ended by 'Text' or the
+-- value cannot be converted to the desired type.
 (.:*-) :: (FromJSON a) => Object -> Text -> Parser a
 (.:*-) o = parseJSON <=< ((maybe empty pure .) . lookupRE) o
   where
@@ -72,15 +79,19 @@ data Trace = Wsgi (TraceInfo HTTPReq) [Trace]
     lookupRE o' suffix = do k <- find (isSuffixOf suffix) (H.keys o')
                             H.lookup k o'
 
+-- | Retrieve the value associated with the ended key of an 'Object'.
+-- The result is 'Nothing' if there is no key ended by 'Text' or
+-- 'empty' if the value cannot be converted to the desired type.
 (.:*-?) :: (FromJSON a) => Object -> Text -> Parser (Maybe a)
 (.:*-?) o s = (<=<) (pure . Just) (.:*- s) o <|> pure Nothing
 
+-- | 'Parser' for the json top 'Trace'.
+parserTopTrace :: Value -> Parser Trace
+parserTopTrace (Object o) = Root <$> o .: "children"
+parserTopTrace _          = empty
+
 class (FromJSON a, Show a, Eq a) => ReqPath a where
   reqPath :: Value -> Parser a
-
-parserTopTrace :: Value -> Parser [Trace]
-parserTopTrace (Object o) = o .: "children"
-parserTopTrace _          = empty
 
 -- ReqPath instances
 instance ReqPath HTTPReq where
@@ -167,33 +178,34 @@ seqdiag t = concat $ seqdiag' serviceName t (getChildren t)
                          else " {\n " ++ seqdiag t' ++ " } ")
 
     serviceName :: Trace -> String
-    serviceName (Wsgi       ti _) = project ti ++ ":WSGI"
-    serviceName (DB         ti _) = project ti ++ ":DB"
-    serviceName (RPC        ti _) = project ti ++ ":RPC"
-    serviceName (ComputeApi ti _) = project ti ++ ":ComputeApi"
-    serviceName (NovaImage  ti _) = project ti ++ ":NovaImage"
-    serviceName (NovaVirt   ti _) = project ti ++ ":NovaVirt"
-    serviceName (NeutronApi ti _) = project ti ++ ":NeutronApi"
-
+    serviceName (Root          _) = "Client"
+    serviceName (Wsgi       ti _) = project ti ++ "-WSGI"
+    serviceName (DB         ti _) = project ti ++ "-DB"
+    serviceName (RPC        ti _) = project ti ++ "-RPC"
+    serviceName (ComputeApi ti _) = project ti ++ "-ComputeApi"
+    serviceName (NovaImage  ti _) = project ti ++ "-NovaImage"
+    serviceName (NovaVirt   ti _) = project ti ++ "-NovaVirt"
+    serviceName (NeutronApi ti _) = project ti ++ "-NeutronApi"
 
     getChildren :: Trace -> [Trace]
-    getChildren (Wsgi _ ts) = ts
-    getChildren (DB _ ts) = ts
-    getChildren (RPC _ ts) = ts
+    getChildren (Root         ts) = ts
+    getChildren (Wsgi       _ ts) = ts
+    getChildren (DB         _ ts) = ts
+    getChildren (RPC        _ ts) = ts
     getChildren (ComputeApi _ ts) = ts
-    getChildren (NovaImage _ ts) = ts
-    getChildren (NovaVirt _ ts) = ts
+    getChildren (NovaImage  _ ts) = ts
+    getChildren (NovaVirt   _ ts) = ts
     getChildren (NeutronApi _ ts) = ts
 
-seqdiagTop :: [Trace] -> String
-seqdiagTop ts = "seqdiag {\n" ++ concat (map seqdiag ts) ++ "\n}"
+seqdiagTop :: Trace -> String
+seqdiagTop t = "seqdiag {\n" ++ seqdiag t ++ "\n}"
 
 
 -- API
-decodeTrace :: BLI.ByteString -> Maybe [Trace]
+decodeTrace :: BLI.ByteString -> Maybe Trace
 decodeTrace = decodeWith json (parse parserTopTrace)
 
-eitherDecodeTrace :: BLI.ByteString -> Either String [Trace]
+eitherDecodeTrace :: BLI.ByteString -> Either String Trace
 eitherDecodeTrace = eitherFormatError . eitherDecodeWith json (iparse parserTopTrace)
   where
     eitherFormatError :: Either (JSONPath, String) a -> Either String a
