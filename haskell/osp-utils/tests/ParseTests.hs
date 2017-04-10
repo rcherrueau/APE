@@ -1,4 +1,4 @@
-module Main (main) where
+module ParseTests (testsAll) where
 
 import Prelude
 
@@ -9,10 +9,9 @@ import qualified Data.ByteString.Lazy.Internal as BLI (ByteString)
 import qualified Data.HashMap.Lazy as H (empty, fromList)
 
 import Test.HUnit
-import System.Exit (exitSuccess, exitFailure)
 
 import Data.OSPUtils.Trace
-import Data.Aeson (encode, decode, FromJSON, Value(..))
+import Data.Aeson (decode, FromJSON, Value(..))
 import Data.Text (pack)
 
 
@@ -210,14 +209,14 @@ testsTraceInfo = TestLabel "TraceInfo Parsing" $ TestList
 testsTraces :: Test
 testsTraces = TestLabel "Trace Parsing" $ TestList $
   map (TestCase . assertParsable)
-  [ "test/rsc/flavor-list-fake.json"
-  , "test/rsc/flavor-list-real.json"
-  , "test/rsc/hypervisor-list-fake.json"
-  , "test/rsc/hypervisor-list-real.json"
-  , "test/rsc/image-list-fake.json"
-  , "test/rsc/image-list-real.json"
-  , "test/rsc/server-create-fake.json"
-  , "test/rsc/server-create-real.json"
+  [ "tests/rsc/flavor-list-fake.json"
+  , "tests/rsc/flavor-list-real.json"
+  , "tests/rsc/hypervisor-list-fake.json"
+  , "tests/rsc/hypervisor-list-real.json"
+  , "tests/rsc/image-list-fake.json"
+  , "tests/rsc/image-list-real.json"
+  , "tests/rsc/server-create-fake.json"
+  , "tests/rsc/server-create-real.json"
   ]
 
 
@@ -225,10 +224,3 @@ testsTraces = TestLabel "Trace Parsing" $ TestList $
 testsAll :: Test
 testsAll = TestList [ testsHTTP, testsHTTPReq, testsDBReq,
                       testsPythonReq, testsTraceInfo, testsTraces ]
-
-main :: IO ()
-main = do
-  c <- runTestTT testsAll
-  if errors c + failures c == 0
-    then exitSuccess
-    else exitFailure
