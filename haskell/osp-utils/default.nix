@@ -9,7 +9,7 @@ _ = let ghc = haskellPackages.ghcWithHoogle (pkgs: with pkgs; [
   cabal-install aeson extra HUnit
 ]);
 in stdenv.mkDerivation {
-  name = "osprofiler-diff";
+  name = "osp-utils";
   buildInputs = [ ghc python27Full python27Packages.seqdiag ];
   shellHook = ''
     eval $(egrep ^export ${ghc}/bin/ghc)

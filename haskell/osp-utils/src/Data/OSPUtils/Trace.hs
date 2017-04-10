@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Data.OSPDiff.Trace where
+module Data.OSPUtils.Trace where
 
 import Prelude
 
@@ -211,7 +211,7 @@ eitherDecodeTrace = eitherFormatError . eitherDecodeWith json (iparse parserTopT
     eitherFormatError :: Either (JSONPath, String) a -> Either String a
     eitherFormatError = either (Left . uncurry formatError) Right
 
-main :: IO ()
-main = do
-  json <- BS.readFile "test/rsc/server-create-real.json"
-  writeFile "/tmp/test" (maybe "nothing" seqdiagTop (decodeTrace json))
+-- main :: IO ()
+-- main = do
+--   json <- BS.readFile "test/rsc/server-create-real.json"
+--   writeFile "/tmp/test" (maybe "nothing" seqdiagTop (decodeTrace json))

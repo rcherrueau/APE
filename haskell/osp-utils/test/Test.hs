@@ -11,7 +11,7 @@ import qualified Data.HashMap.Lazy as H (empty, fromList)
 import Test.HUnit
 import System.Exit (exitSuccess, exitFailure)
 
-import Data.OSPDiff.Trace
+import Data.OSPUtils.Trace
 import Data.Aeson (encode, decode, FromJSON, Value(..))
 import Data.Text (pack)
 
@@ -29,7 +29,7 @@ assertOSP json res = assertEqual json (Just res) (decode (packJSON json))
 assertParsable :: String -> Assertion
 assertParsable file = do
   json <- BS.readFile file
-  let res  = eitherDecodeTrace json :: Either String [Trace]
+  let res  = eitherDecodeTrace json :: Either String Trace
   let msg  = "For " ++ file ++ either (" -- " ++)
                                       (const " -- OK") res
   let theTest = either (const False) (const True) res
@@ -185,11 +185,11 @@ testsTraceInfo :: Test
 testsTraceInfo = TestLabel "TraceInfo Parsing" $ TestList
   [ TestCase $ assertOSP tinfohttpreq
                          (TraceInfo "keystone" "main"
-                           "2017-03-03t14:14:01.008331" (Just "2017-03-03T14:14:01.013634")
+                           "2017-03-03T14:14:01.008331" (Just "2017-03-03T14:14:01.013634")
                            (HTTPReq "/v3" Get ""))
   , TestCase $ assertOSP tinfohttpreqquery
                          (TraceInfo "keystone" "main"
-                           "2017-03-03t14:14:01.008331" (Just "2017-03-03T14:14:01.013634")
+                           "2017-03-03T14:14:01.008331" (Just "2017-03-03T14:14:01.013634")
                            (HTTPReq "/v2/images" Post "limit=20"))
   , TestCase $ assertOSP tinfodbreq
                          (TraceInfo "keystone" "main"
