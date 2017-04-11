@@ -1,10 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Data.OSPUtils.Trace where
 
 import Prelude
 
 import Data.List (find)
+import Data.Typeable (Typeable)
+import Data.Data (Data)
 import Control.Applicative (empty, (<|>))
 import Control.Monad
 import Data.Aeson
@@ -14,28 +17,27 @@ import Data.Aeson.Parser (decodeWith, eitherDecodeWith, json)
 import Data.Text (Text, isSuffixOf)
 import qualified Data.HashMap.Lazy as H (lookup, keys)
 import qualified Data.ByteString.Lazy.Internal as BLI (ByteString)
-import qualified Data.ByteString.Lazy as BS (pack, readFile, writeFile)
 
 
 -- ADTs
-data HTTP = Post | Get | Update | Delete deriving (Show, Eq)
+data HTTP = Post | Get | Update | Delete deriving (Show, Eq, Typeable, Data)
 
 data HTTPReq = HTTPReq
   { path   :: String
   , method :: HTTP
   , query  :: String
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Typeable, Data)
 
 data DBReq = DBReq
   { stmt   :: String
   , params :: Value
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Typeable, Data)
 
 data PythonReq = PythonReq
   { function :: String
   , args     :: String
   , kwargs   :: String
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Typeable, Data)
 
 data (Show a, Eq a) => TraceInfo a = TraceInfo
   { project  :: String
@@ -43,7 +45,7 @@ data (Show a, Eq a) => TraceInfo a = TraceInfo
   , start    :: String
   , stop     :: Maybe String
   , req      :: a
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Typeable, Data)
 
 -- | An OSProfiler Trace represented as a Haskell value.
 data Trace = Wsgi (TraceInfo HTTPReq) [Trace]
@@ -54,7 +56,7 @@ data Trace = Wsgi (TraceInfo HTTPReq) [Trace]
            | NovaVirt (TraceInfo PythonReq) [Trace]
            | NeutronApi (TraceInfo PythonReq) [Trace]
            | Root [Trace]
-           deriving Show
+           deriving (Show, Eq, Typeable, Data)
 
 
 -- Utils
@@ -169,38 +171,6 @@ instance FromJSON Trace where
   parseJSON _          = empty
 
 
-seqdiag :: Trace -> String
-seqdiag t = concat $ seqdiag' serviceName t (getChildren t)
-  where
-    seqdiag' :: (Trace -> String) -> Trace -> [Trace] -> [String]
-    seqdiag' f t = map (\t' -> f t ++ " => " ++ f t' ++
-                         if null (getChildren t') then ";\n"
-                         else " {\n " ++ seqdiag t' ++ " } ")
-
-    serviceName :: Trace -> String
-    serviceName (Root          _) = "Client"
-    serviceName (Wsgi       ti _) = project ti ++ "-WSGI"
-    serviceName (DB         ti _) = project ti ++ "-DB"
-    serviceName (RPC        ti _) = project ti ++ "-RPC"
-    serviceName (ComputeApi ti _) = project ti ++ "-ComputeApi"
-    serviceName (NovaImage  ti _) = project ti ++ "-NovaImage"
-    serviceName (NovaVirt   ti _) = project ti ++ "-NovaVirt"
-    serviceName (NeutronApi ti _) = project ti ++ "-NeutronApi"
-
-    getChildren :: Trace -> [Trace]
-    getChildren (Root         ts) = ts
-    getChildren (Wsgi       _ ts) = ts
-    getChildren (DB         _ ts) = ts
-    getChildren (RPC        _ ts) = ts
-    getChildren (ComputeApi _ ts) = ts
-    getChildren (NovaImage  _ ts) = ts
-    getChildren (NovaVirt   _ ts) = ts
-    getChildren (NeutronApi _ ts) = ts
-
-seqdiagTop :: Trace -> String
-seqdiagTop t = "seqdiag {\n" ++ seqdiag t ++ "\n}"
-
-
 -- API
 decodeTrace :: BLI.ByteString -> Maybe Trace
 decodeTrace = decodeWith json (parse parserTopTrace)
@@ -210,8 +180,3 @@ eitherDecodeTrace = eitherFormatError . eitherDecodeWith json (iparse parserTopT
   where
     eitherFormatError :: Either (JSONPath, String) a -> Either String a
     eitherFormatError = either (Left . uncurry formatError) Right
-
--- main :: IO ()
--- main = do
---   json <- BS.readFile "test/rsc/server-create-real.json"
---   writeFile "/tmp/test" (maybe "nothing" seqdiagTop (decodeTrace json))
