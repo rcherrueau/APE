@@ -45,9 +45,9 @@
 ;; Concretely, an expander for a specific language is provided by
 ;; implementing a function `#%module-begin' that returns a `syntax'
 ;; object. This syntax object can be transformed thanks to macro and
-;; should then call `#%module-begin' of an underlining language (e.g.,
-;; Racket, note that all `#%module-begin' macro have the same name.
-;; Some care is needed to keep them straight).
+;; are expanded until the most basic forms (fix point) that should
+;; call `#%module-begin' of an underlining language (e.g., Racket).
+;; The underlining language handles the final evaluation.
 ;;
 ;; - A name used in the code is called an /identifier/.
 ;; - A connection to an actual value or function is called a /binding/.
@@ -60,6 +60,13 @@
 ;; to the new syntax object. Lexical context is the list of available
 ;; variables which means that the syntax object made with `#'' will be
 ;; able to access all the variables defined at that point of the code.
+;;
+;; As a general methodology:
+;; 1. Handle any language-specific processing of the code in the
+;;    `#%module-begin' macro.
+;; 2. Pass the result to an existing `#%module-begin' for the rest of
+;;    the heavy lifting (note that all `#%module-begin' macro have the
+;;    same name. Some care is needed to keep them straight).
 ;;
 ;; The expander of the `stacker' language calls the `#%module-begin'
 ;; of Racket/base (cf. `#lang racket/base'). Then evaluates `handle'
@@ -74,9 +81,11 @@
   (syntax-case stx ()
       [(_ HANDLE-EXP ...)
        #'(#%module-begin
+          ;; To debug, make it a symbol 'HANDLE-EXP ...
           HANDLE-EXP ...
           (displayln (car stack)))]))
 
+;; The heavy lifting: Racket code that implements the semantics
 (define stack '())
 
 (define (pop-stack!)
