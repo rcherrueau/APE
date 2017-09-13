@@ -8,6 +8,7 @@ in stdenv.mkDerivation {
   ];
   shellHook = ''
     ${racket-with-doc}/bin/raco pkg install beautiful-racket
+    ${racket-with-doc}/bin/raco pkg install megaparsack
     emacs &
   '';
 
