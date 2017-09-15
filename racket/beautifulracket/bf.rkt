@@ -2,44 +2,60 @@
 
 ;; From http://beautifulracket.com
 
-
-;; Parser
+;; BrainFuck lang Grammar
 ;;
 ;; bf-prog ::= (bf-op | bf-loop)*
 ;; bf-op   ::= '>' | '<' | '+' | '-' | '.' | ','
 ;; bf-loop ::= '[' bf-prog ']'
 
+
+;; Parser
+;;
 (require megaparsack megaparsack/text
          data/applicative data/monad)
 
-;; Util parser combinator that consumes chars that are not a tokens.
-;; bf-read/p: parser → parser
+;; Returns #t if `c' is one of ><+-.,[]
+;; :: char → bool
+(define (bf-token? c)
+  (or (char=? #\> c)
+      (char=? #\< c)
+      (char=? #\+ c)
+      (char=? #\- c)
+      (char=? #\. c)
+      (char=? #\, c)
+      (char=? #\[ c)
+      (char=? #\] c)))
+
+;; Util parser combinator that consumes chars that are not tokens.
+;; :: parser → parser
 (define (bf-read/p p)
   (define goto-next-token/p
-    (many/p (or/p letter/p digit/p space/p)))
+    (many/p (satisfy/p (compose not bf-token?))))
 
   (do goto-next-token/p
       [r <- p]
       goto-next-token/p
       (pure r)))
 
+;; Parser that reads bf-op
 (define bf-op/p
   (bf-read/p (do
        [x <- (char-in/p "><+-.,")]
        (pure `(bf-op ,x)))))
 
+;; Parser that reads bf-loop
 (define bf-loop/p
   (bf-read/p (do
       (char/p #\[)
-      [x <- (or/p (try/p bf-prog/p) (pure #f))]
+      [x <- bf-prog/p]
       (char/p #\])
       (pure `(bf-loop ,x)))))
 
+;; Parser that reads bf-prog
 (define bf-prog/p
   (bf-read/p (do
       [x <- (many/p (or/p bf-op/p bf-loop/p))]
       (pure `(bf-prog ,x)))))
-
 
 (module+ test
   (require rackunit
@@ -49,7 +65,7 @@
   (define (check-bf-parsed? title prog)
     (check-pred success? (parse-string bf-prog/p prog) title))
 
-  (check-bf-parsed? "Beautifullracket"
+  (check-bf-parsed? "Beautifulracket"
     "++++-+++-++-++[>++++-+++-++-++<-]>.")
 
   (check-bf-parsed? "Busy Beaver"
@@ -76,5 +92,87 @@
 (define (read-syntax src-path in)
   (define src-string (port->string in))
   (define ast (parse-result! (parse-string (syntax/p bf-prog/p) src-string)))
-  `(module bf-module racket
-     ',ast))
+  `(module bf-module "bf.rkt"
+     ,ast))
+
+
+;; Expander
+;;
+;; When a BrainFuck (bf) program starts, it creates an array of 30,000
+;; cells in memory (with either 8/16/32 Bit cells) initialized to 0
+;; and a pointer into that array (initialized to the 0 position). The
+;; current byte is the byte in the array at the location indicated by
+;; the pointer.
+;;
+;; Then it runs the code of the bf program, which consists of six
+;; operations:
+;;
+;; >  Increase the pointer position by one
+;;
+;; <  Decrease the pointer position by one
+;;
+;; +  Increase the value of the current byte by one
+;;
+;; -  Decrease the value of the current byte by one
+;;
+;; .  Write the current byte to stdout
+;;
+;; , Read a byte from stdin and store it in the current byte
+;;   (overwriting the existing value)
+;;
+;; bf also has a looping construct [...] that will repeat the code
+;; within the brackets until the current byte is zero. If the current
+;; byte is already zero, the loop will not run.
+(require (for-syntax racket/base))
+
+(provide (rename-out [bf-module-begin #%module-begin])
+         #%top #%app #%datum #%top-interaction)
+
+(define-syntax (bf-module-begin stx)
+  (syntax-case stx ()
+    [(_ BF-PROG)
+     #'(#%module-begin
+        ;; To debug, make it a symbol 'BF-PROG
+        BF-PROG)]))
+
+(define-syntax (bf-prog stx)
+  (syntax-case stx ()
+    [(_ ()) #'#f]          ;; Empty program produces #f
+    [(_ (OP-OR-LOOP ...))  ;; Executes instructions in sequence
+     #'(begin OP-OR-LOOP ...)]))
+
+(define-syntax (bf-loop stx)
+  (syntax-case stx ()
+    [(_ #f) #'(void)]      ;; Empty loop produces void
+    [(_ BF-PROG) #'(loop (λ () BF-PROG))]))
+
+(define-syntax (bf-op stx)
+  (syntax-case stx ()
+    [(_ #\>) #'(gt)]
+    [(_ #\<) #'(lt)]
+    [(_ #\+) #'(plus)]
+    [(_ #\-) #'(minus)]
+    [(_ #\.) #'(dot)]
+    [(_ #\,) #'(comma)]
+    [(_ op)  #'(error 'bf-op "failed due to unrecognized op ~a" op)]))
+
+(provide bf-prog bf-op bf-loop loop tape ptr set!)
+
+(define tape (make-bytes 300000 0))
+(define ptr 0)
+(define (current-byte) (bytes-ref tape ptr))
+
+(define (loop p)
+  (unless (zero? (current-byte))
+    (p)
+    (loop p)))
+
+;; Note: I have to provide a mutator function (rather than putting the
+;; `set!' expression directly) due to racket prohibition, see
+;; http://docs.racket-lang.org/guide/module-set.html
+(define (gt) (set! ptr (add1 ptr)))
+(define (lt) (set! ptr (sub1 ptr)))
+(define (plus) (bytes-set! tape ptr (add1 (current-byte))))
+(define (minus) (bytes-set! tape ptr (sub1 (current-byte))))
+(define (dot) (write-byte (current-byte)))
+(define (comma) (error "`,' not implemented yet"))
