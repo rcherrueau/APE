@@ -6,7 +6,7 @@
 ;;
 ;; bf-prog ::= (bf-op | bf-loop)*
 ;; bf-op   ::= '>' | '<' | '+' | '-' | '.' | ','
-;; bf-loop ::= '[' bf-prog ']'
+;; bf-loop ::= '[' (bf-op | bl-loop)* ']'
 
 
 ;; Parser
@@ -30,7 +30,7 @@
 ;; :: parser → parser
 (define (bf-read/p p)
   (define goto-next-token/p
-    (many/p (satisfy/p (compose not bf-token?))))
+    (many/p (satisfy/p (compose1 not bf-token?))))
 
   (do goto-next-token/p
       [r <- p]
@@ -38,20 +38,23 @@
       (pure r)))
 
 ;; Parser that reads bf-op
+;; bf-op ::= '>' | '<' | '+' | '-' | '.' | ','
 (define bf-op/p
   (bf-read/p (do
        [x <- (char-in/p "><+-.,")]
        (pure `(bf-op ,x)))))
 
 ;; Parser that reads bf-loop
+;; bf-loop ::= '[' (bf-op | bl-loop)* ']'
 (define bf-loop/p
   (bf-read/p (do
       (char/p #\[)
-      [x <- bf-prog/p]
+      [x <- (many/p (or/p bf-op/p bf-loop/p))]
       (char/p #\])
       (pure `(bf-loop ,x)))))
 
 ;; Parser that reads bf-prog
+;; bf-prog ::= (bf-op | bf-loop)*
 (define bf-prog/p
   (bf-read/p (do
       [x <- (many/p (or/p bf-op/p bf-loop/p))]
@@ -106,17 +109,11 @@
 ;;
 ;; Then it runs the code of the bf program, which consists of six
 ;; operations:
-;;
 ;; >  Increase the pointer position by one
-;;
 ;; <  Decrease the pointer position by one
-;;
 ;; +  Increase the value of the current byte by one
-;;
 ;; -  Decrease the value of the current byte by one
-;;
 ;; .  Write the current byte to stdout
-;;
 ;; , Read a byte from stdin and store it in the current byte
 ;;   (overwriting the existing value)
 ;;
@@ -137,42 +134,38 @@
 
 (define-syntax (bf-prog stx)
   (syntax-case stx ()
-    [(_ ()) #'#f]          ;; Empty program produces #f
-    [(_ (OP-OR-LOOP ...))  ;; Executes instructions in sequence
+    [(_ (OP-OR-LOOP ...))
+     ;; Executes instructions in sequence
      #'(begin OP-OR-LOOP ...)]))
 
 (define-syntax (bf-loop stx)
   (syntax-case stx ()
-    [(_ #f) #'(void)]      ;; Empty loop produces void
-    [(_ BF-PROG) #'(loop (λ () BF-PROG))]))
+    [(_ (OP-OR-LOOP ...))
+     ;; Loop until current byte is zero
+     #'(until (zero? (current-byte))
+              OP-OR-LOOP ...)]))
 
-(define-syntax (bf-op stx)
+(define-syntax (until stx)
   (syntax-case stx ()
-    [(_ #\>) #'(gt)]
-    [(_ #\<) #'(lt)]
-    [(_ #\+) #'(plus)]
-    [(_ #\-) #'(minus)]
-    [(_ #\.) #'(dot)]
-    [(_ #\,) #'(comma)]
-    [(_ op)  #'(error 'bf-op "failed due to unrecognized op ~a" op)]))
+    [(_ COND EXPR ...)
+     #'(let loop ()
+         (unless COND
+           EXPR ...
+           (loop)))]))
 
-(provide bf-prog bf-op bf-loop loop tape ptr set!)
+(define (bf-op op)
+  (cond
+    [(char=? op #\>) (set! ptr (add1 ptr))]
+    [(char=? op #\<) (set! ptr (sub1 ptr))]
+    [(char=? op #\+) (set-current-byte! (add1 (current-byte)))]
+    [(char=? op #\-) (set-current-byte! (sub1 (current-byte)))]
+    [(char=? op #\.) (write-byte (current-byte))]
+    [(char=? op #\,) (set-current-byte! (read-byte))]
+    [else (error 'bf-op "failed due to unrecognized op ~a" op)]))
 
-(define tape (make-bytes 300000 0))
+(provide bf-prog bf-op bf-loop)
+
+(define tape (make-vector 300000 0))
 (define ptr 0)
-(define (current-byte) (bytes-ref tape ptr))
-
-(define (loop p)
-  (unless (zero? (current-byte))
-    (p)
-    (loop p)))
-
-;; Note: I have to provide a mutator function (rather than putting the
-;; `set!' expression directly) due to racket prohibition, see
-;; http://docs.racket-lang.org/guide/module-set.html
-(define (gt) (set! ptr (add1 ptr)))
-(define (lt) (set! ptr (sub1 ptr)))
-(define (plus) (bytes-set! tape ptr (add1 (current-byte))))
-(define (minus) (bytes-set! tape ptr (sub1 (current-byte))))
-(define (dot) (write-byte (current-byte)))
-(define (comma) (error "`,' not implemented yet"))
+(define (current-byte) (vector-ref tape ptr))
+(define (set-current-byte! val) (vector-set! tape ptr val))
