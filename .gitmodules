@@ -8,3 +8,7 @@
 [submodule "idris/idris-free"]
 	path = idris/idris-free
 	url = git@github.com:idris-hackers/idris-free.git
+[submodule "tla+/nixpkgs"]
+	path = tla+/nixpkgs
+	url = git@github.com:rcherrueau/nixpkgs.git
+	branch = tla+-tools
