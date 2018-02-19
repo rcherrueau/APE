@@ -12,3 +12,7 @@
 	path = tla+/nixpkgs
 	url = git@github.com:rcherrueau/nixpkgs.git
 	branch = tla+-tools
+[submodule "haskell/os-konan/simple-sql-parser"]
+	path = haskell/os-konan/simple-sql-parser
+	url = git@github.com:rcherrueau/simple-sql-parser.git
+	branch = 0.4.3
