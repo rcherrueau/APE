@@ -1,10 +1,20 @@
-module Sql where
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveGeneric #-}
+
+module Data.OpenStack.Sql where
 
 import Language.SQL.SimpleSQL.Parser
 import Language.SQL.SimpleSQL.Syntax
+import Language.SQL.SimpleSQL.Pretty (prettyQueryExpr)
 
 import Data.Either (isRight)
 import Data.Maybe (fromMaybe)
+import qualified Data.Text as Text (pack)
+
+import GHC.Generics (Generic)
+import Data.Store (Store)
+
+import qualified Data.Aeson as JSON (ToJSON(..), Value(..))
 
 -- | Utils functions for SQL query.
 class UtilsQuery q where
@@ -257,3 +267,74 @@ tableNames (TRAlias _ (Alias alias mayAliases)) = alias : fromMaybe [] mayAliase
 tableNames (TRQueryExpr qExpr) = concatMap tableNames (tableRefs qExpr)
 tableNames (TRFunction names _) = [ head names ]
 tableNames (TRLateral tref) = tableNames tref
+
+
+deriving instance Generic SetQuantifier
+deriving instance Generic IntervalTypeField
+deriving instance Generic Name
+deriving instance Generic SortSpec
+deriving instance Generic Frame
+deriving instance Generic NullsOrder
+deriving instance Generic Direction
+deriving instance Generic FrameRows
+deriving instance Generic FramePos
+deriving instance Generic PrecMultiplier
+deriving instance Generic PrecUnits
+deriving instance Generic JoinType
+deriving instance Generic JoinCondition
+deriving instance Generic TypeName
+deriving instance Generic SubQueryExprType
+deriving instance Generic InPredValue
+deriving instance Generic CompPredQuantifier
+deriving instance Generic CombineOp
+deriving instance Generic Comment
+deriving instance Generic TableRef
+deriving instance Generic GroupingExpr
+deriving instance Generic Corresponding
+deriving instance Generic Alias
+deriving instance Generic ValueExpr
+deriving instance Generic QueryExpr
+
+instance Store SetQuantifier
+instance Store IntervalTypeField
+instance Store Name
+instance Store SortSpec
+instance Store Frame
+instance Store NullsOrder
+instance Store Direction
+instance Store FrameRows
+instance Store FramePos
+instance Store PrecMultiplier
+instance Store PrecUnits
+instance Store JoinType
+instance Store JoinCondition
+instance Store TypeName
+instance Store SubQueryExprType
+instance Store InPredValue
+instance Store CompPredQuantifier
+instance Store CombineOp
+instance Store Comment
+instance Store TableRef
+instance Store GroupingExpr
+instance Store Corresponding
+instance Store Alias
+instance Store ValueExpr
+instance Store QueryExpr
+
+-- | Encodes `QueryExpr` into a JSON object.
+instance JSON.ToJSON QueryExpr where
+  toJSON = JSON.String . Text.pack . prettyQueryExpr MySQL
+
+-- instance Store QueryExpr
+-- makeStore ''ValueExpr
+-- makeStore ''QueryExpr
+-- -- | Binary Serializes `QueryExpr`
+-- instance Binary QueryExpr where
+--   put (Select { qeSetQuantifier = t_qeSetQuantifier, qeSelectList = t_qeSelectList, qeFrom = t_qeFrom, qeWhere = t_qeWhere, qeGroupBy = t_qeGroupBy, qeHaving = t_qeHaving, qeOrderBy = t_qeOrderBy, qeOffset = t_qeOffset, qeFetchFirst = t_qeFetchFirst }) = undefined
+--   put (CombineQueryExpr { qe0 = t_qe0, qeCombOp = t_qeCombOp, qeSetQuantifier = t_qeSetQuantifier, qeCorresponding = t_qeCorresponding, qe1 = t_qe1 }) = undefined
+--   put (With { qeWithRecursive = t_qeWithRecursive, qeViews = t_qeViews, qeQueryExpression = t_qeQueryExpression }) = undefined
+--   put (Values t) = undefined
+--   put (Table t) = undefined
+--   put (QEComment t1 t2) = undefined
+
+--   get = undefined

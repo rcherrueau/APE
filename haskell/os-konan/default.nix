@@ -1,22 +1,13 @@
-with import <nixpkgs> {};
+{ pkgs ? (import <nixpkgs> {})
+, compiler ? pkgs.haskell.packages.ghc822
+}:
 
-let ghc = haskellPackages.ghcWithHoogle (pkgs: with pkgs; [
-  # These are for spacemacs haskell layer. To get spacemacs with the
-  # correct PATH. run nix-shell, then launch Emacs inside this
-  # nix-shell.
-  apply-refact hlint stylish-haskell hasktags ghc-mod
-  # apply-refact hlint stylish-haskell hasktags
+# with (import <nixpkgs/pkgs/development/haskell-modules/lib.nix> { inherit pkgs; });
 
-  #nix-env -qaP -A nixos.haskellPackages|fgrep aeson
-  cabal-install 
-  aeson aeson-pretty simple-sql-parser
-  # pretty-show
-  # aeson extra HUnit
-]);
-in stdenv.mkDerivation {
-  name = "os-konan";
-  buildInputs = [ ghc jq ];
+pkgs.mkShell {
+  buildInpupt = [ compiler.stack pkgs.zlib ];
   shellHook = ''
-    eval $(egrep ^export ${ghc}/bin/ghc)
+    stack --nix build --copy-compiler-tool ghc-mod
+    PATH=$PATH:$(stack --nix path --compiler-tools-bin) 
   '';
 }

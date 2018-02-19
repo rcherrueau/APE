@@ -1,0 +1,58 @@
+name:                os-konan
+version:             0.1.0.0
+github:              "rcherrueau/os-konan"
+license:             GPL-3
+author:              "Ronan-A. Cherrueau"
+maintainer:          "example@example.com"
+copyright:           "2018 Ronan-A. Cherrueau"
+
+extra-source-files:
+- README.org
+- ChangeLog.org
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on Github at <https://github.com/rcherrueau/os-konan#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- containers
+- unordered-containers
+- bytestring
+- directory
+- text
+- vector
+- aeson >= 1.2 && < 2
+- aeson-pretty >= 0.8 && < 1
+- store >= 0.4 && < 1
+- simple-sql-parser
+
+library:
+  source-dirs: src
+
+executables:
+  os-konan-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - os-konan
+
+tests:
+  os-konan-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - os-konan
