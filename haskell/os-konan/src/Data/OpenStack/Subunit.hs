@@ -59,8 +59,8 @@ type OSTests = [OSTest]
 --
 -- > {-# LANGUAGE OverloadedStrings #-}
 -- >
--- > >>> decode "{\"name\":\"nova.tests.foo\",\"duration\":1.0e-3,\"sql\":[],\"correlated\":[]}" :: Maybe OSTest
--- > Just (OSTest {name = "nova.tests.foo", duration = Just 1.0e-3, sql = [], correlated = []})
+-- > >>> decode "{ \"name\":\"nova.tests.foo\",\"duration\":1.0e-3,\"sql\":[] }" :: Maybe OSTest
+-- > Just (OSTest {name = "nova.tests.foo", duration = Just 1.0e-3, sql = []})
 instance JSON.FromJSON OSTest where
   parseJSON (JSON.Object o) = do
     n  <- o .:  "name"
@@ -81,7 +81,7 @@ instance JSON.FromJSON OSTest where
 
 -- | Encodes a `OSTest` into a JSON object.
 --
--- > >>> encode (OSTest {name = "nova.tests.foo", duration = Just 0.001, sql = [], correlated = []})
+-- > >>> encode (OSTest {name = "nova.tests.foo", duration = Just 0.001, sql = []})
 -- > "{\"name\": \"nova.tests.foo\", \"sql\": []}"
 instance JSON.ToJSON OSTest where
   toEncoding = JSON.genericToEncoding JSON.defaultOptions

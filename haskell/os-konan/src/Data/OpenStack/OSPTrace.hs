@@ -1,7 +1,22 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Data.OpenStack.OSPTrace where
+module Data.OpenStack.OSPTrace (
+  -- Parses an OpenStack OSProfiler JSON trace. See,
+  -- https://docs.openstack.org/osprofiler/latest/
+  HTTP(..)
+, HTTPReq(..)
+, DBReq(..)
+, PythonReq(..)
+, TraceInfo(..)
+, TraceType(..)
+, OSPTrace
+, decodeTrace
+, eitherDecodeTrace
+, Data.OpenStack.OSPTrace.parse
+, save
+, load
+  ) where
 
 import GHC.Generics (Generic)
 import Control.Applicative ((<|>))
@@ -130,7 +145,7 @@ instance FromJSON HTTPReq where
 instance FromJSON DBReq where
   parseJSON (Object o) = do
     sql    <- (parseSQL <=< (.: "statement")) o
-    -- params <- o .: "params"
+    -- params <- o .: "params"  -- TODO: Store JSON.Value then uncomment
     -- pure (DBReq sql params)
     pure (DBReq sql)
     where
@@ -174,6 +189,13 @@ instance FromJSON TraceType where
           else fail $ show n' ++ " is not a valid TraceType"
   parseJSON v          = typeMismatch "TraceType" v
 
+instance JSON.ToJSON HTTP
+instance JSON.ToJSON HTTPReq
+instance JSON.ToJSON DBReq
+instance JSON.ToJSON PythonReq
+instance (JSON.ToJSON a) => JSON.ToJSON (TraceInfo a)
+instance JSON.ToJSON TraceType
+
 instance Store HTTP
 instance Store HTTPReq
 instance Store DBReq
@@ -184,41 +206,30 @@ instance (Store a) => Store (T.Tree a)
 
 
 -- API
-decodeTrace :: BSL.ByteString -> Maybe OSPTrace
-decodeTrace = decodeWith json (parse parserTopTrace)
 
+-- | Decodes data into an `OSPTrace`.
+decodeTrace :: BSL.ByteString -> Maybe OSPTrace
+decodeTrace = decodeWith json (JSON.parse parserTopTrace)
+
+-- | Either decodes data into an `OSPTrace` or returns an error if
+-- something gets wrong.
 eitherDecodeTrace :: BSL.ByteString -> Either String OSPTrace
 eitherDecodeTrace = eitherFormatError . eitherDecodeWith json (iparse parserTopTrace)
   where
     eitherFormatError :: Either (JSONPath, String) a -> Either String a
     eitherFormatError = either (Left . uncurry formatError) Right
 
--- | Parse an os-profiler JSON file
-readOSPTrace :: String -> IO (Either String OSPTrace)
-readOSPTrace fi = do
-  putStrLn $ "Processing file " ++ fi ++ " ..."
-  json <- BSL.readFile fi
-  pure $ eitherDecodeTrace json
+-- | Parse an os-profiler JSON file into an `OSPTrace`
+parse :: String -> IO (Either String OSPTrace)
+parse = pure . eitherDecodeTrace <=< BSL.readFile
 
--- | Saves an OSPTrace on the disk for later use.
-saveOSPTrace :: OSPTrace  -- ^ OSPTrace to save
-             -> String    -- ^ Binary output file path
-             -> IO ()
-saveOSPTrace t fo = BS.writeFile fo $ Store.encode t
+-- | Saves an `OSPTrace` on the disk for later use.
+save :: OSPTrace  -- ^ OSPTrace to save
+        -> String    -- ^ Binary output file path
+        -> IO ()
+save t fo = BS.writeFile fo $ Store.encode t
 
--- | Parse an OSProfiler json file and save it one the disk for later
--- use.
--- saveOSPTrace :: String       -- ^ Input file path
---              -> String       -- ^ Binary Output file path
---              -> IO ()
--- saveOSPTrace fpi fpb =  do
---   putStrLn $ "Processing file " ++ fpi ++ " ..."
---   json <- BSL.readFile fpi
---   case eitherDecodeTrace json of
---     Left  err      -> putStrLn err
---     Right osptrace -> BS.writeFile fpb $ Store.encode osptrace
-
--- | Loads a previously saved OSPTrace file.
-loadOSPTrace :: String        -- ^ Binary Input file
-             -> IO (Either PeekException OSPTrace)
-loadOSPTrace = (pure . Store.decode) <=< BS.readFile
+-- | Loads a previously saved `OSPTrace` file.
+load :: String        -- ^ Binary Input file
+        -> IO (Either PeekException OSPTrace)
+load = (pure . Store.decode) <=< BS.readFile
