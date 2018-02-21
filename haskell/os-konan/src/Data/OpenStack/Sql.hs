@@ -324,17 +324,3 @@ instance Store QueryExpr
 -- | Encodes `QueryExpr` into a JSON object.
 instance JSON.ToJSON QueryExpr where
   toJSON = JSON.String . Text.pack . prettyQueryExpr MySQL
-
--- instance Store QueryExpr
--- makeStore ''ValueExpr
--- makeStore ''QueryExpr
--- -- | Binary Serializes `QueryExpr`
--- instance Binary QueryExpr where
---   put (Select { qeSetQuantifier = t_qeSetQuantifier, qeSelectList = t_qeSelectList, qeFrom = t_qeFrom, qeWhere = t_qeWhere, qeGroupBy = t_qeGroupBy, qeHaving = t_qeHaving, qeOrderBy = t_qeOrderBy, qeOffset = t_qeOffset, qeFetchFirst = t_qeFetchFirst }) = undefined
---   put (CombineQueryExpr { qe0 = t_qe0, qeCombOp = t_qeCombOp, qeSetQuantifier = t_qeSetQuantifier, qeCorresponding = t_qeCorresponding, qe1 = t_qe1 }) = undefined
---   put (With { qeWithRecursive = t_qeWithRecursive, qeViews = t_qeViews, qeQueryExpression = t_qeQueryExpression }) = undefined
---   put (Values t) = undefined
---   put (Table t) = undefined
---   put (QEComment t1 t2) = undefined
-
---   get = undefined
