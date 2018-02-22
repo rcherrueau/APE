@@ -1,9 +1,11 @@
 module Main where
 
+import Data.List (nubBy)
 import Data.Store as Store (PeekException)
 
 import qualified Data.Aeson as JSON (ToJSON())
 import qualified Data.Aeson.Encode.Pretty as JSON (encodePretty)
+import qualified Language.SQL.SimpleSQL.Syntax as SQL (QueryExpr(..))
 import qualified Data.ByteString.Lazy as File (writeFile)
 import qualified System.Directory as File (doesFileExist)
 import Control.Monad (when)
@@ -58,6 +60,15 @@ processOSS = process OSS.parse OSS.save OSS.load
 processOSP :: JSON.ToJSON b => (OSP.OSPTrace -> b) -> String -> String -> IO ()
 processOSP = process OSP.parse OSP.save OSP.load
 
+corrNotSeen :: ([ SQL.QueryExpr ], [ OSS.OSTest ]) -> OSS.OSTest -> ([ SQL.QueryExpr ], [ OSS.OSTest ])
+corrNotSeen (seen, ts) t =
+
+correlatedNotSeen :: [ OSS.OSTest ] -> [ OSS.OSTest ]
+correlatedNotSeen ts = snd $ foldl corrNotSeen ([], []) ts
+
+
+
+
 
 -- Utils
 
@@ -101,5 +112,10 @@ main = do
     correlatedOSTest :: OSS.OSTest -> OSS.OSTest
     correlatedOSTest t = t { OSS.sql = filter OS.isCorrelated (OSS.sql t) }
 
-    correlatedOSS = processOSS (filter (not . null . OSS.sql) . map correlatedOSTest)
+    equalOSTestQuery :: OSS.OSTest -> OSS.OSTest -> Bool
+    equalOSTestQuery t t' = OSS.sql t == OSS.sql t'
+
+    -- correlatedOSS = processOSS (filter (not . null . OSS.sql) . map correlatedOSTest)
+    correlatedOSS = processOSS (nubBy undefined . filter (not . null . OSS.sql) . map correlatedOSTest)
+
     correlatedOSP = processOSP id
