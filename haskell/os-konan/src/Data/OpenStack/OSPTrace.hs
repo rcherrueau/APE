@@ -150,7 +150,7 @@ instance FromJSON DBReq where
     pure (DBReq sql)
     where
       parseSQL :: String -> JSON.Parser (Maybe SQL.QueryExpr)
-      parseSQL = pure . rightToMaybe . (SQL.parseQueryExpr SQL.MySQL "" Nothing)
+      parseSQL = pure . rightToMaybe . SQL.parseQueryExpr SQL.MySQL "" Nothing
   parseJSON v          = typeMismatch "DBReq" v
 
 instance FromJSON PythonReq where

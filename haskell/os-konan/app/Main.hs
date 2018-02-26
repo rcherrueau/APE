@@ -8,7 +8,7 @@ import qualified Data.Aeson.Encode.Pretty as JSON (encodePretty)
 import qualified Language.SQL.SimpleSQL.Syntax as SQL (QueryExpr(..))
 import qualified Data.ByteString.Lazy as File (writeFile)
 import qualified System.Directory as File (doesFileExist)
-import Control.Monad (when)
+import Control.Monad (unless)
 
 import qualified Data.OpenStack.Subunit as OSS
 import qualified Data.OpenStack.OSPTrace as OSP
@@ -26,7 +26,7 @@ process parse save load m fileIn fileOut = do
 
   -- Parse test from file and save it (if needed)
   alreadyParsed <- File.doesFileExist fileBinary
-  when (not alreadyParsed) (do
+  unless alreadyParsed (do
     putStrLn $ "Parsing file " ++ fileIn ++ " ..."
     eitherTest <- parse fileIn
     case eitherTest of
@@ -40,7 +40,7 @@ process parse save load m fileIn fileOut = do
   putStrLn $ "Loading file " ++ fileBinary ++ " ..."
   eitherTest <- load fileBinary
   case eitherTest of
-    Left err -> putStrLn $ "Error while loading " ++ fileBinary ++ ": " ++ (show err)
+    Left err -> putStrLn $ "Error while loading " ++ fileBinary ++ ": " ++ show err
     Right test -> do
       -- Apply `m` on test and save it
       putStrLn "Folding..."
@@ -60,11 +60,24 @@ processOSS = process OSS.parse OSS.save OSS.load
 processOSP :: JSON.ToJSON b => (OSP.OSPTrace -> b) -> String -> String -> IO ()
 processOSP = process OSP.parse OSP.save OSP.load
 
-corrNotSeen :: ([ SQL.QueryExpr ], [ OSS.OSTest ]) -> OSS.OSTest -> ([ SQL.QueryExpr ], [ OSS.OSTest ])
-corrNotSeen (seen, ts) t =
+sqlUnique :: [ OSS.OSTest ] -> [ OSS.OSTest ]
+sqlUnique ts = snd $ foldl notSeenOSTestLevel ([], []) ts
+  where
+    notSeenOSTestLevel :: ([ SQL.QueryExpr ], [ OSS.OSTest ]) -> OSS.OSTest -> ([ SQL.QueryExpr ], [ OSS.OSTest ])
+    notSeenOSTestLevel (seen, ts) t =
+      let sqls           = OSS.sql t
+          (seen', sqls') = notSeenSqlLevel seen sqls
+      in  (seen', t { OSS.sql = sqls' } : ts)
 
-correlatedNotSeen :: [ OSS.OSTest ] -> [ OSS.OSTest ]
-correlatedNotSeen ts = snd $ foldl corrNotSeen ([], []) ts
+    notSeenSqlLevel :: [ SQL.QueryExpr ] -> [ SQL.QueryExpr ] -> ([ SQL.QueryExpr ], [ SQL.QueryExpr ])
+    notSeenSqlLevel seen []     = (seen, [])
+    notSeenSqlLevel seen (t:ts)
+      -- sql has been already seen, do not keep it in test
+      | t `elem` seen = notSeenSqlLevel seen ts
+      -- sql did not have been already seen, put it in seen, and keep it
+      | otherwise     = let (seen', ts') = notSeenSqlLevel (t : seen) ts
+                        in  (seen', t : ts')
+
 
 
 
@@ -75,7 +88,7 @@ correlatedNotSeen ts = snd $ foldl corrNotSeen ([], []) ts
 -- | Draws a section line with a title
 ___s :: String  -- ^ Section title
      -> IO ()
-___s s = putStrLn $ (replicate (80 - (length s + 1)) '=') ++ " " ++ s
+___s s = putStrLn $ replicate (80 - (length s + 1)) '=' ++ " " ++ s
 
 -- | Draws a line
 ____ :: IO ()
@@ -116,6 +129,6 @@ main = do
     equalOSTestQuery t t' = OSS.sql t == OSS.sql t'
 
     -- correlatedOSS = processOSS (filter (not . null . OSS.sql) . map correlatedOSTest)
-    correlatedOSS = processOSS (nubBy undefined . filter (not . null . OSS.sql) . map correlatedOSTest)
+    correlatedOSS = processOSS (filter (not . null . OSS.sql) . sqlUnique . filter (not . null . OSS.sql) . map correlatedOSTest)
 
     correlatedOSP = processOSP id
