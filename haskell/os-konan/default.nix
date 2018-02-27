@@ -5,17 +5,17 @@
 # with (import <nixpkgs/pkgs/development/haskell-modules/lib.nix> { inherit pkgs; });
 
 pkgs.mkShell {
-  buildInpupt = [ pkgs.stack pkgs.zlib ];
+  buildInpupt = [ pkgs.stack pkgs.zlib pkgs.jq ];
   shellHook = ''
     COMPILER_TOOL_PATH=$(${pkgs.stack}/bin/stack --nix path --compiler-tools-bin)
     function stack_install_tool() {
-        local haskell_tool_name="$1"
-        local fs_tool_name="$2"; if [ -z $2 ]; then fs_tool_name=$haskell_tool_name; fi
-        if [ -e "$COMPILER_TOOL_PATH/$fs_tool_name" ]
+        local haskell_pkg="$1"
+        local executable="$2"; if [ -z $2 ]; then executable=$haskell_pkg; fi
+        if [[ -e "$COMPILER_TOOL_PATH/$executable" ]]
         then
-            echo "$haskell_tool_name already installed"
+            echo "$haskell_pkg already installed"
         else
-            ${pkgs.stack}/bin/stack --nix build --copy-compiler-tool "$haskell_tool_name"
+            ${pkgs.stack}/bin/stack --nix build --copy-compiler-tool "$haskell_pkg"
         fi
     }
 

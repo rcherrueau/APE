@@ -129,6 +129,6 @@ main = do
     equalOSTestQuery t t' = OSS.sql t == OSS.sql t'
 
     -- correlatedOSS = processOSS (filter (not . null . OSS.sql) . map correlatedOSTest)
-    correlatedOSS = processOSS (filter (not . null . OSS.sql) . sqlUnique . filter (not . null . OSS.sql) . map correlatedOSTest)
+    correlatedOSS = processOSS (filter (not . null . OSS.sql) . sqlUnique . map correlatedOSTest)
 
     correlatedOSP = processOSP id
