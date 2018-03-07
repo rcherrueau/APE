@@ -3,6 +3,7 @@ import Test.HUnit
 import System.Exit (exitSuccess, exitFailure)
 
 import qualified Sql.ParseTests
+import qualified OSPTrace.ParseTests
 
 
 main :: IO ()
@@ -14,4 +15,7 @@ main = do
 
   where
     tests :: Test
-    tests = Sql.ParseTests.testsAll
+    tests = TestList [
+        Sql.ParseTests.testsAll
+      , OSPTrace.ParseTests.testsAll
+      ]
