@@ -53,7 +53,7 @@ data HTTPReq = HTTPReq
   } deriving (Generic, Show, Eq)
 
 data DBReq = DBReq
-  { stmt   :: Maybe SQL.QueryExpr
+  { sql :: Maybe SQL.QueryExpr
   -- , params :: Value -- TODO: Store JSON.Value then uncomment
   } deriving (Generic, Show, Eq)
 

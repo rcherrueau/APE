@@ -1,6 +1,8 @@
 module Main where
 
-import Data.List (nubBy)
+import Data.List
+import Data.Tree
+import Data.Maybe
 import Data.Store as Store (PeekException)
 
 import qualified Data.Aeson as JSON (ToJSON())
@@ -78,9 +80,17 @@ sqlUnique ts = snd $ foldl notSeenOSTestLevel ([], []) ts
       | otherwise     = let (seen', ts') = notSeenSqlLevel (t : seen) ts
                         in  (seen', t : ts')
 
-
-
-
+correlatedUniqueOSP :: OSP.OSPTrace -> [SQL.QueryExpr]
+correlatedUniqueOSP = nub . filter OS.isCorrelated . filterDBReq . flatten
+  where
+    -- TODO rewrite with lenses
+    filterDBReq :: [OSP.TraceType] -> [SQL.QueryExpr]
+    filterDBReq [] = []
+    filterDBReq (OSP.DB t:ts) =
+      let dbreq = OSP.req t
+          mSql  = OSP.sql dbreq
+      in maybeToList mSql ++ filterDBReq ts
+    filterDBReq (_:ts) = filterDBReq ts
 
 
 -- Utils
@@ -101,24 +111,24 @@ ____ = putStrLn (replicate 80 '-')
 main :: IO ()
 main = do
   ___s "Subunit Tests"
-  correlatedOSS "./rsc/pike-keystone-tempest.json"
-                    "./rsc/pike-keystone-tempest-correlated.json"
+  correlatedOSS "rsc/pike-keystone-tempest.json"
+                "rsc/pike-keystone-tempest-correlated.json"
 
   ____
-  correlatedOSS "./rsc/pike-nova-tempest.json"
-                    "./rsc/pike-nova-tempest-correlated.json"
+  correlatedOSS "rsc/pike-nova-tempest.json"
+                "rsc/pike-nova-tempest-correlated.json"
 
   ____
-  correlatedOSS "./rsc/pike-nova-functional.json"
-                    "./rsc/pike-nova-functional-correlated.json"
+  correlatedOSS "rsc/pike-nova-functional.json"
+                "rsc/pike-nova-functional-correlated.json"
 
   ____
-  correlatedOSS "./rsc/pike-nova-unit.json"
-                    "./rsc/pike-nova-unit-correlated.json"
+  correlatedOSS "rsc/pike-nova-unit.json"
+                "rsc/pike-nova-unit-correlated.json"
 
   ___s "OSProfiler Tests"
-  correlatedOSP "./rsc/pike-nova-osptrace-boot-and-delete.json"
-                     "./rsc/pike-nova-osptrace-boot-and-delete-correlated.json"
+  correlatedOSP "rsc/queens-osptrace-server-create.json"
+                "rsc/queens-osptrace-server-create-correlated.json"
 
   where
     -- | Only keeps correlated query from an OSTest.
@@ -128,7 +138,10 @@ main = do
     equalOSTestQuery :: OSS.OSTest -> OSS.OSTest -> Bool
     equalOSTestQuery t t' = OSS.sql t == OSS.sql t'
 
-    -- correlatedOSS = processOSS (filter (not . null . OSS.sql) . map correlatedOSTest)
-    correlatedOSS = processOSS (filter (not . null . OSS.sql) . sqlUnique . map correlatedOSTest)
+    correlatedUniqueOSS :: [ OSS.OSTest ] -> [ OSS.OSTest]
+    correlatedUniqueOSS = filter (not . null . OSS.sql) . sqlUnique . map correlatedOSTest
 
-    correlatedOSP = processOSP id
+    -- correlatedOSS = processOSS (filter (not . null . OSS.sql) . map correlatedOSTest)
+    correlatedOSS = processOSS (nub . filter OS.isCorrelated . concatMap OSS.sql)
+
+    correlatedOSP = processOSP correlatedUniqueOSP
