@@ -9,13 +9,11 @@
 ;; IFTHENESLE
 (λ test (λ if-true (λ if-false ((test if-true) if-false))))
 
-;; IFTHENELSE TRUE #t #f
-((((λ test (λ if-true (λ if-false ((test if-true) if-false))))
-   (λ t (λ f t))) 't) 'f)
+;; Y Combinator
+(λ g ((λ x (g (x x))) (λ x (g (x x)))))
 
-;; IFTHENELSE FALSE #t #f
-((((λ test (λ if-true (λ if-false ((test if-true) if-false))))
-   (λ t (λ f f))) 't) 'f)
+;; ISZERO
+(λ n (n ((λ x (λ t (λ f f))) (λ t (λ f t)))))
 
-;; ;; loop
+;; ;; LOOP
 ;; ((λ x (x x)) (λ x (x x)))

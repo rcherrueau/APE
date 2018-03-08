@@ -30,13 +30,15 @@
      (let* ([str-pre (extract-file-name (syntax->datum #'BASE-LANG))]
             [str-pre: (format "~a:" str-pre)]
             [pre: (format-id #'BASE-LANG "~a:" str-pre)]
-            [pre:mb (format-id #'BASE-LANG "~a:#%module-begin" str-pre)])
+            ;; [pre:mb (format-id #'BASE-LANG "~a:#%module-begin" str-pre)]
+            )
        #`(filtered-out
           ;; Remove prefix from the name
           (λ (name) (string-replace name #,str-pre: ""))
-          ;; Also remove `#%module-begin`
-          (except-out (all-from-out BASE-LANG)
-                      #,pre:mb)))]))
+          ;; ;; Also remove `#%module-begin`
+          ;; (except-out (all-from-out BASE-LANG)
+          ;;             #,pre:mb)))]))
+          (all-from-out BASE-LANG)))]))
 (define-syntax-rule (extends-lang BASE-LANG)
   (begin
     (require (require-lang BASE-LANG))
