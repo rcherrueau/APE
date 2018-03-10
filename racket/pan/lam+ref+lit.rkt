@@ -1,8 +1,12 @@
 #lang racket/base
 
-(require "utils.rkt")
+(require (prefix-in r: racket/base)
+         "utils.rkt")
 
 ;; Lambda Calculus + Reference
+;;
+;; x ∈ Variables (a, b, c, ...)
+;; l ∈ Literals (#t,#f,1,2,3,...,"Donatello")
 ;;
 ;; Expression
 ;; e ::= x             (Variable)
@@ -17,6 +21,5 @@
 ;;     | (deref e)     (Dereference)
 
 
-
 (extends-lang "lam+lit.rkt")
 (extends-lang "lam+ref.rkt")

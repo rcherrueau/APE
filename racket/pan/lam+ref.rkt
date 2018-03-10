@@ -1,8 +1,11 @@
 #lang racket/base
 
-(require "utils.rkt")
+(require (prefix-in r: racket/base)
+         "utils.rkt")
 
 ;; Lambda Calculus + Reference
+;;
+;; x ∈ Variables (a, b, c, ...)
 ;;
 ;; Expression
 ;; e ::= x             (Variable)
@@ -12,25 +15,22 @@
 ;;
 ;; Mutable Reference
 ;; r ::= (ref e)       (Reference)
-;;     | (set! e e)    (Assignment)
-;;     | (deref e)     (Dereference)
+;;     | (set! x e)    (Assignment)
+;;     | (deref x)     (Dereference)
 
 
-
 (extends-lang "lam.rkt")
 
 ;; Reference
-(define-syntax-rule (lam+ref-ref EXP)
-  (box EXP))
+(define-syntax-rule (ref EXP)
+  (r:box EXP))
 
 ;; Assignment
-(define-syntax-rule (lam+ref-set! VAR EXP)
-  (set-box! VAR EXP))
+(define-syntax-rule (set! VAR EXP)
+  (r:set-box! VAR EXP))
 
 ;; Dereference
-(define-syntax-rule (lam+ref-deref VAR)
-  (unbox VAR))
+(define-syntax-rule (deref VAR)
+  (r:unbox VAR))
 
-(provide (rename-out [lam+ref-ref ref]
-                     [lam+ref-deref deref]
-                     [lam+ref-set! set!]))
+(provide (all-defined-out))

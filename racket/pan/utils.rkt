@@ -39,6 +39,7 @@
           ;; (except-out (all-from-out BASE-LANG)
           ;;             #,pre:mb)))]))
           (all-from-out BASE-LANG)))]))
+
 (define-syntax-rule (extends-lang BASE-LANG)
   (begin
     (require (require-lang BASE-LANG))

@@ -1,28 +1,27 @@
 #lang racket/base
 
-;; Lambda Calculus
+(require (prefix-in r: racket/base))
 
+;; Lambda Calculus
+;;
+;; x ∈ Variables (a, b, c, ...)
+;;
 ;; Expression
-;; e ::= x             (Variable)
+;; e ::= x            (Variable)
 ;;    | (λ x e)       (Abstraction)
 ;;    | (e e)         (Application)
 
 
+;; List of Expression
+(define-syntax-rule (#%module-begin EXP ...)
+  (r:#%module-begin EXP ...))
 
-(define-syntax-rule (lam-mb EXP ...)     ;; List of Expression
-  (#%module-begin EXP ...))
+;; Abstraction
+(define-syntax-rule (λ VAR EXP)
+  (r:λ (VAR) EXP))
 
-(define-syntax-rule (lam-abs VAR EXP)    ;; Abstraction
-  (λ (VAR) EXP))
+;; Application
+(define-syntax-rule (#%app EXP1 EXP2)
+  (r:#%app EXP1 EXP2))
 
-(define-syntax-rule (lam-app EXP1 EXP2)  ;; Application
-  (#%app EXP1 EXP2))
-
-(define-syntax-rule (lam-var VAR)        ;; Variable
-  (#%variable-reference VAR))
-
-(provide (rename-out [lam-mb #%module-begin]
-                     [lam-var #%variable-reference]
-                     [lam-abs λ]
-                     [lam-app #%app]
-                     ))
+(provide (all-defined-out))
