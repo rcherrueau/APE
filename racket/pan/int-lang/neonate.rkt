@@ -17,6 +17,8 @@
 ;; exp = n
 
 
+;; Parser -- This language assumes an s-exp reader
+
 ;; A module is an `EXP`, not the traditional list of `EXP` (ie,
 ;; EXP...). In other word, it ensures that only one program could be
 ;; given instead of a list of programs.
@@ -34,6 +36,8 @@
    [(_ . N:nat) #'(#%datum . N)]))
 
 
+;; Compiler
+
 ;; Takes a number and compiles it.
 ;;
 ;; (: compile-exp (AST -> ASM))

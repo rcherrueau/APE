@@ -8,7 +8,9 @@
 (provide (all-defined-out))
 
 
-;; ASM Datatype for 32-bit x86 assembly. See,
+;; ASM Datatype
+;;
+;; Datatype for 32-bit x86 assembly. See,
 ;; https://www.cs.virginia.edu/~evans/cs216/guides/x86.html
 
 ;; ASM Registers -- 32-bit (4-byte). See,
@@ -49,48 +51,47 @@
 (define-type ASM (List Instruction))
 
 
+;; Textual form
+
+;; Converts a `Register` into a textual form.
+(: register->string (Register -> String))
+(define (register->string reg)
+  (match reg
+    [(EAX) "eax"]
+    [else (error "Unsupported register " reg)]))
+
+;; Converts an instruction `Arg` into a textual form.
+(: arg->string (Arg -> String))
+(define (arg->string arg)
+  (match arg
+    [(Const n) (number->string n)]
+    [(Reg r)   (register->string r)]
+    [else (error "Unsupported instruction argument " arg)]))
+
+;; Converts an `Instruction` into a textual form.
+(: instruction->string (Instruction -> String))
+(define (instruction->string instruction)
+  (match instruction
+    [(Move a1 a2)
+     (format "mov ~a, ~a" (arg->string a1) (arg->string a2))]
+    [else (error "Unsupported instruction " instruction)]))
+
 ;; Converts an `ASM` list of instructions into a textual form.
 (: asm->string (ASM -> String))
 (define (asm->string asm)
-
-  ;; Converts a `Register` into a textual form.
-  (: register->string (Register -> String))
-  (define (register->string reg)
-    (match reg
-      [(EAX) "eax"]
-      [else (error "Unsupported register " reg)]))
-
-  ;; Converts an instruction `Arg` into a textual form.
-  (: arg->string (Arg -> String))
-  (define (arg->string arg)
-    (match arg
-      [(Const n) (number->string n)]
-      [(Reg r)   (register->string r)]
-      [else (error "Unsupported instruction argument " arg)]))
-
-  ;; Converts an `Instruction` into a textual form.
-  (: instruction->string (Instruction -> String))
-  (define (instruction->string instruction)
-    (match instruction
-      [(Move a1 a2)
-       (format "mov ~a, ~a" (arg->string a1) (arg->string a2))]
-      [else (error "Unsupported instruction " instruction)]))
-
   ;; The textual form of all Instructions.
-  (: the-asm-string String)
   (define the-asm-string
     (string-join (map instruction->string asm) (string #\newline)))
 
   ;; Surround the program with the necessary scaffolding.
-  (: $scaffolding String)
   (define $scaffolding
     (unlines "    .intel_syntax noprefix"
              "    .global _the_asm_code"
              "    .text"
              ""
-             "    _the_asm_code:"
+             "_the_asm_code:"
              "    ~a"
              "    ret"))
 
-  ;; The program
+  ;; The textual ASM program
   (format $scaffolding the-asm-string))
