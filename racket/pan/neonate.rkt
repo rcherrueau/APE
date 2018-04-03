@@ -2,10 +2,12 @@
 
 (require (for-syntax racket/base
                      syntax/parse)
-         "asm.rkt")
+         racket/match
+         "asm.rkt"
+         "utils.rkt")
 
-(provide (rename-out [int-md #%module-begin]
-                     [int-datum #%datum])
+(provide (rename-out [neonate-md #%module-begin]
+                     [neonate-datum #%datum])
          #%top #%app #%top-interaction
          compile-exp)
 
@@ -15,6 +17,10 @@
 ;; n  ∈ Nat
 ;;
 ;; exp = n
+
+(require (only-in "ast.rkt"
+                  Exp
+                  Num))
 
 
 ;; Parser -- This language assumes an s-exp reader
@@ -27,19 +33,27 @@
 ;; Function `compile-exp` takes an `EXP` and produces an `ASM` (ie,
 ;; List of ASM instructions). It then gives the compiled expression to
 ;; `asm->string` that converts the `ASM` into a textual form.
-(define-syntax-rule (int-md EXP)
-   (#%module-begin (printf (asm->string (compile-exp EXP)))))
+(define-syntax (neonate-md stx)
+  (syntax-case stx ()
+    [(_ EXP)
+     (with-syntax ([COMPILE-EXP (datum->syntax #'EXP 'compile-exp)])
+       #'(#%module-begin (printf (asm->string (COMPILE-EXP EXP)))))
+     ]
+    )
+  )
 
 ;;  Only Nat are valid program
-(define-syntax (int-datum stx)
+(define-syntax (neonate-datum stx)
  (syntax-parse stx
-   [(_ . N:nat) #'(#%datum . N)]))
+   [(_ . N:nat) #'(Num (#%datum . N))]))
 
 
 ;; Compiler
 
 ;; Takes a number and compiles it.
 ;;
-;; (: compile-exp (AST -> ASM))
-(define (compile-exp number)
-  (list (Move (Reg (EAX)) (Const number))))
+;; (: compile-exp (Exp -> ASM))
+(define (compile-exp exp)
+  (match exp
+    [(Num n)
+     (list (Move (Reg (EAX)) (Const n)))]))
