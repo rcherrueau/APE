@@ -1,13 +1,11 @@
 #lang typed/racket/base
 
-(require "utils.rkt"
-         racket/list
+(require racket/list
          racket/match
-         racket/string)
+         racket/string
 
-(require/typed "utils.rkt"
-  [unlines ((U String (Listof String))* -> String)]
-  [snoc (All (A) ((Listof A) A -> (Listof A)))])
+         "utils.rkt"
+         )
 
 (provide (all-defined-out))
 
@@ -53,6 +51,10 @@
                    ;; result in its first operand. Note, whereas both
                    ;; operands may be registers, at most one operand
                    ;; may be a memory location.
+  [Sub Arg Arg]    ;; The sub instruction stores in the value of its
+                   ;; first operand the result of subtracting the
+                   ;; value of its second operand from the value of
+                   ;; its first operand. As with add.
   )
 
 ;; An `ASM` program is a list of `Instruction`s.
@@ -84,6 +86,8 @@
      (format "mov ~a, ~a" (arg->string a1) (arg->string a2))]
     [(Add a1 a2)
      (format "add ~a, ~a" (arg->string a1) (arg->string a2))]
+    [(Sub a1 a2)
+     (format "sub ~a, ~a" (arg->string a1) (arg->string a2))]
     [else (error "Unsupported instruction " instruction)]))
 
 ;; Converts an `ASM` list of instructions into a textual form.

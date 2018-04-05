@@ -3,6 +3,7 @@
 (require rackunit
          rackunit/text-ui
          "neonate.rkt"
+         "adder.rkt"
          )
 
 (module+ test
@@ -11,4 +12,5 @@
     "Compiler tests"
 
     neonate-tests
+    adder-tests
     )))

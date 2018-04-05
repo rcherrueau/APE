@@ -1,13 +1,20 @@
 #lang racket/base
 
 (require rackunit
-         "../utils.rkt")
+         rackunit/text-ui
+         "../ast.rkt"
+         "utils.rkt")
 
 (provide neonate-tests)
 
 (define neonate-tests
   (test-suite
    "neonate lang tests"
+
+   (test-ast "neonate-42"
+             "../neonate.rkt"
+             "42"
+             (Num 42))
 
    (test-compile "neonate-42"
                   "../neonate.rkt"
@@ -32,3 +39,5 @@
 
 
    ))
+
+(module+ test (run-tests neonate-tests))

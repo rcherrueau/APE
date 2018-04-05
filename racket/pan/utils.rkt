@@ -1,16 +1,14 @@
 #lang typed/racket/base
 
 (require (for-syntax racket/base
-                     syntax/parse
-                     racket/path
                      racket/sequence
-                     racket/string
+                     racket/path
+                     syntax/parse
                      racket/syntax
+                     racket/string
                      syntax/stx)
          racket/file
          racket/function
-         racket/list
-         racket/match
          racket/path
          racket/port
          racket/provide-syntax
@@ -28,8 +26,6 @@
 
 (provide unlines
          snoc
-         test-compile
-         test-not-compile
          define-datatype)
 
 ;; Macros defined in typed modules may not be used in untyped modules.
@@ -49,46 +45,6 @@
 (: snoc (All (A) ((Listof A) A -> (Listof A))))
 (define (snoc as a)
   (append as (list a)))
-
-
-;; Rackunit utilities
-
-;; Produces a temporary source program file with lang `lang-path` and
-;; source `prog-src` and returns its location.
-(: make-prog-file (String String String -> Path))
-(define (make-prog-file lang-path prog-src [template "rackettmp~a"])
-  (define lang-abs-path (path->string (path->complete-path lang-path)))
-  (define prog-file (make-temporary-file template))
-
-  (call-with-output-file prog-file #:exists 'replace
-    (λ ([out : Output-Port])
-      (displayln (format "#lang s-exp (file \"~a\")" lang-abs-path) out)
-      (displayln prog-src out)))
-
-  prog-file)
-
-;; Tests that program `prog-src` compiles to `expected-result` with
-;; the lang `lang-path`.
-(: test-compile (String String String String -> Any))
-(define (test-compile test-name lang-path prog-src expected-result)
-  (define prog-file
-    (make-prog-file lang-path prog-src (string-append test-name "-" "~a")))
-
-  (define result
-    (with-output-to-string
-      (λ () (dynamic-require prog-file #f))))
-
-  (test-equal? test-name result expected-result))
-
-;; Tests that the program `prog-src` fails with error message
-;; `exn-predicate` during a compilation under `lang-path`.
-(: test-not-compile (String String String (U (Any -> Boolean) Regexp) -> Any))
-(define (test-not-compile test-name lang-path prog-src
-                           [exn-predicate exn:fail:syntax?])
-  (define prog-file
-    (make-prog-file lang-path prog-src (string-append test-name "-" "~a")))
-
-  (test-exn test-name exn-predicate (λ () (dynamic-require prog-file #f))))
 
 
 ;; The extends-lang macro: reuse all from a `base-lang` except
@@ -151,7 +107,7 @@
 
      #'(begin
          (struct (type-name.param ...) data-constructor.name
-           ([data-constructor.field-id : data-constructor.param] ...)) ...
+           ([data-constructor.field-id : data-constructor.param] ...) #:transparent) ...
          (define-type type-name (U data-type ...)))]))
 
 #|

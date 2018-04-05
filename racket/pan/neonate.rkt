@@ -57,7 +57,13 @@
      ;;
      ;; See: https://beautifulracket.com/explainer/hygiene.html
      (with-syntax ([COMPILE-EXP (datum->syntax #'EXP 'compile-exp)])
-       #'(#%module-begin (printf (asm->string (COMPILE-EXP EXP)))))]))
+       #'(#%module-begin
+          (provide ast asm)
+
+          (define ast EXP)               ;; The AST of the Program
+          (define asm (COMPILE-EXP ast)) ;; The ASM of the Program
+          (printf (asm->string asm))     ;; Print textual form of ASM
+          ))]))
 
 ;;  Only Nat are valid program
 (define-syntax (neonate-datum stx)
