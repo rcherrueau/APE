@@ -52,7 +52,4 @@
       ;; Add 1 to EAX
       (Sub (Reg (EAX)) (Const 1)))]
 
-    ;; -- From neonate.rkt
-    [(Num n)
-     (list (Move (Reg (EAX)) (Const n)))]
-    [else (error "Unsupported Exp " exp)]))
+    [else (neonate:compile-exp exp)]))

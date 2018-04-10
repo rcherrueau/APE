@@ -21,12 +21,13 @@
   EAX  ;; Accumulator. The register that contains results. This
        ;; register is the one that compiled C programs expect to find
        ;; return values in.
+  ESP  ;; The Stack Pointer.
   )
 
 ;; Arguments for ASM `Instruction`s. Seek notation in
 ;; https://www.cs.virginia.edu/~evans/cs216/guides/x86.html#instructions
 ;;
-;; Not implemented:
+;; Possible values are:
 ;; <reg32>  Any 32-bit register (EAX, EBX, ECX, EDX, ESI, EDI, ESP, or EBP)
 ;; <reg16>  Any 16-bit register (AX, BX, CX, or DX)
 ;; <reg8>   Any 8-bit register (AH, BH, CH, DH, AL, BL, CL, or DL)

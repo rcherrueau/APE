@@ -7,17 +7,18 @@
 
 (provide neonate-tests)
 
+(define-values (test-ast test-asm test-compile test-not-compile)
+  (tests-for-lang "../neonate.rkt"))
+
 (define neonate-tests
   (test-suite
    "neonate lang tests"
 
    (test-ast "neonate-42"
-             "../neonate.rkt"
              "42"
              (Num 42))
 
    (test-compile "neonate-42"
-                  "../neonate.rkt"
                   "42"
                   (unlines "    .intel_syntax noprefix"
                            "    .global _the_asm_code"
@@ -28,16 +29,12 @@
                            "    ret"))
 
    (test-not-compile "neonate-illtyped"
-                      "../neonate.rkt"
                       "#t"
                       #rx"#%datum: expected exact-nonnegative-integer\n  at: #t")
 
    (test-not-compile "neonate-nonnegative"
-                      "../neonate.rkt"
                       "-1"
                       #rx"#%datum: expected exact-nonnegative-integer\n  at: -1")
-
-
    ))
 
 (module+ test (run-tests neonate-tests))

@@ -26,9 +26,7 @@
   [flatten (Any -> (Listof String))])
 
 (provide unlines
-         test-ast
-         test-compile
-         test-not-compile)
+         tests-for-lang)
 
 
 ;; Haskell unlines. See,
@@ -118,3 +116,15 @@
                     (string-append "compile-" test-name "-" "~a")))
 
   (test-exn test-name exn-predicate (λ () (dynamic-require prog-file #f))))
+
+;; Provide all previous tests for a specific `lang-path`.
+(define (tests-for-lang [lang-path : String])
+  (values
+   (λ ([test-name : String] [prog-src : String] [ast : Exp])
+     (test-ast test-name lang-path prog-src ast))
+   (λ ([test-name : String] [prog-src : String] [asm : ASM])
+     (test-asm test-name lang-path prog-src asm))
+   (λ ([test-name : String] [prog-src : String] [out : String])
+     (test-compile test-name lang-path prog-src out))
+   (λ ([test-name : String] [prog-src : String] [ex : (U (Any -> Boolean) Regexp) exn:fail:syntax? ])
+     (test-not-compile test-name lang-path prog-src ex))))

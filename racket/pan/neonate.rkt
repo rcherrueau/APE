@@ -6,11 +6,6 @@
          "asm.rkt"
          "utils.rkt")
 
-(provide (rename-out [neonate-md #%module-begin]
-                     [neonate-datum #%datum])
-         #%top #%app #%top-interaction
-         compile-exp)
-
 ;; A First Compiler -- Neonate. See,
 ;; https://course.ccs.neu.edu/cs4410/lec_neonate_notes.html
 ;;
@@ -18,9 +13,7 @@
 ;;
 ;; exp = n (Num)
 
-(require (only-in "ast.rkt"
-                  Exp
-                  Num))
+(require (only-in "ast.rkt" Exp Num))
 
 
 ;; Parser -- This language assumes an s-exp reader
@@ -69,6 +62,11 @@
 (define-syntax (neonate-datum stx)
  (syntax-parse stx
    [(_ . N:nat) #'(Num (#%datum . N))]))
+
+(provide (rename-out [neonate-md #%module-begin]
+                     [neonate-datum #%datum])
+         #%top #%app #%top-interaction
+         compile-exp)
 
 
 ;; Compiler
