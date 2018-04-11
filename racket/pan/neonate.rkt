@@ -74,6 +74,6 @@
 ;; Takes a number and compiles it.
 ;; (: compile-exp (Exp -> ASM))
 (define (compile-exp exp)
-  (match exp
-    [(Num n)
-     (list (Move (Reg (EAX)) (Const n)))]))
+  (exp⇒asm exp
+    [(Num n) => (Move (Reg (EAX)) (Const n))]
+    [else (error "Compilation Error: Unsupported Exp" exp)]))

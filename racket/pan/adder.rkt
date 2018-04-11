@@ -36,20 +36,20 @@
 ;; Compiler
 ;; (: compile-exp (Exp -> ASM))
 (define (compile-exp exp)
-  (match exp
+  (exp⇒asm exp
 
     [(Prim1 (Add1) e)
-     (snoc
-      ;; Compiles expression `e`; Result is in EAX.
-      (compile-exp e)
-      ;; Add 1 to EAX
-      (Add (Reg (EAX)) (Const 1)))]
+     => ;; Compiles expression `e`; Result is in EAX.
+        (compile-exp e)
+        ;; Add 1 to EAX
+        (Add (Reg (EAX)) (Const 1))]
 
     [(Prim1 (Sub1) e)
-     (snoc
-      ;; Compiles expression `e`; Result is in EAX.
-      (compile-exp e)
-      ;; Add 1 to EAX
-      (Sub (Reg (EAX)) (Const 1)))]
+     => ;; Compiles expression `e`; Result is in EAX.
+        (compile-exp e)
+        ;; Add 1 to EAX
+        (Sub (Reg (EAX)) (Const 1))]
 
-    [else (neonate:compile-exp exp)]))
+    ;; -- Definitions from "neonate.rkt"
+    [(Num n) => (Move (Reg (EAX)) (Const n))]
+    [else (error "Compilation Error: Unsupported Exp" exp)]))

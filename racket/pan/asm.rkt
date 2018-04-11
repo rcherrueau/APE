@@ -1,13 +1,16 @@
 #lang typed/racket/base
 
-(require racket/list
+(require (for-syntax racket/base
+                     syntax/parse)
+         racket/list
          racket/match
          racket/string
 
          "utils.rkt"
          )
 
-(provide (all-defined-out))
+(provide (except-out (all-defined-out) exp⇒asm exp⇒insts))
+(unsafe-provide exp⇒asm exp⇒insts)
 
 
 ;; ASM Datatype
@@ -109,3 +112,25 @@
 
   ;; The textual ASM program
   (apply format $scaffolding the-asm-strings))
+
+
+;; ASM util functions
+
+;; A `match` where all expressions after `=>` are assembly
+;; Instructions. All assembly Instructions are wrapped and flatten
+;; into one list. Note putting the `=>` ends in a traditional `match`.
+(define-syntax (exp⇒asm stx)
+  (syntax-parse stx
+    [(_ EXP [EXP-PAT INSTRUCTION ...] ...)
+     #'(match EXP
+         [EXP-PAT (exp⇒insts INSTRUCTION ...)] ...)]))
+
+(define-syntax (exp⇒insts stx)
+  (syntax-parse stx
+    #:literals (=>)
+    [(_ DEF ... => INSTRUCTION ...)
+     #'(begin DEF ... (flatten (list INSTRUCTION ...)))]
+    [(_ => INSTRUCTION ...)
+     #'(flatten (list INSTRUCTION ...))]
+    [(_ (~and DEF (~not =>)) ...)
+     #'(begin DEF ...)]))
