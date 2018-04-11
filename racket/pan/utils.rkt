@@ -48,8 +48,9 @@
 
 
 ;; The extends-lang macro: reuse all from a `base-lang` except
-;; `compile-exp`. Imports functions from `base-lang` with prefix
-;; "base-lang:". Provides functions from `base-lang` without prefix.
+;; `compile-exp` and excluded macro. Imports functions from
+;; `base-lang` with prefix "base-lang:". Provides functions from
+;; `base-lang` without prefix.
 (define-for-syntax (extract-file-name file)
   (define f (if (string? file) file (symbol->string file)))
   (path->string (path-replace-suffix (file-name-from-path f) "")))
@@ -63,23 +64,31 @@
        #`(prefix-in #,pre: BASE-LANG))]))
 
 (define-provide-syntax (provide-lang stx)
-  (syntax-case stx ()
-    [(_ BASE-LANG)
-     (let* ([str-pre (extract-file-name (syntax->datum #'BASE-LANG))]
-            [str-pre: (format "~a:" str-pre)]
-            [pre: (format-id #'BASE-LANG "~a:" str-pre)]
-            [pre:c-exp (format-id #'BASE-LANG "~a:compile-exp" str-pre)])
+  (syntax-parse stx
+    [(_ BASE-LANG (~optional (~seq EXCLUDE ...)))
+     (let* ([lang-pre (extract-file-name (syntax->datum #'BASE-LANG))]
+            [lang-pre: (format "~a:" lang-pre)]
+            [make-pre:id (λ (id) (format-id #'BASE-LANG "~a:~a" lang-pre id))]
+            [pre:excludes (map make-pre:id
+                               (cons "compile-exp"
+                                     (syntax->list #'(EXCLUDE ...))))])
        #`(filtered-out
-          ;; Remove prefix from the name
-          (λ (name) (string-replace name #,str-pre: ""))
-          ;; Also remove `#%module-begin`
-          (except-out (all-from-out BASE-LANG)
-                      #,pre:c-exp)))]))
+           ;; Remove prefix from the name
+           (λ (name) (string-replace name #,lang-pre: ""))
+           ;; Also remove `compile-exp` and EXCLUDE ...
+           (except-out (all-from-out BASE-LANG)
+                       #,@pre:excludes)))]))
 
-(define-syntax-rule (extends-lang BASE-LANG)
-  (begin
-    (require (require-lang BASE-LANG))
-    (provide (provide-lang BASE-LANG))))
+(define-syntax (extends-lang stx)
+  (syntax-parse stx
+    [(_ BASE-LANG)
+     #'(begin
+         (require (require-lang BASE-LANG))
+         (provide (provide-lang BASE-LANG)))]
+    [(_ BASE-LANG #:override MACRO-NAME ...)
+     #'(begin
+         (require (require-lang BASE-LANG))
+         (provide (provide-lang BASE-LANG MACRO-NAME ...)))]))
 
 
 ;; Datatype
