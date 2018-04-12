@@ -10,4 +10,7 @@
 
 (define-datatype Exp
   [Num   Number]
-  [Prim1 Primitive1 Exp])
+  [Id    Symbol]
+  [Prim1 Primitive1 Exp]
+  [Let   (Listof (Pairof Symbol Exp)) Exp]
+  )

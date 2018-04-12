@@ -39,8 +39,9 @@
 ;; <con16>  Any 16-bit constant
 ;; <con8>   Any 8-bit constant
 (define-datatype Arg
-  [Const Number]   ;; Any 8-, 16-, or 32-bit numeric constant
-  [Reg Register]   ;; Any named register
+  [Const Number]         ;; Any 8-, 16-, or 32-bit numeric constant
+  [Reg Register]         ;; Any named register
+  [Mem Register Integer] ;; Memory address [Register - 4*Integer]
   )
 
 ;; Machine Instructions. See
@@ -68,22 +69,24 @@
 ;; Textual form
 
 ;; Converts a `Register` into a textual form.
-(: register->string (Register -> String))
+(: register->string (Register → String))
 (define (register->string reg)
   (match reg
     [(EAX) "eax"]
+    [(ESP) "esp"]
     [else (error "Unsupported register " reg)]))
 
 ;; Converts an instruction `Arg` into a textual form.
-(: arg->string (Arg -> String))
+(: arg->string (Arg → String))
 (define (arg->string arg)
   (match arg
     [(Const n) (number->string n)]
     [(Reg r)   (register->string r)]
+    [(Mem r i) (format "[~a - 4*~a]" (register->string r) i)]
     [else (error "Unsupported instruction argument " arg)]))
 
 ;; Converts an `Instruction` into a textual form.
-(: instruction->string (Instruction -> String))
+(: instruction->string (Instruction → String))
 (define (instruction->string instruction)
   (match instruction
     [(Move a1 a2)
@@ -95,7 +98,7 @@
     [else (error "Unsupported instruction " instruction)]))
 
 ;; Converts an `ASM` list of instructions into a textual form.
-(: asm->string (ASM -> String))
+(: asm->string (ASM → String))
 (define (asm->string asm)
   ;; The textual form of all Instructions.
   (define the-asm-strings (map instruction->string asm))
@@ -118,7 +121,7 @@
 
 ;; A `match` where all expressions after `=>` are assembly
 ;; Instructions. All assembly Instructions are wrapped and flatten
-;; into one list. Note putting the `=>` ends in a traditional `match`.
+;; into one list. Not writing the `=>` ends in a traditional `match`.
 (define-syntax (exp⇒asm stx)
   (syntax-parse stx
     [(_ EXP [EXP-PAT INSTRUCTION ...] ...)

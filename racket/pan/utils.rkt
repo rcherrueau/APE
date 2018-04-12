@@ -25,14 +25,15 @@
   [flatten (Any -> (Listof String))])
 
 (provide unlines
-         snoc
-         define-datatype)
+         ∘ thunk
+         define-datatype
+         )
 
 ;; Macros defined in typed modules may not be used in untyped modules.
 ;; A workaround for such macros is provided them with `unsafe-provide`
 ;; which exports the macro without any contracts generated. See,
 ;; https://groups.google.com/d/msg/racket-users/eowl6RpdDwY/1wrCluDcAwAJ
-(unsafe-provide extends-lang)
+(unsafe-provide snoc extends-lang)
 
 
 ;; Haskell unlines. See,
@@ -41,10 +42,13 @@
 (define (unlines . words)
   (string-join (flatten words) (string #\newline) #:after-last (string #\newline)))
 
-;; Inverse of `cons`. Appends a `A` at the end of a `Listof A`.
-(: snoc (All (A) ((Listof A) A -> (Listof A))))
-(define (snoc as a)
-  (append as (list a)))
+;; Like `snoc`, but generalizes it to more than one list.
+(define-syntax-rule (snoc AS ... A)
+  (append AS ... (list A)))
+
+;; Alias for compose1 (digraph C-k Ob)
+(: ∘ (All (a b c) (-> (-> b c) (-> a b) (-> a c))))
+(define ∘ compose1)
 
 
 ;; The extends-lang macro: reuse all from a `base-lang` except

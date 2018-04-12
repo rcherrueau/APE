@@ -4,6 +4,7 @@
          rackunit/text-ui
          "neonate.rkt"
          "adder.rkt"
+         "adder+let.rkt"
          )
 
 (module+ test
@@ -13,4 +14,5 @@
 
     neonate-tests
     adder-tests
+    adder+let-tests
     )))
