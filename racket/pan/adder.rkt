@@ -1,7 +1,8 @@
-#lang racket/base
+#lang racket
 
 (require (for-syntax racket/base
                      syntax/parse)
+         (prefix-in racket/base/ racket/base)
          racket/match
          "asm.rkt"
          "utils.rkt")

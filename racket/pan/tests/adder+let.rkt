@@ -134,8 +134,10 @@
    (test-not-compile "adder+let-bad-syntax"
                      "(add1)")
 
+   ;; With the new 'Id, `add` is parsed as `(Id 'add)`
    (test-not-compile "adder+let-bad-syntax"
-                     "(add 42)")
+                     "(add 42)"
+                     #rx"application: not a procedure")
 
    (test-not-compile "adder+let-unbound-id"
                      "(let ([x 10]) (add1 y))"

@@ -1,8 +1,9 @@
-#lang racket/base
+#lang racket
 
 (require (for-syntax racket/base
                      syntax/parse)
-         (prefix-in r: racket/base)
+         (prefix-in racket/base/ racket/base)
+         syntax/parse/define
          racket/match
          racket/undefined
          "asm.rkt"
@@ -28,23 +29,10 @@
 
 
 ;; Parser
-(extends-lang "adder.rkt" #:override add1 sub1)
+(extends-lang "adder.rkt")
 
-(provide compile-exp
-         add1
-         sub1
-         let
-         quote)
-
-(define-syntax (add1 stx)
-  (syntax-parse stx
-    [(_ ID:id) #'(Prim1 (Add1) (Id 'ID))]
-    [(_ EXP)   #'(Prim1 (Add1) EXP)]))
-
-(define-syntax (sub1 stx)
-  (syntax-parse stx
-    [(_ ID:id) #'(Prim1 (Sub1) (Id 'ID))]
-    [(_ EXP)   #'(Prim1 (Sub1) EXP)]))
+(define-syntax-parser id
+  [(_ . ID:id) #'(Id 'ID)])
 
 (define-syntax (let stx)
   (define (unique-ids? ids)
@@ -58,6 +46,8 @@
        #'(Let (list (cons 'ID EXP) ...) BODY)]
       [else
        (raise-syntax-error #f "duplicate identifier found" stx)])]))
+
+(provide compile-exp (rename-out [id #%top]) let quote)
 
 
 ;; The Stack -- How memory is used in programs. See,
@@ -148,7 +138,7 @@
         ;; Puts x stack address in the env; Computes new offset; And
         ;; compiles Let body.
         (let* ([new-env (hash-set env x stack-offset)]
-               [new-offset (r:add1 stack-offset)])
+               [new-offset (racket/base/add1 stack-offset)])
           (compile-exp e-body new-env new-offset))]
 
     [(Let bindings body)
