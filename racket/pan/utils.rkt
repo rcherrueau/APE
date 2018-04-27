@@ -24,14 +24,15 @@
   ;; Any). This helps type-checking the `unlines` function.
   [flatten (Any -> (Listof String))])
 
-(provide unlines
-         ∘ thunk
+(provide unlines ∘ thunk
+         primitive-op-id? unique-ids?
          define-datatype
          )
 
 ;; Macros defined in typed modules may not be used in untyped modules.
 ;; A workaround for such macros is provided them with `unsafe-provide`
 ;; which exports the macro without any contracts generated. See,
+;; https://docs.racket-lang.org/ts-guide/typed-untyped-interaction.html#%28part._.Using_.Typed_.Code_in_.Untyped_.Code%29
 ;; https://groups.google.com/d/msg/racket-users/eowl6RpdDwY/1wrCluDcAwAJ
 (unsafe-provide snoc extends-lang)
 
@@ -47,8 +48,18 @@
   (append AS ... (list A)))
 
 ;; Alias for compose1 (digraph C-k Ob)
-(: ∘ (All (a b c) (-> (-> b c) (-> a b) (-> a c))))
+(: ∘ (All (a b c) ((b → c) (a → b) → (a → c))))
 (define ∘ compose1)
+
+;; Check whether all identifier are unique, or not.
+(: unique-ids? ((Syntaxof (Listof Identifier)) → Boolean))
+(define (unique-ids? ids)
+  (not (check-duplicate-identifier (syntax->list ids))))
+
+;; Ensure the identifier refers to a primitive operation.
+(: primitive-op-id? ((Syntaxof Any) → Boolean))
+(define (primitive-op-id? id)
+  (and (member (syntax->datum id) '(add1 sub1)) #t))
 
 
 ;; The extends-lang macro: reuse all from a `base-lang` except
