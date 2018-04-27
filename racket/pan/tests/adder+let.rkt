@@ -137,7 +137,7 @@
    ;; With the new 'Id, `add` is parsed as `(Id 'add)`
    (test-not-compile "adder+let-bad-syntax"
                      "(add 42)"
-                     #rx"application: not a procedure")
+                     #rx"cannot apply expression add, since it is not an primitive operation")
 
    (test-not-compile "adder+let-unbound-id"
                      "(let ([x 10]) (add1 y))"

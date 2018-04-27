@@ -1,12 +1,12 @@
 #lang racket
 
 (require (for-syntax racket/base
-                     syntax/parse)
+                     syntax/parse
+                     (only-in "utils.rkt" unique-ids? primitive-op-id?))
          (prefix-in racket/base/ racket/base)
-         syntax/parse/define
          racket/match
-         racket/undefined
-         "asm.rkt"
+         syntax/parse/define
+         typed/racket
          "utils.rkt")
 
 ;; Adder -- A starter language that add number + Let-bindings and
@@ -19,35 +19,44 @@
 ;; n  ∈ Nat
 ;; id ∈ Identifier
 ;;
-;; exp ::= n                          (Num)
+;; exp ::=                            (Exp)
+;;         n                          (Num)
 ;;       | (add1 exp)                 (Prim1 Add1)
 ;;       | (sub1 exp)                 (Prim1 Sub1)
+;;       -- New in adder+let
 ;;       | id                         (Id)
 ;;       | (let ([id exp] ...) exp)   (Let)
 
-(require (only-in "ast.rkt" Exp Num Prim1 Add1 Sub1 Let Id))
-
 
 ;; Parser
-(extends-lang "adder.rkt")
+(require (only-in "ast.rkt" Exp Num Prim1 Add1 Sub1 Let Id))
 
-(define-syntax-parser id
-  [(_ . ID:id) #'(Id 'ID)])
+;; Reuse adder parser
+(extends-lang "adder.rkt" #:override #%app)
 
+;; Id
+(define-syntax-parser #%id
+  [(_ . ID:id)
+   #'(Id 'ID)])
+
+;; Override application to ensure the application with primitive
+;; operation only. Otherwise, it could end up in something like this:
+;; (foo 42) -> '((Id 'foo) (Num 10))
+(define-syntax (@%app stx)
+  (syntax-parse stx
+    [(_ op arg ...)
+     #:fail-when (not (primitive-op-id? #'op))
+       (format (string-append "cannot apply expression ~a, "
+                              "since it is not an primitive "
+                              "operation") (syntax->datum #'op))
+     #'(adder:#%app op arg ...)]))
+
+;; Let
 (define-syntax (let stx)
-  (define (unique-ids? ids)
-    (not (check-duplicate-identifier (syntax->list ids))))
-
   (syntax-parse stx
     [(_ ([ID:id EXP] ...) BODY)
-    (cond
-      ;; Ensure all identifiers are unique
-      [(unique-ids? #'(ID ...))
-       #'(Let (list (cons 'ID EXP) ...) BODY)]
-      [else
-       (raise-syntax-error #f "duplicate identifier found" stx)])]))
-
-(provide compile-exp (rename-out [id #%top]) let quote)
+     #:fail-when (not (unique-ids? #'(ID ...))) "duplicate identifier found"
+     #'(Let (list (cons 'ID EXP) ...) BODY)]))
 
 
 ;; The Stack -- How memory is used in programs. See,
@@ -111,16 +120,18 @@
 ;;    High → +--------------+
 ;;
 ;; The factor of 4 comes because addresses are measured in bytes.
+;;
 ;; TODO: Add an explanation on the handle of `let`.
 
 
 ;; Compiler
-;;
-;; - `env` is a map between and identifier and its address (ie, its
-;;   offset).
-;; - `stack-offset` is the current offset value for the stack frame.
-;;
-;; (: compile-exp (Exp (Immutable-HashTable Symbol Integer) Integer -> ASM))
+(require "asm.rkt")
+
+;; Take an `exp` and compiles into a list of assembly Instructions.
+;; `env` is a map between and identifier and its address on the stack
+;; frame (ie, its offset). `stack-offset` is the current offset value
+;; for the stack frame.
+(: compile-exp (Exp (Immutable-HashTable Symbol Integer) Integer -> ASM))
 (define (compile-exp exp [env (make-immutable-hash)] [stack-offset 1])
   (exp⇒asm exp
 
@@ -157,3 +168,9 @@
     [(Num n)
      => (Move (Reg (EAX)) (Const n))]
     [else (error "Compilation Error: Unsupported Exp" exp)]))
+
+
+;; Interface
+(provide (rename-out [#%id #%top]
+                     [@%app #%app])
+         let quote compile-exp)
