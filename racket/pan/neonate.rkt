@@ -4,7 +4,7 @@
          (prefix-in racket/base/ racket/base)
          racket/match
          syntax/parse/define
-         "asm.rkt"
+         typed/racket
          "utils.rkt")
 
 ;; A First Compiler -- Neonate. See,
@@ -12,26 +12,31 @@
 ;;
 ;; n  ∈ Nat
 ;;
-;; exp = n (Num)
-
-(require (only-in "ast.rkt" Exp Num))
+;; exp ::=   (Exp)
+;;         n (Num)
 
 
 ;; Parser
+(require (only-in "ast.rkt" Exp Num))
+
+;; Reuse core parser
 (extends-lang "core.rkt")
 
-;;  Only Nat are valid program
-(define-syntax-parser neonate-#%datum
+;; Num -- Only Nat are valid program
+(define-syntax-parser @%datum
   [(_ . N:nat) #'(Num (racket/base/#%datum . N))])
-
-(provide (rename-out [neonate-#%datum #%datum]) compile-exp)
 
 
 ;; Compiler
+(require "asm.rkt")
 
 ;; Takes a number and compiles it.
-;; (: compile-exp (Exp -> ASM))
+(: compile-exp (Exp -> ASM))
 (define (compile-exp exp)
   (exp⇒asm exp
     [(Num n) => (Move (Reg (EAX)) (Const n))]
     [else (error "Compilation Error: Unsupported Exp" exp)]))
+
+
+;; Interface
+(provide (rename-out [@%datum #%datum]) compile-exp)

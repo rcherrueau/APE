@@ -1,10 +1,9 @@
 #lang racket
 
-(require (for-syntax racket/base
-                     syntax/parse)
-         (prefix-in racket/base/ racket/base)
+(require (for-syntax racket/base)
          racket/match
-         "asm.rkt"
+         syntax/parse/define
+         typed/racket
          "utils.rkt")
 
 ;; Adder -- A starter language that add number.
@@ -15,27 +14,33 @@
 
 ;; n  ∈ Nat
 ;;
-;; exp ::= n              (Num)
-;;       | (add1 e)       (Prim1 Add1)
-;;       | (sub1 e)       (Prim1 Sub1)
-
-(require (only-in "ast.rkt" Exp Num Prim1 Add1 Sub1))
+;; exp ::=                (Exp)
+;;         n              (Num)
+;;       -- New in adder
+;;       | (add1 exp)     (Prim1 Add1)
+;;       | (sub1 exp)     (Prim1 Sub1)
 
 
 ;; Parser
+(require (only-in "ast.rkt" Exp Num Prim1 Add1 Sub1))
+
+;; Reuse neonate parser
 (extends-lang "neonate.rkt")
 
-(define-syntax-rule (add1 EXP)
-  (Prim1 (Add1) EXP))
+;; Prim1 Add1
+(define-syntax-parser add1
+  [(_ EXP:expr) #'(Prim1 (Add1) EXP)])
 
-(define-syntax-rule (sub1 EXP)
-  (Prim1 (Sub1) EXP))
-
-(provide add1 sub1 compile-exp)
+;; Prim1 Sub1
+(define-syntax-parser sub1
+  [(_ EXP:expr) #'(Prim1 (Sub1) EXP)])
 
 
 ;; Compiler
-;; (: compile-exp (Exp -> ASM))
+(require "asm.rkt")
+
+;; Take an Exp and compiles into a list of assembly Instructions.
+(: compile-exp (Exp -> ASM))
 (define (compile-exp exp)
   (exp⇒asm exp
 
@@ -54,3 +59,7 @@
     ;; -- Definitions from "neonate.rkt"
     [(Num n) => (Move (Reg (EAX)) (Const n))]
     [else (error "Compilation Error: Unsupported Exp" exp)]))
+
+
+;; Interface
+(provide add1 sub1 compile-exp)
