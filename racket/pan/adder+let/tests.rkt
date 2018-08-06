@@ -2,15 +2,11 @@
 
 (require rackunit
          rackunit/text-ui
-         "../ast.rkt"
+         "ast.rkt"
          "utils.rkt")
 
-(provide adder+let-tests)
 
-(define-values (test-ast test-asm test-compile test-not-compile)
-  (tests-for-lang "../adder+let.rkt"))
-
-(define adder+let-tests
+(module+ test (run-tests
   (test-suite
    "adder+let lang tests"
 
@@ -137,7 +133,7 @@
    ;; With the new 'Id, `add` is parsed as `(Id 'add)`
    (test-not-compile "adder+let-bad-syntax"
                      "(add 42)"
-                     #rx"cannot apply expression add, since it is not an primitive operation")
+                     #rx"application: not a procedure")
 
    (test-not-compile "adder+let-unbound-id"
                      "(let ([x 10]) (add1 y))"
@@ -146,6 +142,4 @@
    (test-not-compile "adder+let-letxy"
                      "(let ([x 10] [x 10]) 42)"
                      #rx"let: duplicate identifier found")
-   ))
-
-(module+ test (run-tests adder+let-tests))
+   )))

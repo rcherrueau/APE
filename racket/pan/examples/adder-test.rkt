@@ -1,4 +1,4 @@
-#lang s-exp "../adder.rkt"
+#lang s-exp "../adder/lang.rkt"
 
 ;; Adder -- A starter language.
 ;;

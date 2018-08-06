@@ -2,15 +2,10 @@
 
 (require rackunit
          rackunit/text-ui
-         "../ast.rkt"
+         "ast.rkt"
          "utils.rkt")
 
-(provide neonate-tests)
-
-(define-values (test-ast test-asm test-compile test-not-compile)
-  (tests-for-lang "../neonate.rkt"))
-
-(define neonate-tests
+(module+ test (run-tests
   (test-suite
    "neonate lang tests"
 
@@ -35,6 +30,4 @@
    (test-not-compile "neonate-nonnegative"
                       "-1"
                       #rx"#%datum: expected exact-nonnegative-integer\n  at: -1")
-   ))
-
-(module+ test (run-tests neonate-tests))
+   )))

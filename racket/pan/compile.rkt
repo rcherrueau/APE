@@ -34,8 +34,8 @@
 (define asm-cmd (format "as --32 -o ~a ~a" asm-object-name asm-output-name))
 (exec asm-cmd)
 
-;; > gcc -m32 -o <executable-name> _the_asm_code.o main.c
-(define gcc-cmd (format "gcc -m32 -o ~a ~a main.c"
+;; > gcc -m32 -o <executable-name> _the_asm_code.o _main.c
+(define gcc-cmd (format "gcc -m32 -o ~a ~a _main.c"
                         (or (executable-name)
                             (path-replace-extension file-to-compile ""))
                         asm-object-name))

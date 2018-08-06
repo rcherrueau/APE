@@ -2,15 +2,10 @@
 
 (require rackunit
          rackunit/text-ui
-         "../ast.rkt"
+         "ast.rkt"
          "utils.rkt")
 
-(provide adder-tests)
-
-(define-values (test-ast test-asm test-compile test-not-compile)
-  (tests-for-lang "../adder.rkt"))
-
-(define adder-tests
+(module+ test (run-tests
   (test-suite
    "adder lang tests"
 
@@ -96,6 +91,6 @@
                      "(add1)")
 
    (test-not-compile "adder-bad-syntax"
-                     "(add 42)")))
+                     "(add 42)")
 
-(module+ test (run-tests adder-tests))
+   )))
