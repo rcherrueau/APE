@@ -32,13 +32,14 @@
 
    (test-ast "adder+let-letx"
              "(let ([x 10]) (add1 x))"
-             (Let (list [cons 'x (Num 10 2)]) (Prim1 (Add1) (Id 'x 4) 3) 1))
+             (Let (list [cons 'x (Num 10 2)])
+                (Prim1 (Add1) (Id 'x 4) 3) 1))
 
    (test-ast "adder+let-letxy"
              "(let ([x 10] [y (add1 x)]) (sub1 y))"
              (Let (list [cons 'x (Num 10 2)])
-                  (Let (list [cons 'y (Prim1 (Add1) (Id 'x 5) 4)])
-                       (Prim1 (Sub1) (Id 'y 7) 6) 3) 1))
+                (Let (list [cons 'y (Prim1 (Add1) (Id 'x 5) 4)])
+                   (Prim1 (Sub1) (Id 'y 7) 6) 3) 1))
 
    (test-ast "conditional+tag"
              "(if 10 20 30)"
