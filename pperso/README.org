@@ -1,0 +1,11 @@
+Source code of my [[https://rcherrueau.github.io/][GitHub pages]].
+
+To build the website (you need racket 5+):
+- Clone the repo
+  : git clone --recurse-submodules https://github.com/rcherrueau/APE.git
+- Go into the personal pages directory
+  : cd APE/pperso
+- Install [[https://github.com/rcherrueau/rastache][Racket Mustache]]
+  : raco pkg install "git://github.com/rcherrueau/rastache.git?path=rastache#master
+- Compile the website
+  : ./make-site.rkt

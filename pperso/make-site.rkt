@@ -8,13 +8,14 @@
          racket/port
          racket/cmdline
          racket/match
+         net/url-string
          net/git-checkout)
 
 ;; The mustache page template.
 (define template "mu-scaffolding.html")
 
 ;; The output folder (output of the compilation)
-(define output-path "out")
+(define output-path (build-path (current-directory )"out"))
 
 ;; The web page Mustache template compiled.
 (define tokens (make-parameter (rast-compile/open-file template)))
@@ -51,36 +52,32 @@
 
 ;; Generates a specific page and returns the url of the generated
 ;; page.
-;; page -> page-url
+;; page -> generated-page-path
 (define (make-page page)
-  (call-with-output-file (format "~a/~a" output-path (page-url page))
-                         #:exists 'replace
+  (define output-file-path (build-path output-path (page-url page)))
+  (call-with-output-file output-file-path #:exists 'replace
     (λ (ostream)
       (rast-render (tokens) (make-ctx page) ostream)))
 
-  (define p-url (page-url page))
-  (displayln (format "Generation of ~s" p-url))
-  p-url)
+  (define file-url (url->string (path->url output-file-path)))
+  (displayln (format "Generation of ~s" file-url))
+  output-file-path)
 
 ;; Generates all pages of the web site and returns a list of
 ;; generated pages.
-;; () -> '(page)
+;; () -> '(page-path)
 (define (make-pages) (map make-page pages))
 
 ;; Main program
 (module* main #f
   ;; -------------------------------------------------- cmd-line
   (define continuous?  (make-parameter #f))
-  (define the-url (make-parameter null))
   (define publish?  (make-parameter #f))
   (command-line
    #:program "Personal webpages generator"
    #:once-any
    [("-c" "--continuous") "Continuously update of the webpages"
                           (continuous? #t)]
-   [("-u" "--url")   url
-                     "The webpage to generate base on its <url>"
-                     (the-url url)]
    [("-p" "--publish") "TODO: Publish webpages"
                        (publish? #t)]
    )
@@ -123,12 +120,6 @@
      (sync (eof-evt (current-input-port)))
      (custodian-shutdown-all main-cust)
      (displayln "Bye")]
-    [(not (null? (the-url)))
-     (let* ([eq-url? (λ (p) (equal? (the-url) (page-url p)))]
-            [p-filter (filter eq-url? pages)])
-       (match p-filter
-         [(list p _ ...) (exit (make-page p))]
-         [_ (error "Unknow url for the generation of the webpage")]))]
     [(publish?)
      ;; TODO: implement the automatic publishing of the website
      (git-checkout "github.com"
