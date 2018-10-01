@@ -1,0 +1,219 @@
+OpenStack in a Coconut is a serie of personal notes I take while working on OpenStack at Discovery.
+I take these notes to better understand how OpenStack works and decided to make them public.
+
+<br>
+<br>
+
+<section class="litp" id="nova-api">
+    <div>
+    <pre>
+<span class="linenr">1: </span><span style="color: #DFAF8F;">conductor_rpc</span> = &lt;&lt;RPC-Nova-Super-Conductor-Client&gt;&gt;
+<span class="linenr">2: </span><span style="color: #DFAF8F;">api_db</span>        = &lt;&lt;Database-NOVA_API-Client&gt;&gt;
+<span class="linenr">3: </span>
+<span class="linenr">4: </span><span style="color: #7CB8BB;">@app.route</span><span style="color: #DCDCCC;">(</span><span style="color: #CC9393;">'/servers'</span>, method=<span style="color: #CC9393;">'POST'</span><span style="color: #DCDCCC;">)</span>:
+<span class="linenr">5: </span><span style="color: #F0DFAF; font-weight: bold;">def</span> <span style="color: #93E0E3;">create</span><span style="color: #DCDCCC;">(</span>req: Request<span style="color: #DCDCCC;">)</span>:
+    </pre>
+    </div>
+    <div>
+        <p>
+            From, <code>nova-api</code> (the OpenStack Compute API server), that handles
+            incoming user requests.
+        </p>
+
+        <p>
+            Based on: <a href="https://github.com/jaypipes/articles/blob/master/openstack/walkthrough-launch-instance-request.md#openstack-compute-api-server-receives-boot-request">Jay Pipes Info</a>, <a href="https://developer.openstack.org/api-ref/compute/#create-server">Rest Doc</a>, <a href="https://github.com/openstack/nova/blob/2c9c4a09cb5fd31ccff368315534eaa788e90e67/nova/api/openstack/compute/servers.py#L453">Src code</a>.
+        </p>
+
+        <p>
+            In the following, every time you see a <code>&lt;&lt;some-name&gt;&gt;</code>, it is a
+            placeholder for a piece of code that I don't want to dive into.
+        </p>
+        <br>
+    </div>
+
+<div class="org-src-container">
+<pre class="src src-python"><span class="linenr"> 6: </span>    <span style="color: #5F7F5F;"># </span><span style="color: #7F9F7F;">Boot parameters</span>
+<span class="linenr"> 7: </span>    <span style="color: #DFAF8F;">name</span> = req.form<span style="color: #DCDCCC;">[</span><span style="color: #CC9393;">'name'</span><span style="color: #DCDCCC;">]</span>         <span style="color: #5F7F5F;"># </span><span style="color: #7F9F7F;">VM name</span>
+<span class="linenr"> 8: </span>    <span style="color: #DFAF8F;">image</span> = req.form<span style="color: #DCDCCC;">[</span><span style="color: #CC9393;">'imageRef'</span><span style="color: #DCDCCC;">]</span>    <span style="color: #5F7F5F;"># </span><span style="color: #7F9F7F;">Image UUID</span>
+<span class="linenr"> 9: </span>    <span style="color: #DFAF8F;">flavor</span> = req.form<span style="color: #DCDCCC;">[</span><span style="color: #CC9393;">'flavorRef'</span><span style="color: #DCDCCC;">]</span>  <span style="color: #5F7F5F;"># </span><span style="color: #7F9F7F;">Flavor id, UUID, or url</span>
+<span class="linenr">10: </span>    <span style="color: #DFAF8F;">nets</span> = req.form<span style="color: #DCDCCC;">[</span><span style="color: #CC9393;">'networks'</span><span style="color: #DCDCCC;">]</span>     <span style="color: #5F7F5F;"># </span><span style="color: #7F9F7F;">List of networks UUID</span>
+<span class="linenr">11: </span>    <span style="color: #DFAF8F;">key_name</span> = req.form<span style="color: #DCDCCC;">[</span><span style="color: #CC9393;">'key_name'</span><span style="color: #DCDCCC;">]</span> <span style="color: #5F7F5F;"># </span><span style="color: #7F9F7F;">Keypair name</span>
+<span class="linenr">12: </span>    <span style="color: #5F7F5F;"># </span><span style="color: #7F9F7F;">... project, security_groups, ....</span>
+<span class="linenr">13: </span>
+</pre>
+</div>
+<div>
+
+<p>
+The openstack CLI in listing <a href="#org648a77c">1</a> results in a <a href="https://developer.openstack.org/api-ref/compute/#create-server"><code>POST
+/servers</code></a> with the body in listing <a href="#org0fb3ae6">2</a>.
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 1: </span>OpenStack CLI command to boot a new VM.</label><pre class="src src-sh" id="org648a77c">openstack server create my-vm <span style="color: #CC9393;">\</span>
+          --image debian-9 <span style="color: #CC9393;">\</span>
+          --flavor tiny <span style="color: #CC9393;">\</span>
+          --network provider-net <span style="color: #CC9393;">\</span>
+          --key-name my-key
+</pre>
+</div>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 2: </span>Valid body for <a href="https://developer.openstack.org/api-ref/compute/#create-server"><code>POST /servers</code></a></label><pre class="src src-json" id="org0fb3ae6"><span style="color: #DCDCCC;">{</span>
+  <span style="color: #F0DFAF; font-weight: bold;">"server"</span> : <span style="color: #BFEBBF;">{</span>
+      <span style="color: #F0DFAF; font-weight: bold;">"name"</span> : <span style="color: #CC9393;">"my-vm"</span>,
+      <span style="color: #F0DFAF; font-weight: bold;">"imageRef"</span> : "<span style="color: #BFEBBF;">70a599e0</span>-<span style="color: #BFEBBF;">31e7</span>-<span style="color: #BFEBBF;">49b7</span>-b<span style="color: #BFEBBF;">260</span>-<span style="color: #BFEBBF;">868f441e862b</span>",
+      <span style="color: #F0DFAF; font-weight: bold;">"flavorRef"</span> : "<span style="color: #BFEBBF;">1</span>",
+      <span style="color: #F0DFAF; font-weight: bold;">"networks"</span> : <span style="color: #D0BF8F;">[</span><span style="color: #93E0E3;">{</span><span style="color: #F0DFAF; font-weight: bold;">"uuid"</span> : "ff<span style="color: #BFEBBF;">608</span>d<span style="color: #BFEBBF;">40</span>-<span style="color: #BFEBBF;">75e9</span>-<span style="color: #BFEBBF;">48cb</span>-b<span style="color: #BFEBBF;">745</span>-<span style="color: #BFEBBF;">77bb55b5eaf2</span>"<span style="color: #93E0E3;">}</span><span style="color: #D0BF8F;">]</span>,
+      <span style="color: #F0DFAF; font-weight: bold;">"key_pair"</span>: <span style="color: #CC9393;">"my-key"</span>
+  <span style="color: #BFEBBF;">}</span>
+<span style="color: #DCDCCC;">}</span>
+</pre>
+</div>
+<br>
+<br>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-python"><span class="linenr">14: </span>    <span style="color: #5F7F5F;"># </span><span style="color: #7F9F7F;">Defines the uuid of the instance and Make several entry in the</span>
+<span class="linenr">15: </span>    <span style="color: #5F7F5F;"># </span><span style="color: #7F9F7F;">database to track the new instance and its building state.</span>
+<span class="linenr">16: </span>    <span style="color: #DFAF8F;">instance_uuid</span> =  uuid.generate_uuid<span style="color: #DCDCCC;">()</span>
+<span class="linenr">17: </span>    <span style="color: #DFAF8F;">req_spec</span> = api_db.insert<span style="color: #DCDCCC;">(</span>f<span style="color: #CC9393;">'''</span>
+<span class="linenr">18: </span><span style="color: #CC9393;">      INSERT INTO nova_api.request_specs</span>
+<span class="linenr">19: </span><span style="color: #CC9393;">      (instance_uuid,    spec) VALUES</span>
+<span class="linenr">20: </span><span style="color: #CC9393;">      (${instance_uuid}, ${&lt;flavor.vcpu, flavor.memory, ...&gt;}); '''</span><span style="color: #DCDCCC;">)</span>
+<span class="linenr">21: </span>    <span style="color: #DFAF8F;">build_req</span> = api_db.insert<span style="color: #DCDCCC;">(</span>f<span style="color: #CC9393;">'''</span>
+<span class="linenr">22: </span><span style="color: #CC9393;">      INSERT INTO nova_api.build_requests</span>
+<span class="linenr">23: </span><span style="color: #CC9393;">      (flavor, image, name, vm_state, ..., instance_uuid) VALUES</span>
+<span class="linenr">24: </span><span style="color: #CC9393;">      (${flavor}, ${image}, ${name}, NULL, ..., {instance_uuid}); '''</span><span style="color: #DCDCCC;">)</span>
+<span class="linenr">25: </span>
+</pre>
+</div>
+<div>
+<p>
+Abstract of
+<a href="https://github.com/openstack/nova/blob/2c9c4a09cb5fd31ccff368315534eaa788e90e67/nova/api/openstack/compute/servers.py#L453"><code>nova.api.openstack.compute.servers.ServersController.create</code></a>,
+followed by <a href="https://github.com/openstack/nova/blob/2c9c4a09cb5fd31ccff368315534eaa788e90e67/nova/compute/api.py#L1594"><code>nova.compute.api.API.create</code></a>, which in turns, call the
+private method <a href="https://github.com/openstack/nova/blob/2c9c4a09cb5fd31ccff368315534eaa788e90e67/nova/compute/api.py#L1050"><code>nova.compute.api.API._create_instance</code></a> which finally
+calls <a href="https://github.com/openstack/nova/blob/2c9c4a09cb5fd31ccff368315534eaa788e90e67/nova/compute/api.py#L880"><code>nova.compute.api.API._provision_instances</code></a>. This part first
+calculates and sets the UUID of the instance and then, makes several
+entry in the database to track the new instance and its building
+state:
+</p>
+<ul class="org-ul">
+<li><p>
+The <code>req_spec</code> stores in <code>spec</code> all parameters that have been passed
+to the <code>create</code> method to build the <code>instance_uuid</code>. The output of
+<code>spec</code> is something like in linsting <a href="#orgacd6758">3</a>.
+</p>
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 3: </span>Output of <code>SELECT spec FROM nova_api.request_specs</code>.</label><pre class="src src-json" id="orgacd6758"><span style="color: #DCDCCC;">{</span> <span style="color: #F0DFAF; font-weight: bold;">"nova_object.version"</span>: "<span style="color: #BFEBBF;">1</span>.<span style="color: #BFEBBF;">8</span>", <span style="color: #F0DFAF; font-weight: bold;">"nova_object.changes"</span>:
+<span style="color: #BFEBBF;">[</span><span style="color: #CC9393;">"requested_destination"</span>, <span style="color: #CC9393;">"instance_uuid"</span>, <span style="color: #CC9393;">"retry"</span>, <span style="color: #CC9393;">"num_instances"</span>,
+<span style="color: #CC9393;">"pci_requests"</span>, <span style="color: #CC9393;">"limits"</span>, <span style="color: #CC9393;">"availability_zone"</span>, <span style="color: #CC9393;">"force_nodes"</span>, <span style="color: #CC9393;">"image"</span>,
+<span style="color: #CC9393;">"instance_group"</span>, <span style="color: #CC9393;">"force_hosts"</span>, <span style="color: #CC9393;">"numa_topology"</span>, <span style="color: #CC9393;">"ignore_hosts"</span>,
+<span style="color: #CC9393;">"flavor"</span>, <span style="color: #CC9393;">"project_id"</span>, <span style="color: #CC9393;">"security_groups"</span>, <span style="color: #CC9393;">"scheduler_hints"</span><span style="color: #BFEBBF;">]</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"nova_object.name"</span>: <span style="color: #CC9393;">"RequestSpec"</span>, <span style="color: #F0DFAF; font-weight: bold;">"nova_object.data"</span>:
+<span style="color: #BFEBBF;">{</span><span style="color: #F0DFAF; font-weight: bold;">"requested_destination"</span>: <span style="color: #BFEBBF;">null</span>, <span style="color: #F0DFAF; font-weight: bold;">"instance_uuid"</span>:
+"c<span style="color: #BFEBBF;">8</span>ad<span style="color: #BFEBBF;">80</span>b<span style="color: #BFEBBF;">6</span>-<span style="color: #BFEBBF;">7d34</span>-<span style="color: #BFEBBF;">403a</span>-<span style="color: #BFEBBF;">9551</span>-e<span style="color: #BFEBBF;">25</span>d<span style="color: #BFEBBF;">0</span>b<span style="color: #BFEBBF;">05</span>dbb<span style="color: #BFEBBF;">9</span>", <span style="color: #F0DFAF; font-weight: bold;">"retry"</span>: <span style="color: #BFEBBF;">null</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"num_instances"</span>: <span style="color: #BFEBBF;">1</span>, <span style="color: #F0DFAF; font-weight: bold;">"pci_requests"</span>: <span style="color: #D0BF8F;">{</span><span style="color: #F0DFAF; font-weight: bold;">"nova_object.version"</span>: "<span style="color: #BFEBBF;">1</span>.<span style="color: #BFEBBF;">1</span>",
+<span style="color: #F0DFAF; font-weight: bold;">"nova_object.changes"</span>: <span style="color: #93E0E3;">[</span><span style="color: #CC9393;">"requests"</span><span style="color: #93E0E3;">]</span>, <span style="color: #F0DFAF; font-weight: bold;">"nova_object.name"</span>:
+<span style="color: #CC9393;">"InstancePCIRequests"</span>, <span style="color: #F0DFAF; font-weight: bold;">"nova_object.data"</span>: <span style="color: #93E0E3;">{</span><span style="color: #F0DFAF; font-weight: bold;">"requests"</span>: <span style="color: #9FC59F;">[]</span><span style="color: #93E0E3;">}</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"nova_object.namespace"</span>: <span style="color: #CC9393;">"nova"</span><span style="color: #D0BF8F;">}</span>, <span style="color: #F0DFAF; font-weight: bold;">"limits"</span>: <span style="color: #D0BF8F;">{</span><span style="color: #F0DFAF; font-weight: bold;">"nova_object.version"</span>:
+"<span style="color: #BFEBBF;">1</span>.<span style="color: #BFEBBF;">0</span>", <span style="color: #F0DFAF; font-weight: bold;">"nova_object.changes"</span>: <span style="color: #93E0E3;">[</span><span style="color: #CC9393;">"vcpu"</span>, <span style="color: #CC9393;">"memory_mb"</span>, <span style="color: #CC9393;">"disk_gb"</span>,
+<span style="color: #CC9393;">"numa_topology"</span><span style="color: #93E0E3;">]</span>, <span style="color: #F0DFAF; font-weight: bold;">"nova_object.name"</span>: <span style="color: #CC9393;">"SchedulerLimits"</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"nova_object.data"</span>: <span style="color: #93E0E3;">{</span><span style="color: #F0DFAF; font-weight: bold;">"vcpu"</span>: <span style="color: #BFEBBF;">null</span>, <span style="color: #F0DFAF; font-weight: bold;">"memory_mb"</span>: <span style="color: #BFEBBF;">null</span>, <span style="color: #F0DFAF; font-weight: bold;">"disk_gb"</span>: <span style="color: #BFEBBF;">null</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"numa_topology"</span>: <span style="color: #BFEBBF;">null</span><span style="color: #93E0E3;">}</span>, <span style="color: #F0DFAF; font-weight: bold;">"nova_object.namespace"</span>: <span style="color: #CC9393;">"nova"</span><span style="color: #D0BF8F;">}</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"availability_zone"</span>: <span style="color: #BFEBBF;">null</span>, <span style="color: #F0DFAF; font-weight: bold;">"force_nodes"</span>: <span style="color: #BFEBBF;">null</span>, <span style="color: #F0DFAF; font-weight: bold;">"image"</span>:
+<span style="color: #D0BF8F;">{</span><span style="color: #F0DFAF; font-weight: bold;">"nova_object.version"</span>: "<span style="color: #BFEBBF;">1</span>.<span style="color: #BFEBBF;">8</span>", <span style="color: #F0DFAF; font-weight: bold;">"nova_object.changes"</span>: <span style="color: #93E0E3;">[</span><span style="color: #CC9393;">"status"</span>,
+<span style="color: #CC9393;">"name"</span>, <span style="color: #CC9393;">"container_format"</span>, <span style="color: #CC9393;">"created_at"</span>, <span style="color: #CC9393;">"disk_format"</span>, <span style="color: #CC9393;">"updated_at"</span>,
+<span style="color: #CC9393;">"id"</span>, <span style="color: #CC9393;">"min_disk"</span>, <span style="color: #CC9393;">"min_ram"</span>, <span style="color: #CC9393;">"checksum"</span>, <span style="color: #CC9393;">"owner"</span>, <span style="color: #CC9393;">"properties"</span>,
+<span style="color: #CC9393;">"size"</span><span style="color: #93E0E3;">]</span>, <span style="color: #F0DFAF; font-weight: bold;">"nova_object.name"</span>: <span style="color: #CC9393;">"ImageMeta"</span>, <span style="color: #F0DFAF; font-weight: bold;">"nova_object.data"</span>:
+<span style="color: #93E0E3;">{</span><span style="color: #F0DFAF; font-weight: bold;">"status"</span>: <span style="color: #CC9393;">"active"</span>, <span style="color: #F0DFAF; font-weight: bold;">"created_at"</span>: "<span style="color: #BFEBBF;">2018</span>-<span style="color: #BFEBBF;">05</span>-<span style="color: #BFEBBF;">23T22</span>:<span style="color: #BFEBBF;">31</span>:<span style="color: #BFEBBF;">45Z</span>", <span style="color: #F0DFAF; font-weight: bold;">"name"</span>:
+"cirros-<span style="color: #BFEBBF;">0</span>.<span style="color: #BFEBBF;">3</span>.<span style="color: #BFEBBF;">5</span>-x<span style="color: #BFEBBF;">86</span>_<span style="color: #BFEBBF;">64</span>-disk", <span style="color: #F0DFAF; font-weight: bold;">"container_format"</span>: <span style="color: #CC9393;">"bare"</span>, <span style="color: #F0DFAF; font-weight: bold;">"min_ram"</span>: <span style="color: #BFEBBF;">0</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"disk_format"</span>: <span style="color: #CC9393;">"qcow2"</span>, <span style="color: #F0DFAF; font-weight: bold;">"updated_at"</span>: "<span style="color: #BFEBBF;">2018</span>-<span style="color: #BFEBBF;">05</span>-<span style="color: #BFEBBF;">23T22</span>:<span style="color: #BFEBBF;">31</span>:<span style="color: #BFEBBF;">45Z</span>", <span style="color: #F0DFAF; font-weight: bold;">"id"</span>:
+"<span style="color: #BFEBBF;">83c2d433</span>-<span style="color: #BFEBBF;">52b9</span>-<span style="color: #BFEBBF;">4693</span>-<span style="color: #BFEBBF;">95c3</span>-<span style="color: #BFEBBF;">8aec51960e0b</span>", <span style="color: #F0DFAF; font-weight: bold;">"min_disk"</span>: <span style="color: #BFEBBF;">0</span>, <span style="color: #F0DFAF; font-weight: bold;">"checksum"</span>:
+<span style="color: #CC9393;">"f8ab98ff5e73ebab884d80c9dc9c7290"</span>, <span style="color: #F0DFAF; font-weight: bold;">"owner"</span>:
+"<span style="color: #BFEBBF;">8a46798a647344c0b1cddf97c008a350</span>", <span style="color: #F0DFAF; font-weight: bold;">"properties"</span>:
+<span style="color: #9FC59F;">{</span><span style="color: #F0DFAF; font-weight: bold;">"nova_object.version"</span>: "<span style="color: #BFEBBF;">1</span>.<span style="color: #BFEBBF;">19</span>", <span style="color: #F0DFAF; font-weight: bold;">"nova_object.name"</span>: <span style="color: #CC9393;">"ImageMetaProps"</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"nova_object.data"</span>: <span style="color: #BFEBBF;">null</span>, <span style="color: #F0DFAF; font-weight: bold;">"nova_object.namespace"</span>: <span style="color: #CC9393;">"nova"</span><span style="color: #9FC59F;">}</span>, <span style="color: #F0DFAF; font-weight: bold;">"size"</span>:
+<span style="color: #BFEBBF;">13267968</span><span style="color: #93E0E3;">}</span>, <span style="color: #F0DFAF; font-weight: bold;">"nova_object.namespace"</span>: <span style="color: #CC9393;">"nova"</span><span style="color: #D0BF8F;">}</span>, <span style="color: #F0DFAF; font-weight: bold;">"instance_group"</span>: <span style="color: #BFEBBF;">null</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"force_hosts"</span>: <span style="color: #BFEBBF;">null</span>, <span style="color: #F0DFAF; font-weight: bold;">"numa_topology"</span>: <span style="color: #BFEBBF;">null</span>, <span style="color: #F0DFAF; font-weight: bold;">"ignore_hosts"</span>: <span style="color: #BFEBBF;">null</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"flavor"</span>: <span style="color: #D0BF8F;">{</span><span style="color: #F0DFAF; font-weight: bold;">"nova_object.version"</span>: "<span style="color: #BFEBBF;">1</span>.<span style="color: #BFEBBF;">2</span>", <span style="color: #F0DFAF; font-weight: bold;">"nova_object.name"</span>: <span style="color: #CC9393;">"Flavor"</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"nova_object.data"</span>: <span style="color: #93E0E3;">{</span><span style="color: #F0DFAF; font-weight: bold;">"disabled"</span>: <span style="color: #BFEBBF;">false</span>, <span style="color: #F0DFAF; font-weight: bold;">"root_gb"</span>: <span style="color: #BFEBBF;">1</span>, <span style="color: #F0DFAF; font-weight: bold;">"description"</span>:
+<span style="color: #BFEBBF;">null</span>, <span style="color: #F0DFAF; font-weight: bold;">"flavorid"</span>: "<span style="color: #BFEBBF;">1</span>", <span style="color: #F0DFAF; font-weight: bold;">"deleted"</span>: <span style="color: #BFEBBF;">false</span>, <span style="color: #F0DFAF; font-weight: bold;">"created_at"</span>:
+"<span style="color: #BFEBBF;">2018</span>-<span style="color: #BFEBBF;">05</span>-<span style="color: #BFEBBF;">23T22</span>:<span style="color: #BFEBBF;">33</span>:<span style="color: #BFEBBF;">26Z</span>", <span style="color: #F0DFAF; font-weight: bold;">"ephemeral_gb"</span>: <span style="color: #BFEBBF;">0</span>, <span style="color: #F0DFAF; font-weight: bold;">"updated_at"</span>: <span style="color: #BFEBBF;">null</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"memory_mb"</span>: <span style="color: #BFEBBF;">512</span>, <span style="color: #F0DFAF; font-weight: bold;">"vcpus"</span>: <span style="color: #BFEBBF;">1</span>, <span style="color: #F0DFAF; font-weight: bold;">"extra_specs"</span>: <span style="color: #BFEBBF;">null</span>, <span style="color: #F0DFAF; font-weight: bold;">"swap"</span>: <span style="color: #BFEBBF;">0</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"rxtx_factor"</span>: <span style="color: #BFEBBF;">1</span>, <span style="color: #F0DFAF; font-weight: bold;">"is_public"</span>: <span style="color: #BFEBBF;">true</span>, <span style="color: #F0DFAF; font-weight: bold;">"deleted_at"</span>: <span style="color: #BFEBBF;">null</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"vcpu_weight"</span>: <span style="color: #BFEBBF;">0</span>, <span style="color: #F0DFAF; font-weight: bold;">"id"</span>: <span style="color: #BFEBBF;">6</span>, <span style="color: #F0DFAF; font-weight: bold;">"name"</span>: <span style="color: #CC9393;">"m1.tiny"</span><span style="color: #93E0E3;">}</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"nova_object.namespace"</span>: <span style="color: #CC9393;">"nova"</span><span style="color: #D0BF8F;">}</span>, <span style="color: #F0DFAF; font-weight: bold;">"project_id"</span>:
+"<span style="color: #BFEBBF;">8a46798a647344c0b1cddf97c008a350</span>", <span style="color: #F0DFAF; font-weight: bold;">"security_groups"</span>:
+<span style="color: #D0BF8F;">{</span><span style="color: #F0DFAF; font-weight: bold;">"nova_object.version"</span>: "<span style="color: #BFEBBF;">1</span>.<span style="color: #BFEBBF;">1</span>", <span style="color: #F0DFAF; font-weight: bold;">"nova_object.changes"</span>: <span style="color: #93E0E3;">[</span><span style="color: #CC9393;">"objects"</span><span style="color: #93E0E3;">]</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"nova_object.name"</span>: <span style="color: #CC9393;">"SecurityGroupList"</span>, <span style="color: #F0DFAF; font-weight: bold;">"nova_object.data"</span>:
+<span style="color: #93E0E3;">{</span><span style="color: #F0DFAF; font-weight: bold;">"objects"</span>: <span style="color: #9FC59F;">[</span><span style="color: #94BFF3;">{</span><span style="color: #F0DFAF; font-weight: bold;">"nova_object.version"</span>: "<span style="color: #BFEBBF;">1</span>.<span style="color: #BFEBBF;">2</span>", <span style="color: #F0DFAF; font-weight: bold;">"nova_object.changes"</span>:
+<span style="color: #E0CF9F;">[</span><span style="color: #CC9393;">"name"</span><span style="color: #E0CF9F;">]</span>, <span style="color: #F0DFAF; font-weight: bold;">"nova_object.name"</span>: <span style="color: #CC9393;">"SecurityGroup"</span>, <span style="color: #F0DFAF; font-weight: bold;">"nova_object.data"</span>:
+<span style="color: #E0CF9F;">{</span><span style="color: #F0DFAF; font-weight: bold;">"name"</span>: <span style="color: #CC9393;">"default"</span><span style="color: #E0CF9F;">}</span>, <span style="color: #F0DFAF; font-weight: bold;">"nova_object.namespace"</span>: <span style="color: #CC9393;">"nova"</span><span style="color: #94BFF3;">}</span><span style="color: #9FC59F;">]</span><span style="color: #93E0E3;">}</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"nova_object.namespace"</span>: <span style="color: #CC9393;">"nova"</span><span style="color: #D0BF8F;">}</span>, <span style="color: #F0DFAF; font-weight: bold;">"scheduler_hints"</span>: <span style="color: #BFEBBF;">null</span><span style="color: #BFEBBF;">}</span>,
+<span style="color: #F0DFAF; font-weight: bold;">"nova_object.namespace"</span>: <span style="color: #CC9393;">"nova"</span><span style="color: #DCDCCC;">}</span>
+</pre>
+</div></li>
+<li>The <code>build_req</code> tracks the building state of the instance. This
+information is cleaned after the VM boot or failed to boot.</li>
+<li><p>
+Not mentioned in the abstract code, but nova also add an entry
+into the <code>nova_api.instance_mappings</code> table like in listing
+<a href="#org9e8cdfd">4</a>.
+</p>
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 4: </span>Add instance into <code>nova_api.instance_mappings</code>.</label><pre class="src src-python" id="org9e8cdfd">  <span style="color: #DFAF8F;">instance_mapping</span> = api_db.query<span style="color: #DCDCCC;">(</span>f<span style="color: #CC9393;">'''</span>
+<span style="color: #CC9393;">    INSERT INTO nova_api.instance_mappings</span>
+<span style="color: #CC9393;">    (instance_uuid,    cell_id, project_id) VALUES</span>
+<span style="color: #CC9393;">    (${instance_uuid}, NULL,    ${project_id}); '''</span><span style="color: #DCDCCC;">)</span>
+</pre>
+</div>
+<p>
+The super-conductor uses the <code>instance_mappings</code> table to lookup
+information about VMs without being mandatory to fetch information
+in every Cell. Table <a href="#org0228eef">1</a> shows an output example
+of this table. The <code>&lt;null&gt;</code> value for <code>instance_mapping.cell_id</code>
+tells the super-conductor that the VM
+<code>2cafa443-e1ec-4ed7-8ebb-f81d81672915</code> doesn't yet exist in a Cell,
+and lookups for it need to instead look for the <code>req_spec</code>.
+</p>
+<table id="org0228eef">
+<caption class="t-above"><span class="table-number">Table 1:</span> Output of <code>SELECT * FROM nova_api.instance_mappings</code>.</caption>
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">instance_uuid</th>
+<th scope="col" class="org-left">cell_id</th>
+<th scope="col" class="org-left">project_id</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">c8ad80b6-7d34-403a-9551-e25d0b05dbb9</td>
+<td class="org-left">2</td>
+<td class="org-left">8a46798a647344c0b1cddf97c008a350</td>
+</tr>
+
+<tr>
+<td class="org-left">2cafa443-e1ec-4ed7-8ebb-f81d81672915</td>
+<td class="org-left">&lt;null&gt;</td>
+<td class="org-left">8a46798a647344c0b1cddf97c008a350</td>
+</tr>
+</tbody>
+</table></li>
+</ul>
+
+<p>
+    <br>
+    <br>
+</div>
+</section>

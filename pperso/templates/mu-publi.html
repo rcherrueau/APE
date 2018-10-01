@@ -1,0 +1,39 @@
+<div class="col-12">
+{{#publications.thesis}}
+    <article id="thesis" class="articles">
+        <h1>Thesis</h1>
+        <b>{{{title}}}.</b>
+        Ph.D thesis, {{defense}}. {{school}}.
+        <em>Keywords: {{keywords}}</em>.
+        <a href="{{{url}}}">[abstract]</a>
+        {{#pdf-url}}<a href="{{{pdf-url}}}">[pdf.fr]</a>{{/pdf-url}}
+        {{#slides-url}}<a href="{{{slides-url}}}">[slides.f]</a>{{/slides-url}}
+    </article>
+{{/publications.thesis}}
+</div>
+
+
+<div class="col-12 mt-4">
+<article id="articles" class="articles">
+    <h1>Articles</h1>
+    <ul>
+    {{#publications.articles}}
+    <li>
+        <h4>{{year}}</h4>
+        <ul>
+            {{#articles}}
+            <li>
+                <b>{{{title}}}.</b>
+                {{{authors}}}.
+                In <em>{{{booktitle}}}</em>.
+                <a href="{{{url}}}">[abstract]</a>
+                {{#pdf-url}}<a href="{{{pdf-url}}}">[pdf]</a>{{/pdf-url}}
+                {{#slides-url}}<a href="{{{slides-url}}}">[slides]</a>{{/slides-url}}
+            </li>
+            {{/articles}}
+        </ul>
+    </li>
+    {{/publications.articles}}
+    </ul>
+</article>
+</div>
