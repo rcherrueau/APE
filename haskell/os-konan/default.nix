@@ -1,11 +1,11 @@
 { pkgs ? (import <nixpkgs> {})
-, compiler ? pkgs.haskell.packages.ghc822
+# , compiler ? pkgs.haskell.compiler.ghc843
 }:
 
 # with (import <nixpkgs/pkgs/development/haskell-modules/lib.nix> { inherit pkgs; });
 
 pkgs.mkShell {
-  buildInpupt = [ pkgs.stack pkgs.zlib pkgs.jq ];
+  buildInputs = [ pkgs.stack pkgs.zlib pkgs.jq ];
   shellHook = ''
     COMPILER_TOOL_PATH=$(${pkgs.stack}/bin/stack --nix path --compiler-tools-bin)
     function stack_install_tool() {
@@ -27,7 +27,6 @@ pkgs.mkShell {
     stack_install_tool hasktags
 
     # Put stack, ghc and stack-tools into the PATH
-    PATH=$PATH:${pkgs.stack}/bin                   # stack
     PATH=$PATH:$(stack path --compiler-bin)        # ghc, ghci
     alias stack="${pkgs.stack}/bin/stack --nix"    # Fallback on nix by default
 
