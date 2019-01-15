@@ -1,7 +1,6 @@
 module Main where
 
 import Data.List
-import Data.Tree
 import Data.Maybe
 import Data.Store as Store (PeekException)
 
@@ -12,11 +11,13 @@ import qualified Data.ByteString.Lazy as File (writeFile)
 import qualified System.Directory as File (doesFileExist)
 import Control.Monad (unless)
 
-import qualified Data.OpenStack.Subunit as OSS
-import qualified Data.OpenStack.OSPTrace as OSP
+import qualified Data.OpenStack.Subunit as OSS (save, parse, load, sql)
+import qualified Data.OpenStack.OSPTrace as OSP (save, parse, load, sql)
+import Data.OpenStack.Subunit (OSTest(..))
+import Data.OpenStack.OSPTrace (OSPTrace, TraceType(..), TraceInfo(..))
 import qualified Data.OpenStack.Sql as OS (isCorrelated)
 
-
+
 -- | Processes a test `a`.
 process :: JSON.ToJSON b
         => (String -> IO (Either String a))         -- ^ Parse test `a`
@@ -24,7 +25,7 @@ process :: JSON.ToJSON b
         -> (String -> IO (Either PeekException a))  -- ^ Load `a` from the disk
         -> (a -> b) -> String -> String -> IO ()    -- ^ fold, fileIn, fileOut
 process parse save load m fileIn fileOut = do
-  let fileBinary = fileIn ++ binaryExt
+  let fileBinary = fileIn ++ ".raw"
 
   -- Parse test from file and save it (if needed)
   alreadyParsed <- File.doesFileExist fileBinary
@@ -50,22 +51,21 @@ process parse save load m fileIn fileOut = do
       File.writeFile fileOut $ JSON.encodePretty test'
       putStrLn $ "Folded saved into " ++ fileOut
 
-  where
-  binaryExt :: String
-  binaryExt = ".raw"
-
 -- | Processes `OSTests`.
-processOSS :: JSON.ToJSON b => (OSS.OSTests -> b) -> String -> String -> IO ()
+processOSS :: JSON.ToJSON b => ([OSTest] -> b) -> String -> String -> IO ()
 processOSS = process OSS.parse OSS.save OSS.load
 
 -- | Processes `OSPTrace`.
-processOSP :: JSON.ToJSON b => (OSP.OSPTrace -> b) -> String -> String -> IO ()
+processOSP :: JSON.ToJSON b => (OSPTrace -> b) -> String -> String -> IO ()
 processOSP = process OSP.parse OSP.save OSP.load
 
-sqlUnique :: [ OSS.OSTest ] -> [ OSS.OSTest ]
+
+-- Transformation functions
+
+sqlUnique :: [ OSTest ] -> [ OSTest ]
 sqlUnique ts = snd $ foldl notSeenOSTestLevel ([], []) ts
   where
-    notSeenOSTestLevel :: ([ SQL.QueryExpr ], [ OSS.OSTest ]) -> OSS.OSTest -> ([ SQL.QueryExpr ], [ OSS.OSTest ])
+    notSeenOSTestLevel :: ([ SQL.QueryExpr ], [ OSTest ]) -> OSTest -> ([ SQL.QueryExpr ], [ OSTest ])
     notSeenOSTestLevel (seen, ts) t =
       let sqls           = OSS.sql t
           (seen', sqls') = notSeenSqlLevel seen sqls
@@ -80,17 +80,24 @@ sqlUnique ts = snd $ foldl notSeenOSTestLevel ([], []) ts
       | otherwise     = let (seen', ts') = notSeenSqlLevel (t : seen) ts
                         in  (seen', t : ts')
 
-correlatedUniqueOSP :: OSP.OSPTrace -> [SQL.QueryExpr]
-correlatedUniqueOSP = nub . filter OS.isCorrelated . filterDBReq . flatten
+-- | Returns SQL correlated subqueries of an OSPTrace.
+--
+-- This function removes duplication.
+correlatedUniqueOSP :: OSPTrace -> [SQL.QueryExpr]
+correlatedUniqueOSP = nub . filter OS.isCorrelated . foldMap filterDBReq
   where
-    -- TODO rewrite with lenses
-    filterDBReq :: [OSP.TraceType] -> [SQL.QueryExpr]
-    filterDBReq [] = []
-    filterDBReq (OSP.DB t:ts) =
-      let dbreq = OSP.req t
-          mSql  = OSP.sql dbreq
-      in maybeToList mSql ++ filterDBReq ts
-    filterDBReq (_:ts) = filterDBReq ts
+    -- `foldMap f` walks across the list, applies `f` to each element
+    -- and collects the results by combining them with `mappend`.
+    filterDBReq :: TraceType -> [SQL.QueryExpr]
+    filterDBReq (DB TraceInfo {  req = dbreq }) =
+      -- I may better access `dbreq` with lenses
+      let mSql = OSP.sql dbreq
+      in  maybeToList mSql
+    filterDBReq _ = []
+
+-- | Only keeps edges that ends by a REST call
+restEdges :: OSPTrace -> OSPTrace
+restEdges t = _hole
 
 
 -- Utils
@@ -103,7 +110,6 @@ ___s s = putStrLn $ replicate (80 - (length s + 1)) '=' ++ " " ++ s
 -- | Draws a line
 ____ :: IO ()
 ____ = putStrLn (replicate 80 '-')
-
 
 
 -- Main
@@ -132,16 +138,6 @@ main = do
 
   where
     -- | Only keeps correlated query from an OSTest.
-    correlatedOSTest :: OSS.OSTest -> OSS.OSTest
-    correlatedOSTest t = t { OSS.sql = filter OS.isCorrelated (OSS.sql t) }
-
-    equalOSTestQuery :: OSS.OSTest -> OSS.OSTest -> Bool
-    equalOSTestQuery t t' = OSS.sql t == OSS.sql t'
-
-    correlatedUniqueOSS :: [ OSS.OSTest ] -> [ OSS.OSTest]
-    correlatedUniqueOSS = filter (not . null . OSS.sql) . sqlUnique . map correlatedOSTest
-
-    -- correlatedOSS = processOSS (filter (not . null . OSS.sql) . map correlatedOSTest)
-    correlatedOSS = processOSS (nub . filter OS.isCorrelated . concatMap OSS.sql)
+    correlatedOSS = processOSS (nub . filter OS.isCorrelated . concatMap sql)
 
     correlatedOSP = processOSP correlatedUniqueOSP

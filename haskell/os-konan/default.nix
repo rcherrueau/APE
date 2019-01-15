@@ -1,11 +1,20 @@
 { pkgs ? (import <nixpkgs> {})
+# HIE: Haskell Ide-Integration for nix
+# https://github.com/domenkozar/hie-nix
+, hiepkg ? (import (fetchTarball {
+    url = "https://github.com/domenkozar/hie-nix/tarball/master";
+  }) {})
 # , compiler ? pkgs.haskell.compiler.ghc843
 }:
 
-# with (import <nixpkgs/pkgs/development/haskell-modules/lib.nix> { inherit pkgs; });
 
 pkgs.mkShell {
-  buildInputs = [ pkgs.stack pkgs.zlib pkgs.jq ];
+  buildInputs = [ hiepkg.hies pkgs.stack pkgs.zlib pkgs.jq pkgs.bashInteractive ];
+  # SHELL is overriden for whatever reason:
+  # https://github.com/NixOS/nix/issues/644
+  # SHELL="${pkgs.bashInteractive}/bin/bash";
+  # Workarround: do `exec $ISHELL`
+  ISHELL="${pkgs.bashInteractive}/bin/bash";
   shellHook = ''
     COMPILER_TOOL_PATH=$(${pkgs.stack}/bin/stack --nix path --compiler-tools-bin)
     function stack_install_tool() {
@@ -20,11 +29,12 @@ pkgs.mkShell {
     }
 
     # Spacemacs dependencies for haskell env
-    stack_install_tool ghc-mod
     stack_install_tool apply-refact refactor
     stack_install_tool hlint
     stack_install_tool stylish-haskell
     stack_install_tool hasktags
+    stack_install_tool hsimport
+    # stack_install_tool brittany
 
     # Put stack, ghc and stack-tools into the PATH
     PATH=$PATH:$(stack path --compiler-bin)        # ghc, ghci
