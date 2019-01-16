@@ -12,7 +12,7 @@ import qualified Data.List as L
 
 import Data.Text (Text, isSuffixOf)
 
-
+
 -- JSON Combinators
 
 -- | Retrieve the value associated with the path of key of an 'Value'.
@@ -20,9 +20,9 @@ import Data.Text (Text, isSuffixOf)
 -- value cannot be converted to the desired type.
 --
 -- Example usage to get the value of "k" {a: {path: {to: k: {}}}}:
--- >>> o .:+ ["a", "path", "to", "k"]
-(.:+) :: (FromJSON a) => JSON.Value -> [Text] -> JSON.Parser a
-(.:+) v t = parseJSON <=< foldM ((maybe err pure .) . lookupE) v $ t
+-- >>> o .+: ["a", "path", "to", "k"]
+(.+:) :: (FromJSON a) => JSON.Value -> [Text] -> JSON.Parser a
+(.+:) v t = parseJSON <=< foldM ((maybe err pure .) . lookupE) v $ t
   where
     err :: JSON.Parser a
     err = fail $ "No key path for " ++ show t ++ " in " ++ show v
@@ -35,10 +35,10 @@ import Data.Text (Text, isSuffixOf)
 -- The result is 'empty' if there is no key ended by 'Text' or the
 -- value cannot be converted to the desired type.
 --
--- Example usage to get the value of "word-with-suffix":
--- >>> o .:*- "-suffix"
-(.:*-) :: (FromJSON a) => JSON.Object -> Text -> JSON.Parser a
-(.:*-) o t = parseJSON <=< ((maybe err pure .) . lookupRE) o $ t
+-- Example usage to get the value of "{wordWithSuffix: {}}":
+-- >>> o *.: "Suffix"
+(*.:) :: (FromJSON a) => JSON.Object -> Text -> JSON.Parser a
+(*.:) o t = parseJSON <=< ((maybe err pure .) . lookupRE) o $ t
   where
     err :: JSON.Parser a
     err = fail $ "No key ended by " ++ show t ++ " in Object"
@@ -52,11 +52,11 @@ import Data.Text (Text, isSuffixOf)
 -- 'empty' if the value cannot be converted to the desired type.
 --
 -- Example usage to get the value of "word-with-suffix":
--- >>> o .:*- "-suffix"
-(.:*-?) :: (FromJSON a) => JSON.Object -> Text -> JSON.Parser (Maybe a)
-(.:*-?) o s = (pure . Just <=< (.:*- s)) o <|> pure Nothing
+-- >>> o *.:? "-suffix"
+(*.:?) :: (FromJSON a) => JSON.Object -> Text -> JSON.Parser (Maybe a)
+(*.:?) o s = (pure . Just <=< (*.: s)) o <|> pure Nothing
 
-
+
 -- Others
 
 rightToMaybe :: Either l r -> Maybe r

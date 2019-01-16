@@ -70,7 +70,7 @@ data TraceInfo a = TraceInfo
   , start    :: String
   , stop     :: Maybe String
   , req      :: a
-  } deriving (Generic, Show, Eq)
+  } deriving (Generic, Eq)
 
 
 -- | An OSProfiler Trace represented as a Haskell value.
@@ -105,20 +105,20 @@ class (FromJSON a, Show a, Eq a) => ReqPath a where
 
 -- ReqPath instances
 instance ReqPath HTTPReq where
-  reqPath = (.:+ [ "meta.raw_payload.wsgi-start", "info", "request" ])
+  reqPath = (.+: [ "meta.raw_payload.wsgi-start", "info", "request" ])
 
 instance ReqPath DBReq where
   reqPath v
-    =   v .:+ [ "meta.raw_payload.db-start", "info", "db" ]
-    <|> v .:+ [ "meta.raw_payload.neutron.db-start", "info", "db" ]
+    =   v .+: [ "meta.raw_payload.db-start", "info", "db" ]
+    <|> v .+: [ "meta.raw_payload.neutron.db-start", "info", "db" ]
 
 instance ReqPath PythonReq where
   reqPath v =
-    let rpc        = v .:+ [ "meta.raw_payload.rpc-start",         "info", "function" ]
-        computeApi = v .:+ [ "meta.raw_payload.compute_api-start", "info", "function" ]
-        novaImage  = v .:+ [ "meta.raw_payload.nova_image-start",  "info", "function" ]
-        novaVirt   = v .:+ [ "meta.raw_payload.vif_driver-start",  "info", "function" ]
-        neutronApi = v .:+ [ "meta.raw_payload.neutron_api-start", "info", "function" ]
+    let rpc        = v .+: [ "meta.raw_payload.rpc-start",         "info", "function" ]
+        computeApi = v .+: [ "meta.raw_payload.compute_api-start", "info", "function" ]
+        novaImage  = v .+: [ "meta.raw_payload.nova_image-start",  "info", "function" ]
+        novaVirt   = v .+: [ "meta.raw_payload.vif_driver-start",  "info", "function" ]
+        neutronApi = v .+: [ "meta.raw_payload.neutron_api-start", "info", "function" ]
     in rpc <|> computeApi <|> novaImage <|> novaVirt <|> neutronApi
 
 -- FronJSON instances
@@ -165,29 +165,29 @@ instance (ReqPath a, FromJSON a) => FromJSON (TraceInfo a) where
         o .: "project"
     <*> o .: "service"
     <*> o .: "host"
-    <*> ((.: "timestamp") <=< (.:*-  "-start")) o
-    <*> (maybe (pure Nothing) (.: "timestamp") <=< (.:*-? "-stop"))  o
+    <*> ((.: "timestamp") <=< (*.:  "-start")) o
+    <*> (maybe (pure Nothing) (.: "timestamp") <=< (*.:? "-stop"))  o
     <*> reqPath v
   parseJSON v            = typeMismatch "TraceInfo" v
 
 instance FromJSON TraceType where
   parseJSON (Object o)
-    =   traceType o "wsgi"        *> (Wsgi       <$> o .: "info")
-    <|> traceType o "db"          *> (DB         <$> o .: "info")
-    <|> traceType o "rpc"         *> (RPC        <$> o .: "info")
-    <|> traceType o "compute_api" *> (ComputeApi <$> o .: "info")
-    <|> traceType o "nova_image"  *> (NovaImage  <$> o .: "info")
-    <|> traceType o "vif_driver"  *> (NovaVirt   <$> o .: "info")
-    <|> traceType o "neutron_api" *> (NeutronApi <$> o .: "info")
+    =   traceType "wsgi"        *> (Wsgi       <$> o .: "info")
+    <|> traceType "db"          *> (DB         <$> o .: "info")
+    <|> traceType "rpc"         *> (RPC        <$> o .: "info")
+    <|> traceType "compute_api" *> (ComputeApi <$> o .: "info")
+    <|> traceType "nova_image"  *> (NovaImage  <$> o .: "info")
+    <|> traceType "vif_driver"  *> (NovaVirt   <$> o .: "info")
+    <|> traceType "neutron_api" *> (NeutronApi <$> o .: "info")
     where
-      traceType :: Object -> String -> Parser String
-      traceType o n = do
+      traceType :: String -> Parser String
+      traceType n = do
         o' <- o  .: "info" :: Parser Object
         n' <- o' .: "name" :: Parser String
         if n `L.isSuffixOf` n'
           then pure n'
           else fail $ show n' ++ " is not a valid TraceType"
-  parseJSON v          = typeMismatch "TraceType" v
+  parseJSON v           = typeMismatch "TraceType" v
 
 instance JSON.ToJSON HTTP
 instance JSON.ToJSON HTTPReq
@@ -203,6 +203,13 @@ instance Store PythonReq
 instance (Store a) => Store (TraceInfo a)
 instance Store TraceType
 instance (Store a) => Store (T.Tree a)
+
+instance (Show a) => Show (TraceInfo a) where
+  show TraceInfo { project = p, service = s, req = r } =
+    "TraceInfo " ++
+    "{ project = " ++ show p ++
+    ", service = " ++ show s ++
+    ", req = " ++ show r ++ "}"
 
 
 -- API
