@@ -82,6 +82,7 @@ data TraceType = Wsgi (TraceInfo HTTPReq)
                | NovaVirt (TraceInfo PythonReq)
                | NeutronApi (TraceInfo PythonReq)
                | Root
+               | Fuu
                deriving (Generic, Show, Eq)
 
 type OSPTrace = T.Tree TraceType
@@ -206,10 +207,11 @@ instance (Store a) => Store (T.Tree a)
 
 instance (Show a) => Show (TraceInfo a) where
   show TraceInfo { project = p, service = s, req = r } =
-    "TraceInfo " ++
-    "{ project = " ++ show p ++
-    ", service = " ++ show s ++
-    ", req = " ++ show r ++ "}"
+    -- "{ project = " ++ show p ++
+    -- ", service = " ++ show s ++
+    -- ", req = " ++ show r ++ "}"
+    "{ " ++ show p ++
+    ", " ++ show r ++ "}"
 
 
 -- API
