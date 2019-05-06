@@ -1,7 +1,7 @@
 import Dict exposing (Dict)
 
 import Browser exposing (element)
-import Browser.Dom exposing (focus)
+import Browser.Dom exposing (focus, Error(..))
 import Browser.Navigation exposing (reloadAndSkipCache)
 import Html exposing (Html, text)
 import Html.Attributes exposing (id)
@@ -18,12 +18,14 @@ import FormatNumber.Locales exposing (frenchLocale)
 import Material
 import Material.Button as Button
 import Material.Checkbox as Checkbox
+import Material.Dialog as Dialog
 import Material.Elevation as Elevation
 import Material.FormField as FormField
 import Material.Icon as Icon
 import Material.LayoutGrid as LayoutGrid
 import Material.Options as Options exposing (when)
 import Material.TextField as Textfield
+import Material.TextField.HelperLine as Textfield
 import Material.TextField.HelperText as Textfield
 import Material.Theme as Theme
 import Material.TopAppBar as TopAppBar
@@ -47,6 +49,7 @@ type alias Model =
     , coefMax: Outstanding Float
     , shipFactor: Outstanding Float
     , currentUid: Int
+    , error: Maybe String
     }
 
 type alias Entry =
@@ -90,6 +93,7 @@ init _ =
           (Ok defaultCoefMax)
           (Ok defaultShipFactor)
           0
+          Nothing
     , Material.init Mdc
     )
 
@@ -136,6 +140,12 @@ priceMeanMax m =
     |> andThen (\pMean -> m.coefMax
     |> andThen (\coefMax -> Ok (pMean / coefMax)))
 
+isJust : Maybe a -> Bool
+isJust maybe =
+  case maybe of
+    Just _ -> True
+    Nothing -> False
+
 -- UPDATE
 type Msg
     = Mdc (Material.Msg Msg)
@@ -158,6 +168,7 @@ type Msg
 
     -- Error
     | Focus (Result Browser.Dom.Error ())
+    | CancelDialog
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -203,7 +214,7 @@ update msg model =
                   let toggleIsShipped = not e.isShipped
                       newE            = { e | isShipped = toggleIsShipped }
                   in ({ model | entries = Dict.insert uid newE model.entries }, Cmd.none)
-                Nothing -> Debug.todo "isErr result ⇒ Display modal for error"
+                Nothing -> ({ model | error = Just "I cannot find the entry" }, Cmd.none)
 
         RemoveEntry uid ->
             ({ model | entries = Dict.remove uid model.entries }
@@ -223,10 +234,14 @@ update msg model =
             (model, reloadAndSkipCache)
 
         -- Other
+        CancelDialog ->
+            ({ model | error = Nothing}, Cmd.none)
+
         Focus result ->
             case result of
-                Ok  _     -> (model, Cmd.none)
-                Err error -> Debug.todo "isErr result ⇒ Display modal for error"
+                Ok  _ -> (model, Cmd.none)
+                Err (NotFound id) ->
+                    ({ model | error = Just ("Dom error: " ++ id ++ " not found") }, Cmd.none)
 
 -- More HTML
 hMain : List (Html.Attribute msg) -> List (Html msg) -> Html msg
@@ -285,8 +300,7 @@ viewEntry m (uid, e) =
         , LayoutGrid.cell qtrRow
             [ Html.label [] [
                    Button.view Mdc (rowId ++ ":delete-entry") m.mdc
-                       [
-                        Button.outlined
+                       [ Button.outlined
                        , Button.dense
                        , Button.ripple
                        , Options.onClick <| RemoveEntry uid
@@ -348,9 +362,11 @@ view model =
                                       , onOutstandingInputMdc UpdateNewEntryQuantity
                                       , onOutstandingChangeMdc (String.toFloat) UpdateNewEntryQuantity
                                       ] []
-                                , Textfield.helperText
-                                    [ Textfield.validationMsg ]
-                                    [ text nanMessage ]
+                                , Textfield.helperLine []
+                                    [ Textfield.helperText
+                                          [ Textfield.validationMsg ]
+                                          [ text nanMessage ]
+                                    ]
                                 ]
                           , LayoutGrid.cell qtrRow
                               [ Textfield.view Mdc "new-entry:price" model.mdc
@@ -362,9 +378,11 @@ view model =
                                     , onOutstandingInputMdc UpdateNewEntryPrice
                                     , onOutstandingChangeMdc String.toFloat UpdateNewEntryPrice
                                     ] []
-                              , Textfield.helperText
-                                  [ Textfield.validationMsg ]
-                                  [ text nanMessage ]
+                              , Textfield.helperLine []
+                                  [ Textfield.helperText
+                                        [ Textfield.validationMsg ]
+                                        [ text nanMessage ]
+                                  ]
                               ]
                           , LayoutGrid.cell qtrRow
                               [ FormField.view []
@@ -411,9 +429,11 @@ view model =
                               , onOutstandingChangeMdc
                                     (String.toFloat |> withDefault defaultCoefMin) UpdateCoefMin
                               ] [  ]
-                        , Textfield.helperText
-                            [ Textfield.validationMsg ]
-                            [ text nanMessage ]
+                        , Textfield.helperLine []
+                            [ Textfield.helperText
+                                  [ Textfield.validationMsg ]
+                                  [ text nanMessage ]
+                            ]
                         ]
                   , LayoutGrid.cell qtrRow
                         [ Textfield.view Mdc "params:coef-max" model.mdc
@@ -426,9 +446,11 @@ view model =
                               , onOutstandingChangeMdc
                                     (String.toFloat |> withDefault defaultCoefMax) UpdateCoefMax
                               ] [  ]
-                        , Textfield.helperText
-                            [ Textfield.validationMsg ]
-                            [ text nanMessage ]
+                        , Textfield.helperLine []
+                            [ Textfield.helperText
+                                  [ Textfield.validationMsg ]
+                                  [ text nanMessage ]
+                            ]
                         ]
                   , LayoutGrid.cell qtrRow
                         [ Textfield.view Mdc "params:ship-factor" model.mdc
@@ -442,9 +464,11 @@ view model =
                               , onOutstandingChangeMdc
                                     (String.toFloat |> withDefault defaultShipFactor) UpdateShipFactor
                               ] [  ]
-                        , Textfield.helperText
-                            [ Textfield.validationMsg ]
-                            [ text nanMessage ]
+                        , Textfield.helperLine []
+                            [ Textfield.helperText
+                                  [ Textfield.validationMsg ]
+                                  [ text nanMessage ]
+                            ]
                         ]
                   , LayoutGrid.cell qtrRow
                         [ Button.view Mdc "refresh" model.mdc
@@ -456,4 +480,20 @@ view model =
                         ]
                   ]
             ]
+        , Dialog.view Mdc "error-dialog" model.mdc
+            [ Dialog.open |> when (isJust model.error)
+            , Dialog.onClose CancelDialog
+            ]
+              [ Options.styled Html.h2 [ Dialog.title ] [ text "Error" ]
+              , Dialog.content [] [ text (Maybe.withDefault "" model.error) ]
+              , Dialog.actions []
+                  [
+                   Button.view Mdc "error-dialog:accept" model.mdc
+                       [ Button.ripple
+                       , Dialog.accept
+                       , Options.onClick CancelDialog
+                       ]
+                       [ text "ACCEPT"]
+                  ]
+              ]
         ]
