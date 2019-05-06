@@ -1,8 +1,8 @@
 import Dict exposing (Dict)
 
 import Browser exposing (element)
-import Browser.Navigation exposing (reloadAndSkipCache)
 import Browser.Dom exposing (focus)
+import Browser.Navigation exposing (reloadAndSkipCache)
 import Html exposing (Html, text)
 import Html.Attributes exposing (id)
 import Html.Events exposing (onClick)
@@ -23,10 +23,10 @@ import Material.FormField as FormField
 import Material.Icon as Icon
 import Material.LayoutGrid as LayoutGrid
 import Material.Options as Options exposing (when)
-import Material.TopAppBar as TopAppBar
 import Material.TextField as Textfield
 import Material.TextField.HelperText as Textfield
 import Material.Theme as Theme
+import Material.TopAppBar as TopAppBar
 
 import Outstanding exposing (..)
 
@@ -71,7 +71,7 @@ nanMessage : String
 nanMessage = "✗ Nombre"
 
 
-es = Dict.fromList
+entriesMoc = Dict.fromList
           [ (0, Entry (Ok 1) (Ok 1) False)
           , (1, Entry (Ok 1) (Ok 1) True)
           , (2, Entry (Ok 2) (Ok 1) False)
@@ -84,7 +84,7 @@ init _ =
     ( Model
           Material.defaultModel
           defaultNewEntry
-          es
+          entriesMoc
           -- Dict.empty
           (Ok defaultCoefMin)
           (Ok defaultCoefMax)
@@ -147,8 +147,6 @@ type Msg
     | AddNewEntry
 
     -- entry
-    | ValidateEntryQuantity Int (Outstanding Float)
-    | ValidateEntryPrice Int (Outstanding Float)
     | ToggleEntryIsShipped Int
     | RemoveEntry Int
 
@@ -199,34 +197,13 @@ update msg model =
                     (focus "new-entry:quantity"))      -- Focus on quantity field
 
         -- entry-uid:
-        --
-        -- FIXME: Make entry not editable. This make the application
-        -- really complicated and the feature is useless. You may
-        -- simply remove the old line by a new one.
-        ValidateEntryQuantity uid n ->
-            case Dict.get uid model.entries of
-                Just  e ->
-                    let newE = { e | quantity = Debug.log "v" n }
-                    in ({ model | entries = Dict.insert uid newE model.entries }, Cmd.none)
-                Nothing -> Debug.todo "handle error"
-
-        -- FIXME: Make entry not editable. This make the application
-        -- really complicated and the feature is useless. You may
-        -- simply remove the old line by a new one.
-        ValidateEntryPrice uid n ->
-            case Dict.get uid model.entries of
-                Just  e ->
-                    let newE = { e | price = n }
-                    in ({ model | entries = Dict.insert uid newE model.entries }, Cmd.none)
-                Nothing -> Debug.todo "handle error"
-
         ToggleEntryIsShipped uid ->
             case Dict.get uid model.entries of
                 Just  e ->
                   let toggleIsShipped = not e.isShipped
                       newE            = { e | isShipped = toggleIsShipped }
                   in ({ model | entries = Dict.insert uid newE model.entries }, Cmd.none)
-                Nothing -> Debug.todo "handle error"
+                Nothing -> Debug.todo "isErr result ⇒ Display modal for error"
 
         RemoveEntry uid ->
             ({ model | entries = Dict.remove uid model.entries }
@@ -292,31 +269,9 @@ viewEntry m (uid, e) =
     in
     LayoutGrid.inner [ Options.id rowId ]
         [ LayoutGrid.cell qtrRow
-              [ Html.p
-                    []
-                    -- FIXME: Make entry not editable. This make the application
-                    -- really complicated and the feature is useless. You may
-                    -- simply remove the old line by a new one.
-                    --
-                    -- Thus a textarea is no more needed. a <p> should
-                    -- do the job!
-                    [ Html.textarea
-                          ([ Html.Attributes.rows 1 ] ++
-                               onOutstanding String.toFloat (ValidateEntryQuantity uid))
-                          [viewFloat e.quantity] ] ]
+              [ Html.p [] [viewFloat e.quantity] ]
         , LayoutGrid.cell qtrRow
-              [ Html.p
-                    []
-                    -- FIXME: Make entry not editable. This make the application
-                    -- really complicated and the feature is useless. You may
-                    -- simply remove the old line by a new one.
-                    --
-                    -- Thus a textarea is no more needed. a <p> should
-                    -- do the job!
-                    [ Html.textarea
-                          ([ Html.Attributes.rows 1 ] ++
-                               onOutstanding String.toFloat (ValidateEntryPrice uid))
-                          [ viewFloat e.price ] ] ]
+              [ Html.p [] [ viewFloat e.price ] ]
         , LayoutGrid.cell qtrRow
               [ Html.label [] [
                      FormField.view []
@@ -348,9 +303,11 @@ view model =
         thePriceMeanMax  = viewFloat (priceMeanMax model)
     in
     Html.div []
-        [ Options.styled Html.header [Options.id "top-app-bar", Elevation.z2, Theme.textPrimaryOnDark ]
+        [ Options.styled Html.header [
+               Theme.background,
+               Elevation.z4, Theme.textPrimaryOnDark ]
               [ Options.styled Html.div
-                    [ Options.id "top-app-bar--results", Theme.primaryBg ]
+                    [ Theme.primaryBg ]
                     [ LayoutGrid.view []
                           [ LayoutGrid.cell fullRow
                                 [ LayoutGrid.inner [ Options.id "results-label" ]
@@ -377,8 +334,7 @@ view model =
                           ]
                     ]
               , Options.styled Html.div
-                    [ Options.id "top-app-bar--new-entry"
-                    , Theme.background ]
+                    [ Theme.background ]
                     [ LayoutGrid.view [ Options.id "new-entry" ]
                           [ LayoutGrid.cell qtrRow
                                 [ Textfield.view Mdc "new-entry:quantity" model.mdc
@@ -442,7 +398,7 @@ view model =
         , Options.styled Html.footer
             [ Options.id "params"
             , Theme.background
-            , Elevation.z2 ]
+            , Elevation.z4 ]
             [ LayoutGrid.view []
                   [ LayoutGrid.cell qtrRow
                         [ Textfield.view Mdc "params:coef-min" model.mdc
