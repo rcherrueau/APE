@@ -48,8 +48,8 @@ type alias Model =
     , coefMin: Outstanding Float
     , coefMax: Outstanding Float
     , shipFactor: Outstanding Float
-    , currentUid: Int
     , error: Maybe String
+    , currentUid: Int
     }
 
 type alias Entry =
@@ -92,8 +92,8 @@ init _ =
           (Ok defaultCoefMin)
           (Ok defaultCoefMax)
           (Ok defaultShipFactor)
-          0
           Nothing
+          0
     , Material.init Mdc
     )
 
@@ -166,7 +166,7 @@ type Msg
     | UpdateShipFactor (Outstanding Float)
     | ReloadPage
 
-    -- Error
+    -- Others
     | Focus (Result Browser.Dom.Error ())
     | CancelDialog
 
@@ -233,7 +233,7 @@ update msg model =
         ReloadPage ->
             (model, reloadAndSkipCache)
 
-        -- Other
+        -- Others
         CancelDialog ->
             ({ model | error = Nothing}, Cmd.none)
 
@@ -353,36 +353,22 @@ view model =
                           [ LayoutGrid.cell qtrRow
                                 [ Textfield.view Mdc "new-entry:quantity" model.mdc
                                       [ Textfield.label "Qté..."
-                                      -- , Textfield.type_ "number"
                                       , Textfield.pattern "-?[0-9]*(\\.[0-9]+)?"
-                                      -- , Textfield.dense
                                       , Textfield.autofocus
                                       , Textfield.value
                                           (showOutstanding fmtFloat model.newEntry.quantity)
                                       , onOutstandingInputMdc UpdateNewEntryQuantity
                                       , onOutstandingChangeMdc (String.toFloat) UpdateNewEntryQuantity
                                       ] []
-                                , Textfield.helperLine []
-                                    [ Textfield.helperText
-                                          [ Textfield.validationMsg ]
-                                          [ text nanMessage ]
-                                    ]
                                 ]
                           , LayoutGrid.cell qtrRow
                               [ Textfield.view Mdc "new-entry:price" model.mdc
                                     [ Textfield.label "Prix..."
-                                      -- , Textfield.type_ "number"
                                     , Textfield.pattern "-?[0-9]*(\\.[0-9]+)?"
-                                    -- , Textfield.dense
                                     , Textfield.value (showOutstanding fmtFloat model.newEntry.price)
                                     , onOutstandingInputMdc UpdateNewEntryPrice
                                     , onOutstandingChangeMdc String.toFloat UpdateNewEntryPrice
                                     ] []
-                              , Textfield.helperLine []
-                                  [ Textfield.helperText
-                                        [ Textfield.validationMsg ]
-                                        [ text nanMessage ]
-                                  ]
                               ]
                           , LayoutGrid.cell qtrRow
                               [ FormField.view []
@@ -421,54 +407,33 @@ view model =
                   [ LayoutGrid.cell qtrRow
                         [ Textfield.view Mdc "params:coef-min" model.mdc
                               [ Textfield.label "Coef min... "
-                              -- , Textfield.type_ "number"
                               , Textfield.pattern "-?[0-9]*(\\.[0-9]+)?"
-                              -- , Textfield.dense
                               , Textfield.value (showOutstanding fmtFloat model.coefMin)
                               , onOutstandingInputMdc UpdateCoefMin
                               , onOutstandingChangeMdc
                                     (String.toFloat |> withDefault defaultCoefMin) UpdateCoefMin
                               ] [  ]
-                        , Textfield.helperLine []
-                            [ Textfield.helperText
-                                  [ Textfield.validationMsg ]
-                                  [ text nanMessage ]
-                            ]
                         ]
                   , LayoutGrid.cell qtrRow
                         [ Textfield.view Mdc "params:coef-max" model.mdc
                               [ Textfield.label "Coef max..."
-                              -- , Textfield.type_ "number"
                               , Textfield.pattern "-?[0-9]*(\\.[0-9]+)?"
-                              -- , Textfield.dense
                               , Textfield.value (showOutstanding fmtFloat model.coefMax)
                               , onOutstandingInputMdc UpdateCoefMax
                               , onOutstandingChangeMdc
                                     (String.toFloat |> withDefault defaultCoefMax) UpdateCoefMax
-                              ] [  ]
-                        , Textfield.helperLine []
-                            [ Textfield.helperText
-                                  [ Textfield.validationMsg ]
-                                  [ text nanMessage ]
-                            ]
+                              ] [ ]
                         ]
                   , LayoutGrid.cell qtrRow
                         [ Textfield.view Mdc "params:ship-factor" model.mdc
                               [ Textfield.leadingIcon "local_shipping"
-                              -- , Textfield.type_ "number"
                               , Textfield.label "(%)"
                               , Textfield.pattern "-?[0-9]*(\\.[0-9]+)?"
-                              -- , Textfield.dense
                               , Textfield.value (showOutstanding String.fromFloat model.shipFactor)
                               , onOutstandingInputMdc UpdateShipFactor
                               , onOutstandingChangeMdc
                                     (String.toFloat |> withDefault defaultShipFactor) UpdateShipFactor
-                              ] [  ]
-                        , Textfield.helperLine []
-                            [ Textfield.helperText
-                                  [ Textfield.validationMsg ]
-                                  [ text nanMessage ]
-                            ]
+                              ] [ ]
                         ]
                   , LayoutGrid.cell qtrRow
                         [ Button.view Mdc "refresh" model.mdc
@@ -480,6 +445,9 @@ view model =
                         ]
                   ]
             ]
+
+
+        -- Error Dialog
         , Dialog.view Mdc "error-dialog" model.mdc
             [ Dialog.open |> when (isJust model.error)
             , Dialog.onClose CancelDialog
