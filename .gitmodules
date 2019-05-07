@@ -20,3 +20,6 @@
 	path = pperso/out
 	url = git@github.com:rcherrueau/rcherrueau.github.com.git
 	branch = master
+[submodule "elm/elm-mdc"]
+	path = elm/elm-mdc
+	url = git@github.com:aforemny/elm-mdc.git
