@@ -1,7 +1,7 @@
 module.exports = [{
   entry: ['./app.scss', './elm-mdc/src/elm-mdc.js'],
   output: {
-    filename: 'elm-mdc.js',
+    filename: 'www/elm-mdc.js',
   },
   module: {
     rules: [
@@ -11,7 +11,7 @@ module.exports = [{
           {
             loader: 'file-loader',
             options: {
-              name: 'app.css',
+              name: 'www/app.css',
             },
           },
           { loader: 'extract-loader' },
