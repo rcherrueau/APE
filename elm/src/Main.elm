@@ -75,11 +75,12 @@ init _ =
     ( Model
           Material.defaultModel
           defaultNewEntry
-          -- entriesMoc
+          -- entriesMock -- MOCK
           Dict.empty
           (Ok defaultCoefMin)
           (Ok defaultCoefMax)
           (Ok defaultShipFactor)
+          -- (Just "This is a Mock error") -- MOCK
           Nothing
           0
     , Material.init Mdc
@@ -457,7 +458,7 @@ defaultNewEntry = (Entry (Err "") (Err "") True)
 nanMessage : String
 nanMessage = "✗ Nombre"
 
-entriesMoc = Dict.fromList
+entriesMock = Dict.fromList
           [ (0, Entry (Ok 1) (Ok 1) False)
           , (1, Entry (Ok 1) (Ok 1) True)
           , (2, Entry (Ok 2) (Ok 1) False)
