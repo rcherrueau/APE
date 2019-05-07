@@ -1,8 +1,8 @@
---  ,---.    ____      __       ___          __   __      ,---.
--- ( @ @ )  / __ \____/ /____  / _ \___ ____/ /__/ /_ __ ( @ @ )
---  ).-.(  / /_/ / __/ __/ _ \/ // / _ `/ _  / _  / // /  ).-.(
--- '/|||\` \____/\__/\__/\___/____/\_,_/\_,_/\_,_/\_, /  '/|||\`
---   '|`                                         /___/     '|`
+--  ,---.    ____      __       ___          __   __
+-- ( @ @ )  / __ \____/ /____  / _ \___ ____/ /__/ /_ __
+--  ).-.(  / /_/ / __/ __/ _ \/ // / _ `/ _  / _  / // /
+-- '/|||\` \____/\__/\__/\___/____/\_,_/\_,_/\_,_/\_, /
+--   '|`                                         /___/
 --
 -- Adapted Calculator for my Daddy's Needs
 
@@ -34,6 +34,7 @@ import Material.FormField as FormField
 import Material.Icon as Icon
 import Material.LayoutGrid as LayoutGrid
 import Material.Options as Options exposing (when)
+import Material.Typography as Typography
 import Material.TextField as Textfield
 import Material.TextField.HelperLine as Textfield
 import Material.TextField.HelperText as Textfield
@@ -239,7 +240,8 @@ view model =
         thePriceMeanMin  = viewFloat (priceMeanMin model)
         thePriceMeanMax  = viewFloat (priceMeanMax model)
     in
-    Html.div []
+    Options.styled Html.div
+        [ Typography.typography ]
         -- header: Fixed. Display results and fields for a new entry
         [ Options.styled Html.header
               [ Theme.background
@@ -253,7 +255,9 @@ view model =
                     [ Theme.primaryBg ]
                     [ LayoutGrid.view []
                           [ fullRowCell
-                                [ LayoutGrid.inner [ Options.id "results-label" ]
+                                [ LayoutGrid.inner
+                                      [ Options.id "results-label"
+                                      , Typography.headline6 ]
                                       [ qtrRowCell
                                             [ Html.label [] [ text "Total Qté" ] ]
                                       , qtrRowCell

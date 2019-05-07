@@ -1,14 +1,22 @@
-//  ,---.    ____      __       ___          __   __      ,---.
-// ( @ @ )  / __ \____/ /____  / _ \___ ____/ /__/ /_ __ ( @ @ )
-//  ).-.(  / /_/ / __/ __/ _ \/ // / _ `/ _  / _  / // /  ).-.(
-// '/|||\` \____/\__/\__/\___/____/\_,_/\_,_/\_,_/\_, /  '/|||\`
-//   '|`                                         /___/     '|`
+//  ,---.    ____      __       ___          __   __
+// ( @ @ )  / __ \____/ /____  / _ \___ ____/ /__/ /_ __
+//  ).-.(  / /_/ / __/ __/ _ \/ // / _ `/ _  / _  / // /
+// '/|||\` \____/\__/\__/\___/____/\_,_/\_,_/\_,_/\_, /
+//   '|`                                         /___/
 //
 // Adapted Calculator for my Daddy's Needs
 
 $mdc-theme-primary: #01579b;
 $mdc-theme-secondary: #c51162;
 $mdc-theme-background: #fff;
+
+$mdc-typography-styles-headline6: (
+    font-size: 1.15rem
+);
+
+/* $mdc-layout-grid-inner: (desktop, 8px, 4px); */
+/* $mdc-layout-grid-inner: (tablet, 8px, 4px); */
+/* $mdc-layout-grid-inner: (phone, 8px, 4px); */
 
 @import "@material/theme/mdc-theme";
 @import "@material/typography/mdc-typography";
@@ -26,9 +34,9 @@ $mdc-theme-background: #fff;
 
 /* General */
 :root {
-    // @include mdc-layout-grid-inner(desktop, 8px, 4px);
-    // @include mdc-layout-grid-inner(tablet, 8px, 4px);
-    // @include mdc-layout-grid-inner(phone, 8px, 4px);
+    /* @include $mdc-layout-grid-inner(desktop, 8px, 4px); */
+    /* @include $mdc-layout-grid-inner(tablet, 8px, 4px); */
+    /* @include $mdc-layout-grid-inner(phone, 8px, 4px); */
     --mdc-layout-grid-margin-desktop: 8px;
     --mdc-layout-grid-gutter-desktop: 4px;
     --mdc-layout-grid-margin-tablet: 8px;
@@ -59,9 +67,8 @@ header#top-app-bar > div > .mdc-layout-grid {
 
 
 /* RESULTS-LABEL (Total Qté, Prix Moy, Moy Min, Moy Max) */
-#results-label > .mdc-layout-grid__cell > label {
-    font-weight: bold;
-    font-size: 13px;
+#results-label {
+    line-height: 1.15;
 }
 
 

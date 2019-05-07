@@ -1,11 +1,21 @@
-#+TITLE: 🐙 OctoDaddy 🐙
+#+TITLE: 🐙 OctoDaddy
 
 Adapted Calculator for my Daddy's Needs
 
+* Getting started
+: git clone --recurse-submodules ...
+: cd octo-daddy
+: npm install
+
+
 * Develop
 : npm start
-
 http://localhost:8080/www/
 
 * Build
 : npm run build
+
+* Resources
+- MDC web doc https://material.io/develop/web/docs/getting-started/
+  + Reach it from Develop > Web > DOCUMENTATION > Components
+- Elm doc https://package.elm-lang.org/
