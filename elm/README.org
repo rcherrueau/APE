@@ -1,0 +1,11 @@
+#+TITLE: 🐙 OctoDaddy 🐙
+
+Adapted Calculator for my Daddy's Needs
+
+* Develop
+: npm start
+
+http://localhost:8080/www/
+
+* Build
+: npm run build

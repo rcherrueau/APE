@@ -6,6 +6,19 @@
 //
 // Adapted Calculator for my Daddy's Needs
 
+// Determine build env
+const dev = 'development';
+const prod = 'production';
+const TARGET_ENV = process.env.npm_lifecycle_event === 'build' ? prod : dev;
+
+// Specific elm make options
+const elmOpts = TARGET_ENV === dev
+      // Dev
+      ? { verbose: true, debug: true }
+      // Prod
+      : { optimize: true };
+
+// Package application
 module.exports = [{
     entry: [
         // Elm MDC specific javascript (e.g., MDC Dialog js -- output
@@ -53,10 +66,7 @@ module.exports = [{
                 test: /\.elm$/,
                 exclude: [/elm-stuff/, /node_modules/, /elm-mdc/],
                 loader: 'elm-webpack-loader',
-                options: {
-                    verbose: true,
-                    debug: true
-                }
+                options: elmOpts,
             }
         ]
     },
