@@ -1,3 +1,13 @@
+--   ,---.           _              _         _    _        ,---.
+--  ( @ @ )  ___  __| |_ ___ ___ __| |__ _ __| |__| |_  _  ( @ @ )
+--   ).-.(  / _ \/ _|  _/ _ \___/ _` / _` / _` / _` | || |  ).-.(
+--  '/|||\` \___/\__|\__\___/   \__,_\__,_\__,_\__,_|\_, | '/|||\`
+--    '|`                                            |__/    '|`
+--
+-- Adapted Calculator for my Daddy's Needs
+
+module Main exposing (main)
+
 import Dict exposing (Dict)
 
 import Browser exposing (element)
@@ -40,16 +50,18 @@ main =
       , subscriptions = subscriptions
       }
 
+
+--------------------------------------------------------------------------
 -- MODEL
 type alias Model =
-    { mdc: Material.Model Msg
-    , newEntry: Entry
-    , entries: Dict Int Entry
+    { mdc: Material.Model Msg          -- Material Design Component
+    , newEntry: Entry                  -- Info for a new entry to be added
+    , entries: Dict Int Entry          -- List of all entries
     , coefMin: Outstanding Float
     , coefMax: Outstanding Float
     , shipFactor: Outstanding Float
-    , error: Maybe String
-    , currentUid: Int
+    , error: Maybe String              -- Error that should be notified to the user
+    , lastUid: Int                     -- Uid value for the next new entry (increment after allocation)
     }
 
 type alias Entry =
@@ -58,37 +70,13 @@ type alias Entry =
     , isShipped: Bool
     }
 
-defaultCoefMin : Float
-defaultCoefMin = 0.8
-
-defaultCoefMax : Float
-defaultCoefMax = 0.7
-
-defaultShipFactor : Float
-defaultShipFactor = 3
-
-defaultNewEntry : Entry
-defaultNewEntry = (Entry (Err "") (Err "") True)
-
-nanMessage : String
-nanMessage = "✗ Nombre"
-
-
-entriesMoc = Dict.fromList
-          [ (0, Entry (Ok 1) (Ok 1) False)
-          , (1, Entry (Ok 1) (Ok 1) True)
-          , (2, Entry (Ok 2) (Ok 1) False)
-          , (3, Entry (Ok 3) (Ok 1) False)
-          , (4, Entry (Ok 4) (Ok 1) False)
-          ]
-
 init : () -> (Model, Cmd Msg)
 init _ =
     ( Model
           Material.defaultModel
           defaultNewEntry
-          entriesMoc
-          -- Dict.empty
+          -- entriesMoc
+          Dict.empty
           (Ok defaultCoefMin)
           (Ok defaultCoefMax)
           (Ok defaultShipFactor)
@@ -98,54 +86,10 @@ init _ =
     )
 
 subscriptions : Model -> Sub Msg
--- subscriptions = always Sub.none
-subscriptions model =
-    Material.subscriptions Mdc model
+subscriptions model = Material.subscriptions Mdc model
 
--- Helper
-totalQuantity : Model -> Outstanding Float
-totalQuantity = Result.map List.sum
-                    << Result.combine
-                    << List.map .quantity
-                    << Dict.values << .entries
 
-computePrice : Float -> Entry -> Outstanding Float
-computePrice shipFactor {quantity, price, isShipped} =
-    quantity |> andThen (\q ->
-    price    |> andThen (\p ->
-      let computedPrice = q * p
-          factorPrice   = computedPrice * (if isShipped then shipFactor / 100 else 0)
-      in Ok (computedPrice + factorPrice)))
-
-priceMean : Model -> Outstanding Float
-priceMean m =
-    m.shipFactor
-    |> andThen (\shipFactor ->
-       let cPrice  = computePrice shipFactor
-       in (Result.combine <| List.map cPrice <| Dict.values <| m.entries)
-    |> andThen (\prices -> totalQuantity m
-    |> andThen (\totalQ ->
-       let result = List.sum prices / totalQ
-       in if isNaN result then Err "NaN" else Ok result)))
-
-priceMeanMin : Model -> Outstanding Float
-priceMeanMin m =
-    priceMean m
-    |> andThen (\pMean -> m.coefMin
-    |> andThen (\coefMin -> Ok (pMean / coefMin)))
-
-priceMeanMax : Model -> Outstanding Float
-priceMeanMax m =
-    priceMean m
-    |> andThen (\pMean -> m.coefMax
-    |> andThen (\coefMax -> Ok (pMean / coefMax)))
-
-isJust : Maybe a -> Bool
-isJust maybe =
-  case maybe of
-    Just _ -> True
-    Nothing -> False
-
+--------------------------------------------------------------------------
 -- UPDATE
 type Msg
     = Mdc (Material.Msg Msg)
@@ -196,12 +140,12 @@ update msg model =
 
         AddNewEntry ->
             let entries     = model.entries
-                newEntryUid = model.currentUid
+                newEntryUid = model.lastUid
                 newEntryVal = Entry model.newEntry.quantity
                                     model.newEntry.price
                                     model.newEntry.isShipped
             in ({ model | entries    = Dict.insert newEntryUid newEntryVal entries
-                        , currentUid = newEntryUid + 1
+                        , lastUid = newEntryUid + 1
                         , newEntry   = defaultNewEntry -- Reset newEntry to its
                                                        -- default state
                 }, Task.attempt Focus                  -- and,
@@ -243,31 +187,9 @@ update msg model =
                 Err (NotFound id) ->
                     ({ model | error = Just ("Dom error: " ++ id ++ " not found") }, Cmd.none)
 
--- More HTML
-hMain : List (Html.Attribute msg) -> List (Html msg) -> Html msg
-hMain attributes children =
-    Html.node "main" [] [ Html.div attributes children ]
 
+--------------------------------------------------------------------------
 -- VIEW
-mkUid : Model -> (String, Model)
-mkUid m =
-    let cUid     = m.currentUid
-        uid      = "entry-" ++ (String.fromInt cUid) ++ ":"
-        newModel = {m | currentUid = cUid + 1}
-    in (uid, newModel)
-
-qtrRow : List (LayoutGrid.Property m)
-qtrRow = [ LayoutGrid.span1Phone
-         , LayoutGrid.span2Tablet
-         , LayoutGrid.span3Desktop
-         ]
-fullRow : List (LayoutGrid.Property m)
-fullRow = [ LayoutGrid.span4Phone
-          , LayoutGrid.span8Tablet
-          , LayoutGrid.span12Desktop
-          ]
-
-
 fmtFloat : Float -> String
 fmtFloat = format { frenchLocale | decimals = 3
                                  , decimalSeparator = "." }
@@ -283,11 +205,11 @@ viewEntry m (uid, e) =
     let rowId = "entry-" ++ (String.fromInt uid)
     in
     LayoutGrid.inner [ Options.id rowId ]
-        [ LayoutGrid.cell qtrRow
+        [ qtrRowCell
               [ Html.p [] [viewFloat e.quantity] ]
-        , LayoutGrid.cell qtrRow
+        , qtrRowCell
               [ Html.p [] [ viewFloat e.price ] ]
-        , LayoutGrid.cell qtrRow
+        , qtrRowCell
               [ Html.label [] [
                      FormField.view []
                          [ Checkbox.view Mdc (rowId ++ ":is-shipped") m.mdc
@@ -297,7 +219,7 @@ viewEntry m (uid, e) =
                                [ ]
                          , Icon.view [ ] "local_shipping"
                          ] ] ]
-        , LayoutGrid.cell qtrRow
+        , qtrRowCell
             [ Html.label [] [
                    Button.view Mdc (rowId ++ ":delete-entry") m.mdc
                        [ Button.outlined
@@ -317,40 +239,48 @@ view model =
         thePriceMeanMax  = viewFloat (priceMeanMax model)
     in
     Html.div []
-        [ Options.styled Html.header [
-               Theme.background,
-               Elevation.z4, Theme.textPrimaryOnDark ]
+        -- header: Fixed. Display results and fields for a new entry
+        [ Options.styled Html.header
+              [ Theme.background
+              , Options.id "top-app-bar"
+              , Elevation.z4
+              , Theme.textPrimaryOnDark
+              ]
+
+              -- results: contains results of computations
               [ Options.styled Html.div
                     [ Theme.primaryBg ]
                     [ LayoutGrid.view []
-                          [ LayoutGrid.cell fullRow
+                          [ fullRowCell
                                 [ LayoutGrid.inner [ Options.id "results-label" ]
-                                      [ LayoutGrid.cell qtrRow
+                                      [ qtrRowCell
                                             [ Html.label [] [ text "Total Qté" ] ]
-                                      , LayoutGrid.cell qtrRow
+                                      , qtrRowCell
                                           [ Html.label [] [ text "Prix Moy" ] ]
-                                      , LayoutGrid.cell qtrRow
+                                      , qtrRowCell
                                           [ Html.label [] [ text "Moy Min" ] ]
-                                      , LayoutGrid.cell qtrRow
+                                      , qtrRowCell
                                           [ Html.label [] [ text "Moy Max" ] ]
                                       ]
                                 , LayoutGrid.inner [ Options.id "results" ]
-                                    [ LayoutGrid.cell qtrRow
+                                    [ qtrRowCell
                                           [ Html.p [ id "total-quantity" ] [ theTotalQuantity ] ]
-                                    , LayoutGrid.cell qtrRow
+                                    , qtrRowCell
                                         [ Html.p [ id "price-mean" ]     [ thePriceMean ] ]
-                                    , LayoutGrid.cell qtrRow
+                                    , qtrRowCell
                                         [ Html.p [ id "price-mean-min" ] [ thePriceMeanMin ] ]
-                                    , LayoutGrid.cell qtrRow
+                                    , qtrRowCell
                                         [ Html.p [ id "price-mean-max" ] [ thePriceMeanMax ] ]
                                     ]
                                 ]
                           ]
                     ]
+
+              -- new-entry: Fields for a new entry
               , Options.styled Html.div
                     [ Theme.background ]
                     [ LayoutGrid.view [ Options.id "new-entry" ]
-                          [ LayoutGrid.cell qtrRow
+                          [ qtrRowCell
                                 [ Textfield.view Mdc "new-entry:quantity" model.mdc
                                       [ Textfield.label "Qté..."
                                       , Textfield.pattern "-?[0-9]*(\\.[0-9]+)?"
@@ -361,7 +291,7 @@ view model =
                                       , onOutstandingChangeMdc (String.toFloat) UpdateNewEntryQuantity
                                       ] []
                                 ]
-                          , LayoutGrid.cell qtrRow
+                          , qtrRowCell
                               [ Textfield.view Mdc "new-entry:price" model.mdc
                                     [ Textfield.label "Prix..."
                                     , Textfield.pattern "-?[0-9]*(\\.[0-9]+)?"
@@ -370,7 +300,7 @@ view model =
                                     , onOutstandingChangeMdc String.toFloat UpdateNewEntryPrice
                                     ] []
                               ]
-                          , LayoutGrid.cell qtrRow
+                          , qtrRowCell
                               [ FormField.view []
                                     [ Checkbox.view Mdc "new-entry:is-shipped" model.mdc
                                           [ Checkbox.checked model.newEntry.isShipped
@@ -380,7 +310,7 @@ view model =
                                     , Icon.view [ ] "local_shipping"
                                     ]
                               ]
-                          , LayoutGrid.cell qtrRow
+                          , qtrRowCell
                               [ Button.view Mdc "new-entry:add" model.mdc
                                     [ Button.outlined
                                     , Button.dense
@@ -391,20 +321,24 @@ view model =
                           ]
                     ]
               ]
+
+        -- Main: contains the list of entries
         , Options.styled hMain
             [ Options.id "entries" ]
             [ LayoutGrid.view []
-                  [ LayoutGrid.cell fullRow (
+                  [ fullRowCell (
                       List.map (viewEntry model) <| Dict.toList <| model.entries)
                   ]
             ]
 
+        -- Footer: Fixed. Display/Update results parameters (coef min,
+        -- coef max, ship factor)
         , Options.styled Html.footer
             [ Options.id "params"
             , Theme.background
             , Elevation.z4 ]
             [ LayoutGrid.view []
-                  [ LayoutGrid.cell qtrRow
+                  [ qtrRowCell
                         [ Textfield.view Mdc "params:coef-min" model.mdc
                               [ Textfield.label "Coef min... "
                               , Textfield.pattern "-?[0-9]*(\\.[0-9]+)?"
@@ -414,7 +348,7 @@ view model =
                                     (String.toFloat |> withDefault defaultCoefMin) UpdateCoefMin
                               ] [  ]
                         ]
-                  , LayoutGrid.cell qtrRow
+                  , qtrRowCell
                         [ Textfield.view Mdc "params:coef-max" model.mdc
                               [ Textfield.label "Coef max..."
                               , Textfield.pattern "-?[0-9]*(\\.[0-9]+)?"
@@ -424,7 +358,7 @@ view model =
                                     (String.toFloat |> withDefault defaultCoefMax) UpdateCoefMax
                               ] [ ]
                         ]
-                  , LayoutGrid.cell qtrRow
+                  , qtrRowCell
                         [ Textfield.view Mdc "params:ship-factor" model.mdc
                               [ Textfield.leadingIcon "local_shipping"
                               , Textfield.label "(%)"
@@ -435,7 +369,7 @@ view model =
                                     (String.toFloat |> withDefault defaultShipFactor) UpdateShipFactor
                               ] [ ]
                         ]
-                  , LayoutGrid.cell qtrRow
+                  , qtrRowCell
                         [ Button.view Mdc "refresh" model.mdc
                               [ Button.outlined
                               , Button.dense
@@ -446,8 +380,7 @@ view model =
                   ]
             ]
 
-
-        -- Error Dialog
+        -- Error Dialog (Display errors)
         , Dialog.view Mdc "error-dialog" model.mdc
             [ Dialog.open |> when (isJust model.error)
             , Dialog.onClose CancelDialog
@@ -465,3 +398,109 @@ view model =
                   ]
               ]
         ]
+
+
+--------------------------------------------------------------------------
+-- App Logic
+totalQuantity : Model -> Outstanding Float
+totalQuantity = Result.map List.sum
+                    << Result.combine
+                    << List.map .quantity
+                    << Dict.values << .entries
+
+computePrice : Float -> Entry -> Outstanding Float
+computePrice shipFactor {quantity, price, isShipped} =
+    quantity |> andThen (\q ->
+    price    |> andThen (\p ->
+      let computedPrice = q * p
+          factorPrice   = computedPrice * (if isShipped then shipFactor / 100 else 0)
+      in Ok (computedPrice + factorPrice)))
+
+priceMean : Model -> Outstanding Float
+priceMean m =
+    m.shipFactor
+    |> andThen (\shipFactor ->
+       let cPrice  = computePrice shipFactor
+       in (Result.combine <| List.map cPrice <| Dict.values <| m.entries)
+    |> andThen (\prices -> totalQuantity m
+    |> andThen (\totalQ ->
+       let result = List.sum prices / totalQ
+       in if isNaN result then Err "NaN" else Ok result)))
+
+priceMeanMin : Model -> Outstanding Float
+priceMeanMin m =
+    priceMean m
+    |> andThen (\pMean -> m.coefMin
+    |> andThen (\coefMin -> Ok (pMean / coefMin)))
+
+priceMeanMax : Model -> Outstanding Float
+priceMeanMax m =
+    priceMean m
+    |> andThen (\pMean -> m.coefMax
+    |> andThen (\coefMax -> Ok (pMean / coefMax)))
+
+
+--------------------------------------------------------------------------
+-- Constants
+defaultCoefMin : Float
+defaultCoefMin = 0.8
+
+defaultCoefMax : Float
+defaultCoefMax = 0.7
+
+defaultShipFactor : Float
+defaultShipFactor = 3
+
+defaultNewEntry : Entry
+defaultNewEntry = (Entry (Err "") (Err "") True)
+
+nanMessage : String
+nanMessage = "✗ Nombre"
+
+entriesMoc = Dict.fromList
+          [ (0, Entry (Ok 1) (Ok 1) False)
+          , (1, Entry (Ok 1) (Ok 1) True)
+          , (2, Entry (Ok 2) (Ok 1) False)
+          , (3, Entry (Ok 3) (Ok 1) False)
+          , (4, Entry (Ok 4) (Ok 1) False)
+          ]
+
+
+--------------------------------------------------------------------------
+-- Utils
+isJust : Maybe a -> Bool
+isJust maybe =
+  case maybe of
+    Just _ -> True
+    Nothing -> False
+
+-- More HTML
+hMain : List (Html.Attribute msg) -> List (Html msg) -> Html msg
+hMain attributes children =
+    Html.node "main" [] [ Html.div attributes children ]
+
+{-| Make a cell that takes a quarter of a row.
+
+Fix the size of a cell so that it takes a quarter of a row whatever
+the device (phone, tablet, desktop).
+-}
+qtrRow : List (LayoutGrid.Property m)
+qtrRow = [ LayoutGrid.span1Phone
+         , LayoutGrid.span2Tablet
+         , LayoutGrid.span3Desktop
+         ]
+
+qtrRowCell = LayoutGrid.cell qtrRow
+
+{-| Make a cell that takes a full row.
+
+Fix the size of a cell so that it takes a full row whatever the device
+(phone, tablet, desktop).
+-}
+fullRow : List (LayoutGrid.Property m)
+fullRow = [ LayoutGrid.span4Phone
+          , LayoutGrid.span8Tablet
+          , LayoutGrid.span12Desktop
+          ]
+
+fullRowCell = LayoutGrid.cell fullRow
