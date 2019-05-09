@@ -24,10 +24,12 @@
 @import "~normalize.css";
 
 
-/* MD icons https://github.com/jossef/material-design-icons-iconfont */
-$material-design-icons-font-directory-path: '~material-design-icons-iconfont/dist/fonts/';
+/* Roboto typeface https://github.com/KyleAMathews/typefaces */
+@import '~typeface-roboto/index.css';
 
-@import '~material-design-icons-iconfont/src/material-design-icons';
+
+/* MD icons https://github.com/jossef/material-design-icons-iconfont */
+@import '~material-design-icons-iconfont/dist/material-design-icons.css';
 
 
 /* MDC https://material.io/develop/web/docs/getting-started/ */
