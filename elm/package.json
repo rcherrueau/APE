@@ -2,7 +2,7 @@
   "name": "octo-daddy",
   "version": "1.0.0",
   "description": "Daddy's Mean Program for Fish Selling",
-  "main": "app.html",
+  "main": "OctoDaddy.html",
   "scripts": {
     "build": "webpack -p",
     "start": "webpack-dev-server",

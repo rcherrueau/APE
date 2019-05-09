@@ -252,6 +252,7 @@
                      [@add1 add1] [@sub1 sub1]
                      [@let let]
                      [@if if]
-                     [@%id #%top])
+                     [@%id #%top] ;; #%top wrapped unbound variables
+                     )
          quote
          #%app #%top-interaction compile-exp)

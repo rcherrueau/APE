@@ -88,11 +88,6 @@ typings/
 # DynamoDB Local files
 .dynamodb/
 
-# End of https://www.gitignore.io/api/node
-
-# Created by https://www.gitignore.io/api/elm
-# Edit at https://www.gitignore.io/?templates=elm
-
 ### Elm ###
 # elm-package generated files
 elm-stuff
@@ -101,6 +96,15 @@ repl-temp-*
 
 0.19.*
 
+<<<<<<< Updated upstream
+# Exclude dist files
+www/*
+||||||| merged common ancestors
+# End of https://www.gitignore.io/api/elm
+=======
 # End of https://www.gitignore.io/api/elm
 
-www/app.*
+# Exclude dist files
+www/app.js
+www/app.css
+>>>>>>> Stashed changes

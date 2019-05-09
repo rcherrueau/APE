@@ -11,7 +11,7 @@ Require Import Coq.Setoids.Setoid.
 Name (out/in/ν *n*.p), parallelism (p | q) and replication (!p) are
 intentionally left apart.
 *)
-Inductive Pi: Type :=
+Inductive Pi: Set :=
 | Out: Pi -> Pi        (* out.P *)
 | In: Pi -> Pi         (* in.P  *)
 | Nu: Pi -> Pi         (* ν(P)  *)
@@ -41,7 +41,6 @@ Struct. Congruence (≡) is the *smallest congruence relation* over Pi.
   -----------
   C[p] ≡ C[q]
 *)
-
 Inductive SCong: Pi -> Pi -> Prop :=
 (*
   Smallest congruence relation.
@@ -86,12 +85,20 @@ Inductive SCong: Pi -> Pi -> Prop :=
     SCong (Nu p) r -> SCong r (Nu q)
     -> SCong (Nu q) (Nu p)
 (* Axioms *)
+(* Rhaaa: I Struggle to encode scope extrusion *)
 | scong_res_zero: forall p : Pi,           (* ν0 ≡ 0 *)
     SCong (Nu Zero) p -> SCong Zero p
 | scong_res_zero_sym: forall p : Pi,
-    SCong (Nu Zero) p -> SCong p Zero.
+    SCong (Nu Zero) p -> SCong p Zero
+.
+
 
 Infix "≡" := SCong (at level 70, no associativity).
+
+Inductive ZSCong: Pi -> Prop :=
+| zscong_zero: ZSCong Zero
+| zscong_nu: forall p : Pi,
+    ZSCong p -> ZSCong (Nu p).
 
 Lemma z_is_nuz:
   Zero ≡ Nu Zero.
@@ -99,6 +106,73 @@ Proof.
   assert (Zero ≡ Zero) by exact scong_refl_zero.
   assert (Nu Zero ≡ Nu Zero) by exact (scong_nu Zero Zero H).
   apply (scong_res_zero (Nu Zero) H0).
+Qed.
+
+Locate "<->". Print iff.
+Locate "/\". Print and.
+
+Lemma scong_zero: forall p q : Pi,
+    p ≡ q -> (Zero ≡ p <-> Zero ≡ q).
+Proof.
+  intros p q H.
+  induction H.
+  - split.
+    + intros.  inversion H0. inversion H1.
+    + intros.  inversion H0. inversion H1.
+  - split.
+    + intros. inversion H0. inversion H1.
+    + intros.  inversion H0. inversion H1.
+  - split.
+    + intros. inversion H0.
+      assert (Nu p ≡ Nu q) by apply (scong_nu p q H).
+      assert (Nu Zero ≡ Nu q) by apply (scong_nu_trans Zero q (Nu p) H1 H2).
+      apply (scong_res_zero (Nu q) H4).
+    + intros. inversion H0.
+      assert (Nu q ≡ Nu p) by apply (scong_nu_sym p q H).
+      assert (Nu Zero ≡ Nu p) by apply (scong_nu_trans Zero p (Nu q) H1 H2).
+      apply (scong_res_zero (Nu p) H4).
+  - split. tauto. tauto.
+  - split.
+    + intros. inversion H1. inversion H2.
+    + intros. inversion H1. inversion H2.
+  - split.
+    + intros. inversion H1. inversion H2.
+    + intros. inversion H1. inversion H2.
+  - split. tauto. tauto.
+    (* + case IHSCong1, IHSCong2. intros. *)
+    (*   assert (Zero ≡ r) by apply (H1 H5). *)
+    (*   apply (H3 H6). *)
+    (* + case IHSCong1, IHSCong2. intros. *)
+    (*   assert (Zero ≡ r) by apply (H2 H5). *)
+    (*   apply (H4 H6). *)
+  - split.
+    + intros. inversion H0. inversion H1.
+    + intros. inversion H0. inversion H1.
+  - split.
+    + intros. inversion H1. inversion H2.
+    + intros. inversion H1. inversion H2.
+  - split.
+    + intros. inversion H0. inversion H1.
+    + intros. inversion H0. inversion H1.
+  - split.
+    + intros. inversion H1. inversion H2.
+    + intros. inversion H1. inversion H2.
+  - split.
+    + intros. inversion H0.
+      assert (Nu q ≡ Nu p) by apply (scong_nu_sym p q H).
+      assert (Nu Zero ≡ Nu p) by apply (scong_nu_trans Zero p (Nu q) H1 H2).
+      apply (scong_res_zero (Nu p) H4).
+    + intros. inversion H0.
+      assert (Nu p ≡ Nu q) by apply (scong_nu p q H).
+      assert (Nu Zero ≡ Nu q) by apply (scong_nu_trans Zero q (Nu p) H1 H2).
+      apply (scong_res_zero (Nu q) H4).
+  - split. tauto. tauto.
+  - split.
+    + intros. apply (scong_res_zero p H).
+    + intros. apply scong_refl_zero.
+  - split.
+    + intros. apply scong_refl_zero.
+    + intros. apply (scong_res_zero p H).
 Qed.
 
 (* ------------------------------------------------------------------- *)
@@ -114,7 +188,6 @@ Here is an example for the equivalence relation on Bool:
 > Proof.
 >   intro Heq. inversion Heq.
 > Qed.
-
 
 Which is equivalent to the more common pattern.
 
@@ -211,7 +284,7 @@ Qed.
 
 Theorem scong_sym: symmetric Pi SCong.
   intros p q.
-  destruct p; destruct q.
+  destruct p, q.
   - intro Hscong; apply (scong_sym_out p q Hscong).
   - intro Hscong; inversion Hscong.
   - intro Hscong. inversion Hscong.
@@ -256,7 +329,7 @@ Qed.
 
 Theorem scong_trans: transitive Pi SCong.
   intros p r q.
-  destruct p; destruct q.
+  destruct p, q.
   - intros HscongPR HscongRQ.
     exact (scong_trans_out p q r HscongPR HscongRQ).
   - intros HscongPR HscongRQ. destruct r.
@@ -395,6 +468,8 @@ Lemma nuznup_is_zp: forall p : Pi,
 Proof.
   intros p H.
   rewrite <- z_is_nuz in H.
+  set (scong_zero Zero (Nu p) H).
+  case i. intros.
   (* Were I struggle! I don't want to use the previous axiom. But,
   cannot figure out how to remove Nu. *)
   (* apply (znup_is_zp p H). *)

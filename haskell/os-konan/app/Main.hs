@@ -24,8 +24,8 @@ import qualified Data.OpenStack.Sql as OS (isCorrelated)
 process :: (String -> IO (Either String a))         -- ^ Parse test `a`
         -> (a -> String -> IO ())                   -- ^ Save `a` on the disk
         -> (String -> IO (Either PeekException a))  -- ^ Load `a` from the disk
-        -> (a -> File.ByteString) -> String -> String -> IO ()  -- ^ fold, fileIn, fileOut
-process parse save load m fileIn fileOut = do
+        -> (a -> File.ByteString) -> String -> String -> IO ()  -- ^ transform, fileIn, fileOut
+process parse save load t fileIn fileOut = do
   let fileBinary = fileIn ++ ".raw"
 
   -- Parse test from file and save it (if needed)
@@ -48,7 +48,7 @@ process parse save load m fileIn fileOut = do
     Right test -> do
       -- Apply `m` on test and save it
       putStrLn "Folding..."
-      let test' = m test
+      let test' = t test
       File.writeFile fileOut test'
       putStrLn $ "Folded saved into " ++ fileOut
 
@@ -62,24 +62,6 @@ processOSP = process OSP.parse OSP.save OSP.load
 
 
 -- Transformation functions
-
-sqlUnique :: [ OSTest ] -> [ OSTest ]
-sqlUnique ts = snd $ foldl notSeenOSTestLevel ([], []) ts
-  where
-    notSeenOSTestLevel :: ([ SQL.QueryExpr ], [ OSTest ]) -> OSTest -> ([ SQL.QueryExpr ], [ OSTest ])
-    notSeenOSTestLevel (seen, ts) t =
-      let sqls           = OSS.sql t
-          (seen', sqls') = notSeenSqlLevel seen sqls
-      in  (seen', t { OSS.sql = sqls' } : ts)
-
-    notSeenSqlLevel :: [ SQL.QueryExpr ] -> [ SQL.QueryExpr ] -> ([ SQL.QueryExpr ], [ SQL.QueryExpr ])
-    notSeenSqlLevel seen []     = (seen, [])
-    notSeenSqlLevel seen (t:ts)
-      -- sql has been already seen, do not keep it in test
-      | t `elem` seen = notSeenSqlLevel seen ts
-      -- sql did not have been already seen, put it in seen, and keep it
-      | otherwise     = let (seen', ts') = notSeenSqlLevel (t : seen) ts
-                        in  (seen', t : ts')
 
 -- | Returns SQL correlated subqueries of an OSPTrace.
 --

@@ -6,6 +6,8 @@
 //
 // Adapted Calculator for my Daddy's Needs
 
+const path = require('path');
+
 // Determine build env
 const dev = 'development';
 const prod = 'production';
@@ -29,12 +31,25 @@ module.exports = [{
         // Loading of my Elm OctoDaddy App (output tangles with
         // www/app.js)
         './OctoDaddy.js',
+        // Loading of the Index (output in www/index.html)
+        './OctoDaddy.html', './favicon.ico'
     ],
     output: {
-        filename: 'www/app.js',
+        path: path.resolve(__dirname, 'www'), // output directory of the build
+        filename: 'app.js',
     },
     module: {
         rules: [
+            // Index
+            {
+                test: /OctoDaddy.html$/,
+                use: {
+                    loader: "file-loader",
+                    options: {
+                        name: 'index.html',
+                    },
+                }
+            },
             // Sass part
             {
                 test: /\.scss$/,
@@ -42,7 +57,7 @@ module.exports = [{
                     {
                         loader: 'file-loader',
                         options: {
-                            name: 'www/app.css',
+                            name: 'app.css',
                         },
                     },
                     { loader: 'extract-loader' },
@@ -67,7 +82,15 @@ module.exports = [{
                 exclude: [/elm-stuff/, /node_modules/, /elm-mdc/],
                 loader: 'elm-webpack-loader',
                 options: elmOpts,
-            }
+            },
+            // Assets (including font, favicon)
+            // Note: put this in an assets directory?
+            { test: /\.(png|ico|ttf|eot|svg|woff(2)?)$/,
+              loader: "file-loader",
+              options: {
+                  name: '[name].[ext]',
+              },
+            },
         ]
     },
 }];
