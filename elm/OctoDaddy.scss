@@ -6,6 +6,9 @@
 //
 // Adapted Calculator for my Daddy's Needs
 
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+/* ~ General parameters and import */
+
 $mdc-theme-primary: #01579b;
 $mdc-theme-secondary: #c51162;
 $mdc-theme-background: #fff;
@@ -13,6 +16,17 @@ $mdc-theme-background: #fff;
 $mdc-typography-styles-headline6: (
     font-size: 1.15rem
 );
+
+/* css `@import` is relative to the current directory. So we should go
+   with something like:
+
+     `@import node_modules/normalize.css/normalize.css`
+
+   Or we could use the `~` syntax to resolve the import as a module.
+
+   See, https://github.com/webpack-contrib/css-loader/issues/12
+*/
+@import "~normalize.css";
 
 /* $mdc-layout-grid-inner: (desktop, 8px, 4px); */
 /* $mdc-layout-grid-inner: (tablet, 8px, 4px); */
@@ -32,7 +46,8 @@ $mdc-typography-styles-headline6: (
 @import "@material/textfield/helper-text/mdc-text-field-helper-text";
 @import "@material/top-app-bar/mdc-top-app-bar";
 
-/* General */
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+/* ~ MDC overriding */
 :root {
     /* @include $mdc-layout-grid-inner(desktop, 8px, 4px); */
     /* @include $mdc-layout-grid-inner(tablet, 8px, 4px); */
@@ -52,6 +67,9 @@ $mdc-typography-styles-headline6: (
 .mdc-text-field::before, .mdc-text-field::after {
     background-color: $mdc-theme-background;
 }
+
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+/* ~ OctoDaddy Specific */
 
 /* header contains the result and new-entry parts */
 header#top-app-bar {
