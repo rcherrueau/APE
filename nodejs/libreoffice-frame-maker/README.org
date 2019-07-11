@@ -1,0 +1,56 @@
+#+TITLE: Draw a Double Frame Around JPG Photos of a LibreOffice Presentation
+
+This program draws a double frame around jpg photos of a LibreOffice
+presentation. It is a mix of shell commands and a NodeJS program. The
+shell commands unpack/pack the ~content.xml~ file of a LibreOffice
+document. The NodeJS program (1)\nbsp{}parses the XML LibreOffice
+document, (2)\nbsp{}selects jpg photos, and (3)\nbsp{}finally inserts
+the svg missing tags that draws a double frame around the photo.
+
+[[example/pres-framed.jpg]]
+
+* Example
+The [[file:example/pres-framed.odp][example/pres-framed.odp]] is the output of [[file:example/pres.odp][example/pres.odp]].
+
+* Use it
+This programs requires zip, unzip, NodeJS and the [[https://github.com/jsdom/jsdom][jsdom]] library. The
+jsdom library implements the same ~DOM~ interface as in the [[https://developer.mozilla.org/en-US/docs/Web/API/Document_Object_Model][browser]].
+Making it easy to parse and manipulate the LibreOffice presentation.
+Do ~make req~, or directly =npm install jsdom@"^15.1.1"= to install
+it.
+
+Then starts the framing by calling the Makefile. The ~ODP~ argument
+links to your current presentation and defaults to ~./pres.odp~. The
+~F_ODP~ argument control the name of the output framed presentation
+and defaults to ~./pres-framed.opd~.
+: make ODP=example/pres.odp F_ODP=example/pres-framed.odp
+
+The NodeJS program is customized for my presentation. It works well
+with the [[file:example/pres.odp][example/pres.odp]] presentation. But, it certainly requires to
+update two ~const~ at the top of [[file:frameMaker.js][frameMaker.js]] for your personal use.
+First, customize the ~excludeSlides~ to exclude slides (start at
+number ~1~). Second, customize the ~slideThemes~ to tell the frame
+stroke and background colors. It's an object that gives for a specific
+slide background color (/e.g/, ~#ffffff~) the frame stroke (/e.g./,
+~#eeeeee~) and background (/e.g./, ~#dddddd~) colors, plus the name of
+the theme (/i.e./, an alphanumeric word).
+#+begin_src javascript
+"#ffffff" : {                       // Slide background color
+    "frameStrokeColor": "#eeeeee",  // Frame stroke color
+    "frameBackColor":   "#dddddd",  // Frame background color
+    "name":             "myTheme",  // Theme name
+},
+#+end_src
+
+* Export slides as images
+LibreOffice isn't helpful to export slides as good quality images. The
+only option is to export it as HTML but the quality of rendered slides
+is horribly low. A better solution consists in exporting the
+presentation as a PDF file (300 DPI) and then call imagemagick to
+render each slide into a good quality image.
+
+After exporting your presentation as a PDF file, then call the
+following command to render each slide as a jpg image. The ~PDF~
+argument is optional and defaults to ~./pres-framed.pdf~. The result
+is in the ~pres-images~ directory.
+: make export PDF=example/pres-framed.pdf
