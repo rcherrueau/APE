@@ -16,8 +16,8 @@ Check (fun x: nat => x).
 Check (fun x: True => x).
 (* [: True -> True] *)
 
-(* Implication table*)
-(* | =>    | True     | False     | *)
+(* Implication table: A ⇒ B: Prop *)
+(* | A\B   | True     | False     | *)
 (* |-------+----------+-----------| *)
 (* | False | True (1) | True (2)  | *)
 (* | True  | True (3) | False (4) | *)
@@ -58,7 +58,7 @@ Check unit_ind.
       P tt -> ∀ u : unit, P u]
 
 See the type `Prop`? It is the type for logical proposition. And
-the values of such type are proofs. Here the induction principle of
+the values of such type are proofs. Here, the induction principle of
 `unit` states that:
 - P tt :: If you can present a proof that `P` holds for `tt`
 - ∀ u : unit, P u :: Then we are rewarded with a proof that P holds
@@ -115,7 +115,7 @@ Theorem negb_inverse: forall b, negb (negb b) = b.
   destruct b; simpl; reflexivity.
 Qed.
 
-Theorem negb_ineq: forall b, ~ (negb b = b).
+Theorem negb_ineq: forall b, ~ (negb b = b).  (* Similarly, nebg <> b *)
   destruct b; discriminate.
   (* The discriminate tactic is used to proved that two values of an
   inductive type are not equal, whenever the values are formed with
@@ -126,7 +126,7 @@ Theorem negb_ineq: forall b, ~ (negb b = b).
   tries to find which constructors could lead to the `Hypo`. If there
   is none, then `H -> False`. *)
 Restart.
-  Locate "~". Print not.
+  Locate "~". Print not.  (* Similarly, Locate "<>" .*)
   destruct b; simpl; unfold not.
   - intro H. inversion H.
   - intro H. inversion H.
@@ -138,28 +138,134 @@ Qed.
 (* ------------------------------------------------------------------- *)
 (* Natural numbers *)
 Inductive nat: Set :=
-| Z: nat
+| O: nat
 | S: nat -> nat.
+
+Check nat_ind.
+(* [: ∀ P : nat -> Prop,
+       P O ->
+       (∀ n : nat, P n -> P (S n)) ->
+       ∀ n : nat, P n]
+
+The first argument is the predicate as usual, then the second argument
+tells to prove my predicate for `O`. And look, the third argument `∀ n
+: nat, P n -> P (S n)` is a function (or, implication) that should be
+"suppose `P` holds for `n`, now prove that it holds for `S n`", which
+is an inductive hypothesis!
+
+From there, we can prove theorems by case analysis with `destruct` af
+for simpler inductive types, but we can also now get into genuine
+inductive theorems. *)
 
 Definition isZero(n: nat): bool :=
   match n with
-  | Z => true
+  | O => true
   | _ => false
   end.
 
 Definition pred(n: nat): nat :=
   match n with
-  | Z => Z
+  | O => O
   | (S n') => n'
   end.
 
-Check nat_ind.
-(* [: ∀ P : nat -> Prop,
-       P Z ->
-       (∀ n : nat, P n -> P (S n)) ->
-       ∀ n : nat, P n]
+Fixpoint plus (n m: nat) : nat :=
+  match n with
+  | O => m
+  | S n' => S (plus n' m)
+  end.
 
- *)
-(*
-Look, here I have an inductive hypothesis.
-*)
+(* Some theorems about `plus` can be proved without induction. *)
+Theorem O_plus_n : forall (n: nat), plus O n = n.
+  intro n. simpl. reflexivity.
+  (* Coq computation (e.g., `simpl`) automatically simplify the
+    application of `plus`, because unfolding the `plus` a `match`
+    expression where the branch to be taken is obvious (i.e, the `O =>
+    m`). *)
+Restart.
+  unfold plus. reflexivity.
+Qed.
+
+(* Reversing the order of the arguments, though, this no longer works,
+because there is no induction on the second argument in the `plus`
+definition. Thus, we need induction. *)
+Theorem n_plus_O : forall (n: nat), plus n O = n.
+  induction n.
+  - reflexivity.  (* O = O *)
+  - simpl. rewrite IHn. reflexivity.  (* plus (S n) O = S n *)
+Restart.  (* BTW, `crush` handles it very well. *)
+  induction n; crush.
+Qed.
+
+(* `S` of nat is injective *)
+Theorem S_inj : forall n m, S n = S m -> n = m.
+  intros n m H. injection H. trivial.
+Qed.
+
+(* ------------------------------------------------------------------- *)
+(* List of Natural numbers *)
+
+Inductive nat_list: Set :=
+| NNil: nat_list
+| NCons: nat -> nat_list -> nat_list.
+
+Fixpoint nlength (ns: nat_list): nat :=
+  match ns with
+  | NNil => O
+  | NCons n ns' => S (nlength ns')
+  end.
+
+Fixpoint napp (ns1 ns2: nat_list): nat_list :=
+  match ns1 with
+  | NNil => ns2
+  | NCons n ns1' => NCons n (napp ns1' ns2)
+  end.
+
+Theorem nlength_napp : forall (ns1 ns2: nat_list),
+    nlength(napp ns1 ns2) = plus (nlength ns1) (nlength ns2).
+Proof.
+  induction ns1.
+  - simpl. reflexivity.
+  - simpl. intro ns2. rewrite (IHns1 ns2). reflexivity.
+Restart.
+  induction ns1; crush.
+Qed.
+
+(* ------------------------------------------------------------------- *)
+(* Binary Tree of Natural Numbers *)
+
+Inductive nat_btree: Set :=
+| NLeaf: nat_btree
+| NNode: nat_btree -> nat -> nat_btree -> nat_btree.
+
+Fixpoint nsize (tr: nat_btree): nat :=
+  match tr with
+  | NLeaf => S O
+  | NNode l _ r => plus (nsize l) (nsize r)
+  end.
+
+Fixpoint nsplice (tr1 tr2: nat_btree): nat_btree :=
+  match tr1 with
+  | NLeaf => NNode tr2 O NLeaf
+  | NNode l n r => NNode (nsplice l tr2) n r
+  end.
+
+Theorem plus_assoc: forall n1 n2 n3: nat,
+    plus (plus n1 n2) n3 = plus n1 (plus n2 n3).
+Proof.
+  induction n1.
+  - simpl. reflexivity.
+  - intros n2 n3. simpl. rewrite IHn1. reflexivity.
+Restart.
+  induction n1; crush.
+Qed.
+
+Hint Rewrite n_plus_O plus_assoc.
+Theorem nsize_nsplice : forall (tr1 tr2: nat_btree),
+    nsize (nsplice tr1 tr2) = plus (nsize tr2) (nsize tr1).
+Proof.
+  induction tr1; crush.
+Qed.
+
+(* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
+(* Parameterized Types *)
