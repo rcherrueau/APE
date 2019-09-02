@@ -1,5 +1,20 @@
 #lang racket
 
+;; @InProceedings{CPN98,
+;;   author    = {David G. Clarke and
+;;                John Potter and
+;;                James Noble},
+;;   title     = {Ownership Types for Flexible Alias Protection},
+;;   booktitle = {Proceedings of the 1998 {ACM} {SIGPLAN} Conference
+;;                on Object-Oriented Programming Systems, Languages
+;;                {\&} Applications {(OOPSLA} '98),
+;;                Vancouver, British Columbia, Canada, October 18-22, 1998.},
+;;   pages     = {48--64},
+;;   year      = {1998},
+;;   url       = {https://doi.org/10.1145/286936.286947},
+;;   doi       = {10.1145/286936.286947}
+;; }
+
 (require (for-syntax syntax/parse
                      racket/syntax)
          syntax/parse
@@ -17,57 +32,49 @@
          #%app #%top-interaction
          )
 
-;; ;; (define-syntaxclass-parser C : class
-;; ;;   #'(foo C.NAME [C.OWNER ...+] C.FIELD ...))
-;; ;; >
-;; ;; > (define-syntax-parser class
-;; ;; >   [(C:class)
-;; ;; >    #'(foo C.NAME (C.OWNER ...+) C.FIELD ...)])
-;; (define-syntax (define-syntaxclass-parser stx)
-;;   (syntax-parse stx
-;;     [(_ PAT:id (~datum :) STX-CLASS:id CLAUSE:expr)
-;;      (let* ([pat       (syntax->datum #'PAT)]
-;;             [stx-class (syntax->datum #'STX-CLASS)]
-;;             [PAT:CLASS (format-id stx "~a:~a" pat stx-class)])
-;;        #`(define-syntax-parser STX-CLASS
-;;            [(#,PAT:CLASS) CLAUSE]))]))
+
+;; Utils
 
 (begin-for-syntax
+  ;; -- Syntax class for type and arg
   (define-syntax-class type
     (pattern TYPE:id))
 
   (define-syntax-class arg
-    (pattern (NAME:id (~datum :) TYPE:type))))
+    (pattern (NAME:id (~datum :) TYPE:type)))
 
-(define-for-syntax (forall p l)
-  (foldr eq? #t (map p l)))
+  ;; -- Syntax checker
+  (define (forall p l)
+    (foldr eq? #t (map p l)))
 
-(define-for-syntax (is-syntax-value? value stx)
-  (define expr (syntax-e (car (syntax->list stx))))
-  (eq? value expr))
+  (define (is-syntax-value? value stx)
+    (define expr (syntax-e (car (syntax->list stx))))
+    (eq? value expr))
 
-(define-for-syntax (is-class? stx)
-  (is-syntax-value? 'class stx))
+  (define (is-class? stx)
+    (is-syntax-value? 'class stx))
 
-(define-for-syntax (is-field? stx)
-  (is-syntax-value? 'field stx))
+  (define (is-field? stx)
+    (is-syntax-value? 'field stx))
 
-(define-for-syntax (is-def? stx)
-  (is-syntax-value? 'def stx))
+  (define (is-def? stx)
+    (is-syntax-value? 'def stx))
 
-(define-for-syntax (is-field/def? stx)
-  (or (is-field? stx) (is-def? stx)))
+  (define (is-field/def? stx)
+    (or (is-field? stx) (is-def? stx)))
 
-(define-for-syntax (is-expr? stx)
-  (define expr (syntax-e stx))
-  (displayln expr)
-  (cond
-    [(symbol? expr) #t]  ;; variable
-    [(number? expr) #t]
-    [else
-     (let ([expr (syntax-e (car expr))])
-       (displayln expr)
-       (member expr '(new let send get-field set-field!)))]))
+  (define (is-expr? stx)
+    (define expr (syntax-e stx))
+    (cond
+      [(symbol? expr) #t]  ;; variable
+      [(number? expr) #t]
+      [else
+       (let ([expr (syntax-e (car expr))])
+         (member expr '(new let send get-field set-field!)))]))
+  )
+
+
+;; Class expander
 
 (define-syntax-parser @%module-begin
   [(_ CLASS:expr ... E:expr)
@@ -76,7 +83,6 @@
    ;; Check `E` is an expression
    #:when (is-expr? #'E)
    #'(#%module-begin CLASS ... E)])
-
 
 ;; ----- Class
 (define-syntax-parser class
@@ -122,7 +128,7 @@
   [(_ CNAME:id DNAME:id ARG:expr ...)
    #'`(Send ,CNAME DNAME ,ARG ...)])
 
-;; ;; ---- Value
+;; ---- Value
 (define-syntax-parser @%datum
   [(_ . N:nat) #''(Num  N)])
 
