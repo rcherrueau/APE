@@ -1,19 +1,6 @@
 #lang racket/base
 
-;; @InProceedings{CPN98,
-;;   author    = {David G. Clarke and
-;;                John Potter and
-;;                James Noble},
-;;   title     = {Ownership Types for Flexible Alias Protection},
-;;   booktitle = {Proceedings of the 1998 {ACM} {SIGPLAN} Conference
-;;                on Object-Oriented Programming Systems, Languages
-;;                {\&} Applications {(OOPSLA} '98),
-;;                Vancouver, British Columbia, Canada, October 18-22, 1998.},
-;;   pages     = {48--64},
-;;   year      = {1998},
-;;   url       = {https://doi.org/10.1145/286936.286947},
-;;   doi       = {10.1145/286936.286947}
-;; }
+;; The desugared version of surface-lang
 
 (require (for-syntax racket/base
                      syntax/parse
@@ -199,8 +186,8 @@
    #'`(get-field CNAME FNAME)]
   [(_ set-field! CNAME:id FNAME:id E:expr)
    #'`(set-field! CNAME FNAME ,E)]
-  [(_ send CLASS:expr DNAME:id ARG:expr ...)
-   #'`(send ,CLASS DNAME ,ARG ...)]
+  [(_ send E:expr DNAME:id ARG:expr ...)
+   #'`(send ,E DNAME ,ARG ...)]
   ;; [(_ F:id ARG:expr ...)
   ;;  ;; #:fail-unless (is-keyword? #'F)
   ;;  ;; ;; (format "unexpected literal, expected one of ~s" keyword-lits)
@@ -211,6 +198,7 @@
 ;; ---- Value
 ;; (define-syntax-parser @%datum
 ;;   [(_ . N:nat) #''(Num  N)])
+
 
 (define-syntax-parser @%top
   [(_ . ID:id)
