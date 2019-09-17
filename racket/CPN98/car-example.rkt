@@ -1,4 +1,4 @@
-#lang s-exp "lang.rkt"
+#lang s-exp "surface-lang.rkt"
 
 (class Engine
   (def (start → Unit) void)
@@ -8,7 +8,11 @@
   ;; ...
   )
 
-(class Car
+(class Driver []
+  ;; ...
+  )
+
+(class Car [n m]
   (field [engine : (rep   / Engine)])
   (field [driver : (norep / Driver)])
 
