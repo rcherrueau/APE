@@ -1,4 +1,5 @@
-#lang s-exp "surface-lang.rkt"
+;; #lang s-exp "surface-lang.rkt"
+#lang reader "surface-lang.rkt"
 
 (class Driver
   ;; ...
@@ -8,12 +9,12 @@
   (field [fst : (m / X)])
   (field [snd : (n / Y)]))
 
-;; Check duplicated class
-;; (class Driver []
+;; ;; Check duplicated class
+;; (class Pair []
 ;;   ;; ...
 ;;   )
 
-(class Driver_ []
+(class Pair_ []
   ;; ...
   )
 
@@ -21,7 +22,7 @@
   (field [p1 : (rep   / (Pair rep norep))])
   (field [p2 : (norep / (Pair rep norep))])
 
-  ;; Check duplicated field
+  ;; ;; Check duplicated field
   ;; (field [p2 : (norep / (Pair rep norep))])
 
   (def (a → [rep   / (Pair rep norep)])
@@ -30,7 +31,7 @@
   (def (b → [norep / (Pair rep norep)])
     p2)
 
-  ;; Check duplicated def
+  ;; ;; Check duplicated def
   ;; (def (b) void)
 
   (def (x → [rep / X])
