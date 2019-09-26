@@ -15,137 +15,241 @@
 ;;   doi       = {10.1145/286936.286947}
 ;; }
 
-(require
- (for-syntax racket/base
-                     syntax/parse
-                     syntax/parse/define
-                     syntax/transformer
-                     syntax/free-vars
-                     racket/syntax
-                     racket/match
-                     racket/list
-                     racket/stxparam
-                     "type-checker.rkt"
-                     "utils.rkt"
-                     )
-         racket/match
+(require racket/match
          racket/function
-         racket/stxparam
-         ;;
-         "type-checker.rkt"
+         racket/list
+         racket/pretty
+         racket/syntax
          "utils.rkt"
+         "definitions.rkt"
          syntax/parse
          syntax/parse/define
          syntax/module-reader
-         )
+         (for-syntax syntax/parse
+                     syntax/parse/define
+                     racket/base
+                     "definitions.rkt"
+                     )
+ )
+
 
 ;; Naming conventions:
 ;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
-
+;; - c-type>, binder> Introduce class-type/binder for the rest of thread
+;; - c-type+, binder+ Mark class-type/binder of the current syntax
 
 
+;; Desugaring syntax transformation (∗>)
+
+;; - Introduce missing CPARAM
+;; - Transform let with multiple binding into nested lets of one
+;;   binding.
+;; - Rename short field access to normal (get-field this field)
+;;   access.
+;; - Mark fields with the name of their class
+;; - Mark free identifiers with their binder
+;; - Check no duplicate class name, field, def
+
+;; ∗> :: stx -> stx
+(define ∗> (syntax-parser
+  #:literal-sets [keyword-lits expr-lits arg-lits]
+
+  ;; A prog is a list of classes and one expression.
+  ;;
+  ;; (prog CLASS ... E)
+  ;; ∗>  (*prog *CLASS ... *E)
+  ;;
+  ;; The `~!` eliminate backtracking. Hence, if the next
+  ;; `fail-when` failed, it will not backtrack and reach the `_`
+  ;; case.
+  [(prog ~! CLASS:expr ... E:expr)
+   #:fail-when (check-class #'(CLASS ...)) "Duplicated class name"
+   #:with [*CLASS ...] (map ∗> (syntax->list #'(CLASS ...)))
+   #:with *E           (∗> #'E)
+   #'(*prog (*CLASS ...) *E)]
+
+  ;; A class is a `name`, an optional list of context parameters
+  ;; `CPARAM`, and a list of fields and definitions.
+  ;;
+  ;; (class name (CPARAM ...)? FIELD ... DEF ...)
+  ;; ∗>  (*class name *FIELD ... *DEF ...)
+  [(class name:id [CPARAM:id ...] ~! FIELD/DEF:expr ...)
+   #:fail-when (field-twice? #'(FIELD/DEF ...)) "Duplicated field"
+   #:fail-when (def-twice? #'(FIELD/DEF ...))   "Duplicated def"
+   #:with [*FIELD/DEF ...] (map (#'name . c-type> . ∗>)
+                                (syntax->list #'(FIELD/DEF ...)))
+   #'(*class name [CPARAM ...] (*FIELD/DEF ...))]
+  ;; Transforms a `class` without `CPARAM ...` into a `class` with.
+  [(class name FIELD/DEF ...)
+   (∗> #'(class name [] FIELD/DEF ...))]
+
+  ;; A field declares one argument `ARG` (i.e., no initialization).
+  ;;
+  ;; (field ARG)
+  ;; ∗>  (*field ARG)
+  [(field ARG:arg)
+   #:with *ARG (c-type+ #'ARG)
+   #'(*field *ARG)]
+
+  ;; A def (i.e., method) is a `name`, a list of arguments `ARG`, a
+  ;; return type `ret` and the `BODY` of the def. The def binds
+  ;; `ARG` in the `BODY`. The binding relation is noted
+  ;; `(ARG ...) binder*> `.
+  ;;
+  ;; (def (name ARG ... → ret) BODY)
+  ;; ∗>  (*def (name *ARG ... . ret) *BODY)
+  [(def (name:id ARG:arg ... → ret:type) BODY:expr)
+   #:with *BODY (((syntax->list #'(ARG ...)) . binder*> . ∗>) #'BODY)
+   #'(*def (name ARG ... . ret) *BODY)]
+
+  ;; A let binds a variables `var` to expression `E` in a BODY. The
+  ;; binding relation is noted `binder> var`.
+  ;;
+  ;; (let ([var : type E] ...) BODY)
+  ;; ∗>  (*let (var : type *E) (*let... (...) *BODY)
+  [(let ([var:id : t:type E:expr]) ~! BODY:expr)
+   #:with *E    (∗> #'E)
+   #:with *BODY ((#'var . binder> . ∗>) #'BODY)
+   #'(*let (var : t *E) *BODY)]
+  ;; Transforms a `let` with multiple binding into multiple nested
+  ;; `let`s with one unique binding (such as the previous let)
+  [(let (B1 BS ...) BODY:expr)
+   (∗> #'(let (B1) (let (BS ...) BODY)))]
+
+  ;; A new takes the class type `c-type` of the class to instantiate
+  ;; (i.e., no constructor).
+  ;;
+  ;; (new c-type)
+  ;; ∗>  (*new c-type)
+  [(new c-type:type)
+   #'(*class c-type)]
+
+  ;; A get-field takes an expression `E` that should reduce to an
+  ;; object and the name of the field `fname` to get on that object.
+  ;;
+  ;; (get-field E fname)
+  ;; ∗>  (*get-field *E fname)
+  [(get-field E:expr fname:id)
+   #:with *E (∗> #'E)
+   #'(*get-field *E fname)]
+
+  ;; A set-field! takes an expression `E` that should reduce to an
+  ;; object, the name of the field `fname` to change the value of, and
+  ;; the `BODY` of the new value.
+  ;;
+  ;; (set-field! E fname BODY)
+  ;; ∗>  (*set-field! *E fname *BODY)
+  [(set-field! E:expr fname:id BODY:expr)
+   #:with *E    (∗> #'E)
+   #:with *BODY (∗> #'BODY)
+   #'(*set-field! *E fname *BODY)]
+
+  ;; A send takes an expression `E` that should reduce to an object,
+  ;; the name of the def `dname` to call on that object, and a list of
+  ;; expressions `E-ARG ...` to pass as arguments to the def.
+  ;;
+  ;; (send E dname E-ARG ...)
+  ;; ∗>  (*get-field *E fname *E-ARG)
+  [(send E:expr dname:id E-ARG:expr ...)
+   #:with *E           (∗> #'E)
+   #:with [*E-ARG ...] (map ∗> (syntax->list #'(E-ARG ...)))
+   #'(*send *E dname *E-ARG ...)]
+
+  ;; An identifier is either:
+  ;;
+  ;; - The reserved keyword `this`. Marked with the current class
+  ;;   type.
+  [this
+   (c-type+ #'*this)]
+  ;; - A local binding (from a def or let). Marked with its binder.
+  [ID:id #:when (is-locally-binded? #'ID)
+         (binder+ #'ID)]
+  ;; - A top level binding (no binder). In that case, it presumably
+  ;;   refers to a field of the current class: A sort of shortcut for
+  ;;   (get-field this id) -- i.e., `id` instead of `this.id` in terms
+  ;;   of Java. E.g.,
+  ;;
+  ;;   1 (class C
+  ;;   2   (field [id : A])
+  ;;   3   (def (get-id → A) id))
+  ;;
+  ;;   With line 3 a shortcut for
+  ;;   > (def (get-id → A) (get-field this id))
+  ;;
+  ;;   ID ∗> *(get-field this ID)
+  [ID:id
+   #:with *ID (c-type+ #'ID)
+   (∗> #'(get-field this *ID))]
+
+  [_ (error "Unknown syntax" this-syntax)]))
 
 
-;; Utils
+;; Lang
 
-(begin-for-syntax
-
-  (define (forall p l)
-    (for/and ([i l]) (p i)))
-
-  ;; (define-literal-set keyword-lits
-  ;;   ;; Note: I have to define new, send, ... as datum otherwise they
-  ;;   ;; are going to be interpreted as identifier during macro
-  ;;   ;; expansion and may risk an evaluation with new, send from
-  ;;   ;; racket/class.
-  ;;   #:datum-literals (new send get-field set-field! this)
-  ;;   ;; I have no literals that should be interpreted.
-  ;;   ())
-
-  ;; ;; Check `#%app F ARG ...` is one of defined keywords
-  ;; (define is-keyword? (literal-set->predicate keyword-lits))
-
-
-  )
-
-(define-literal-set keyword-lits
-  ;; Note: I have to define new, send, ... as datum otherwise they
-  ;; are going to be interpreted as identifier during macro
-  ;; expansion and may risk an evaluation with new, send from
-  ;; racket/class.
-  #:datum-literals (new send get-field set-field! this)
-  ;; I have no literals that should be interpreted.
-  ())
-
-(define-literal-set expr-lits
-  #:datum-literals (prog class field def let)
-  ())
-
-(define-literal-set arg-lits
-  #:datum-literals (: →)
-  ())
-
-(define-literal-set expr*-lits
-  #:datum-literals (#%class #%field #%def #%let)
-  ())
-
-  ;; -- Syntax class for type and arg
-  (define-syntax-class type
-    #:description "class' type with ownership and context parameters"
-    #:attributes [TYPE OWNER CPARAMS]
-    #:datum-literals (/)  ;; Don't consider '/' as a pattern
-    (pattern (O:id / T:id)
-             #:with OWNER #'O
-             #:with TYPE #'T
-             #:with CPARAMS #''())
-    (pattern (O:id / (T:id PARAMS:id ...+))
-             #:with OWNER #'O
-             #:with TYPE #'T
-             #:with CPARAMS #''(PARAMS ...))
-    (pattern T:id
-             #:with OWNER #''Θ
-             #:with TYPE #'T
-             #:with CPARAMS #''())
-    (pattern (T:id PARAMS:id ...+)
-             #:with OWNER #''Θ
-             #:with TYPE #'T
-             #:with CPARAMS #''(PARAMS ...))
-    )
-
-  (define-syntax-class arg
-    #:description "argument with its type"
-    #:literal-sets [arg-lits]
-    (pattern (NAME:id : T:type)
-             #:attr OWNER #'T.OWNER
-             #:attr TYPE  #'T.TYPE
-             #:attr CPARAMS #'T.CPARAMS))
-;; Syntax parameters, as racket `parameter`, but at transformer level
-;; - https://beautifulracket.com/explainer/parameters.html#syntax-parameters
-;; - https://www.greghendershott.com/fear-of-macros/Syntax_parameters.html
+;; ;; Syntax parameters, as racket `parameter`, but at transformer level
+;; ;; - https://beautifulracket.com/explainer/parameters.html#syntax-parameters
+;; ;; - https://www.greghendershott.com/fear-of-macros/Syntax_parameters.html
+;; ;;
+;; ;; These parameters can be accessed inside a syntax object and give
+;; ;; the binded stx object in return. E.g., in the following,
+;; ;; `#'my-param` syntax object is, actually, a binder for the `#'42`
+;; ;; syntax object.
+;; ;;
+;; ;; > (define-syntax-parameter my-param (λ (stx) #'42))
+;; ;; > ...
+;; ;; > #'(writeln my-param) ; 42
+;; ;;
+;; ;; And I can later rebind it to another value with
+;; ;; `syntax-parameterize`, analogously to `parameterize` .
+;; ;;
+;; ;; These parameters should take place in a syntax-object for phase 0
+;; ;; (runtime). However, in the following, I use these parameters to
+;; ;; track information during phase 1 (macro expansion). Thus, I bind
+;; ;; them to a syntax error if someone try to use it a runtime.
+;; (define-syntax-parameter current-class-type  ;; Syntax object that is
+;;                                              ;; the type of the
+;;                                              ;; current class.
+;;   (λ (stx) (raise-syntax-error #f "Should only be used during macro expansion" stx)))
 ;;
-;; These parameters can be accessed inside a syntax object and give
-;; the binded stx object in return. E.g., in the following,
-;; `#'my-param` syntax object is, actually, a binder for the `#'42`
-;; syntax object.
-;;
-;; > (define-syntax-parameter my-param (λ (stx) #'42))
-;; > ...
-;; > #'(writeln my-param) ; 42
-;;
-;; And I can later rebind it to another value with
-;; `syntax-parameterize`, analogously to `parameterize` .
-;;
-;; These parameters should take place in a syntax-object for phase 0
-;; (runtime). However, in the following, I use these parameters to
-;; track information during phase 1 (macro expansion). Thus, I bind
-;; them to a syntax error if someone try to use it a runtime.
-(define-syntax-parameter current-class-type  ;; Syntax object that is
-                                             ;; the type of the
-                                             ;; current class.
-  (λ (stx) (raise-syntax-error #f "Should only be used during macro expansion" stx)))
+;; (define-syntax-parameter field-types        ;; Map of `(class-τ . field-name) -> field-τ`
+;;   (λ (stx) (raise-syntax-error #f "Should only be used during macro expansion" stx)))
 
-(define-syntax-parameter field-types        ;; Map of `(class-τ . field-name) -> field-τ`
-  (λ (stx) (raise-syntax-error #f "Should only be used during macro expansion" stx)))
+;; (define current-class-type (make-parameter #f))
+;; (define local-bindings     (make-parameter #hash{}))
+
+
+;; (define bind-local (curry bind local-bindings))
+
+
+;; Expand to:
+;; (let* ([arg-name-stxs (syntax-parse #'(ARG ...)
+;;                         [(A:arg ...) (syntax->list #'(A.NAME ...))])]
+;;        [arg-names (map syntax->datum arg-name-stxs)]
+;;        [arg-stxs (syntax->list #'(ARG ...))]
+;;        [binders (interleave arg-names arg-stxs)]
+;;        [new-bindings (apply hash-set* (local-bindings) binders)])
+;;  (parameterize ([local-bindings new-bindings]) (*d #'BODY))))
+
+
+;; (define-syntax-parser bind*
+;;   [(_ BINDERS:expr BODY:expr)
+;;    #'(let* ([binder-name-stxs
+;;              (syntax-parse BINDERS
+;;                [(ARG ...) #'(ARG ...)])]
+;;             [binder-names (map syntax->datum binder-name-stxs)]
+;;             [binder-stxs (syntax->list BINDERS)]
+;;             [binders (interleave binder-names binder-stxs)]
+;;             [new-bindings (apply hash-set* (local-bindings) binders)])
+;;                   (parameterize ([local-bindings new-bindings]) BODY))
+;;    ])
+
+;; #,(let* ([arg-name-stxs (syntax-parse #'(ARG ...)
+;;                           [(A:arg ...) (syntax->list #'(A.NAME ...))])]
+;;          [arg-names (map syntax->datum arg-name-stxs)]
+;;          [arg-stxs (syntax->list #'(ARG ...))]
+;;          [binders (interleave arg-names arg-stxs)]
+;;          [new-bindings (apply hash-set* (local-bindings) binders)])
+;;     (parameterize ([local-bindings new-bindings]) (*d #'BODY)))
 
 
 (provide (rename-out
@@ -158,50 +262,6 @@
 
 
 (define (surface-read-syntax src in)
-
-  (define d*
-    (syntax-parser
-      #:literal-sets [keyword-lits expr-lits arg-lits]
-      [(prog ~! CLASS:expr ... E:expr)
-       #:fail-when (check-class #'(CLASS ...)) "Duplicated class name"
-       #:with CLASS* (map d* (syntax->list #'(CLASS ...)))
-       #:with E*     (d* #'E)
-       #'(#%prog CLASS* E*)]
-      ;; The `~!` eliminate backtracking. Hence, if the next `fail-when`
-      ;; failed, it will not backtrack to the second pattern, which would
-      ;; lead to an infinite loop.
-      [(class name:id [CPARAM:id ...] ~! FIELD/DEF:expr ...)
-       #:fail-when (field-twice? #'(FIELD/DEF ...)) "Duplicated field"
-       #:fail-when (def-twice? #'(FIELD/DEF ...))   "Duplicated def"
-       #:with FIELD/DEF* (map d* (syntax->list #'(FIELD/DEF ...)))
-       #'(#%class name [CPARAM ...] FIELD/DEF*)]
-      [(class name BODY ...)
-       (d* #'(class name [] BODY ...))]
-      [(field ARG:arg) #'(#%field ARG)]
-      [(def (def-name ARG:arg ... → ret:type) BODY:expr)
-       #:with BODY* (d* #'BODY)
-       #'(#%def (def-name ARG ... → ret) BODY*)]
-      [(let ([ANAME:id : ATYPE:type E:expr] BINDING ...) BODY:expr)
-       ;; A `let` with multiple binding into multiple successive `let`s
-       ;; with one unique binding.
-       #:with B1 #'(ANAME : ATYPE E)  ;; The first binding of `let`
-       #:with BS #'(BINDING ...)      ;; Remaining bindings of `let`
-       (syntax-parse #'BS
-         ;; FIXME: my ANAME should bind ANAME in BODY so that every (@%top
-         ;; . var) if BODY refers to a top variable.
-         ;; (define-syntax my-or (make-rename-transformer #'ANAME))
-         [()
-          #:with E*    (d* #'E)
-          #:with BODY* (d* #'BODY)
-          #'(#%let (ANAME : ATYPE E*) BODY*)]
-         [_  (d* #'(let (B1) (let BS BODY)))])
-
-       ]
-      [_ this-syntax]))
-
-
-
-
   (define the-s-exps
     (let s-exps ([s-exp (read-syntax src in)])
       (if (eof-object? s-exp)
@@ -209,8 +269,7 @@
           (cons s-exp (s-exps (read-syntax src in))))))
 
   (define prog-sexp (quasisyntax/loc (car the-s-exps) (prog #,@the-s-exps)))
-  ;; (writeln prog-sexp)
-  (writeln (d* prog-sexp))
+  (pretty-print (syntax->datum (∗> prog-sexp)))
 
     ;; (define the-s-exp #`(#,@(s-exps)))
     ;; (d* #`(prog #,@the-s-exp)))
@@ -229,7 +288,7 @@
 
   ;; #`(module m "surface-desugar-lang.rkt" #,@prog)
   ;; (error "lala")
-  #'(module m racket/base(void))
+  #'(module m racket/base (void))
 
   )
 
@@ -243,143 +302,3 @@
 ;;    s-reader
 ;;    TODO...))
 ;; Expander
-
-;; ;; ----- Class
-;; ;;  CLASS := (class NAME (C-PARAMS ...) FIELD ... DEF ...)
-;; ;;  ~> (class O-SCHEME NAME FIELD ... DEF ...)
-;; (define-syntax-parser class
-;;   ;; The `~!` eliminate backtracking. Hence, if the next `fail-when`
-;;   ;; failed, it will not backtrack to the second pattern, which would
-;;   ;; create an infinite loop.
-;;   [(_ NAME:id [CPARAM:id ...] ~! FIELD/DEF:expr ...)
-;;    #:fail-when (field-twice? #'(FIELD/DEF ...)) "Duplicated field"
-;;    #:fail-when (def-twice? #'(FIELD/DEF ...)) "Duplicated def"
-;;    #'(syntax-parameterize ([current-class-type #'NAME]
-;;                            [field-types (hash)])
-;;        `(#%class NAME [CPARAM ...] ,FIELD/DEF ...))]
-;;      ;; #'`(#%class NAME [CPARAM ...] B)]
-;;   [(_ NAME:id FIELD/DEF:expr ...)
-;;    #'(class NAME [] FIELD/DEF ...)] )
-
-;; ;; ;;  FIELD := (field [NAME : TYPE])
-;; ;; ;;  ~> (field O-SCHEME NAME)
-;; (define-syntax-parser field
-;;   [(_ ARG:arg)
-;;    #:with F-ARG (syntax->datum #'ARG)
-;;    #'`(#%field F-ARG)])
-
-;; ;; DEF := (def (NAME [ARG:NAME : ARG:TYPE] ... → RET:TYPE) E)
-;; ;; ~> (def RET:O-SCHEME NAME (ARG:O-SCHEME ...) E)
-;; (define-syntax-parser def
-;;   #:datum-literals (→)
-;;   [(_ (DNAME ARG:arg ... → RET:type)  BODY:expr)
-;;    #:with D-ARGs (syntax->datum #'(DNAME ARG ... → RET))
-;;    #'`(#%def D-ARGs ,BODY)])
-
-
-;; ;; (define-for-syntax (add-τ e τ) (syntax-property e 'type τ))
-;; ;; (define-for-syntax (get-τ e τ) (syntax-property e 'type))
-;; ;; (define-for-syntax (compute-τ e) (get-τ (local-expand e 'expression null)))
-;; ;; (define-for-syntax (check-τ τ1 τ2) (stx=? τ1 τ2))
-;; ;; (define-for-syntax (erase-τ e) (local-expand e 'expression null))
-;; ;; (define-for-syntax (comp+erase-τ e)
-;; ;;   (let* ([e- (local-expand e 'expression null)]
-;; ;;          [τ (get-τ e-)])
-;; ;;     (values e- τ)))
-;; (define-syntax-parser @%app
-;;   #:literal-sets ([keyword-lits])
-;;   [(_ new CLASS:type)
-;;    (add-τ #'`(#%new CLASS) #'CLASS.TYPE)]
-;;   [(_ get-field E:expr FNAME:id)
-;;    ;; #:with Cτ (compute-τ #'E)
-;;    #:with Cτ #''Main ;; (compute-τ #'E)
-;;    ;; #:when (unless (∈f #'Cτ #'FNAME)
-;;    ;;          (raise-syntax-error #f
-;;    ;;                              (format "Class ~s doesn't contains field ~s" #'Cτ #'FNAME)
-;;    ;;                              this-syntax))
-
-;;    ;; (printf "~s:~s~n" this-syntax #'Cτ)
-;;    ;; #:with Fτ ;; TODO: look into a store such as A for (Cτ . FNAME)
-;;    ;;           ;; then add-τ Fτ
-;;    #'`(#%get-field ,E FNAME)]
-;;   [(_ set-field! E1:expr FNAME:id E2:expr)
-;;    #'`(#%set-field! ,E1 FNAME ,E2)]
-;;   [(_ send E:expr DNAME:id ARG:expr ...)
-;;    #'`(#%send ,E DNAME ,ARG ...)]
-;;   )
-
-
-;; ;; `(@%top . id)` refers to a top-level variable. In my lang, every
-;; ;; var is considered as a top-level variable since no racket `let`
-;; ;; binds it. There is two kind of var:
-;; (define-syntax-parser @%top
-;;   #:literal-sets ([keyword-lits])
-
-;;   ;; - The var is `this`, e.g., `(get-field (@%top . this) my-field)`
-;;   ;;   -#% I rebind it to the core #%this.
-;;   [(_ . this)
-;;    (add-τ #''#%this (class-τ))]
-
-;;   ;; - The var is presumably a local field of the current class, that
-;;   ;;   is, a sort of shortcut for (get-field this var) -- `var` instead of
-;;   ;;   `this.var` in terms of Java. E.g.,
-;;   ;;   > (class C
-;;   ;;   >   (field [var : D])
-;;   ;;   >   (def (get-f → D) (@%top . var)))
-;;   ;;   -#% I expand it to the normal form with `this`:
-;;   ;;       > (get-field (@%top . this) var)
-;;   [(_ . ID:id)
-;;    #'(@%app get-field (@%top . this) ID)])
-
-;; (define-syntax-parser @let
-;;   #:datum-literals (:)
-;;   [(_ ((ANAME:id : ATYPE:type E:expr) BINDING ...) BODY:expr)
-;;     ;; A `@let` with multiple binding into multiple successive `@let`s
-;;     ;; with one unique binding.
-;;    #:with B1 #'(ANAME : ATYPE E)  ;; The first binding of `@let`
-;;    #:with BS #'(BINDING ...)      ;; Remaining bindings of `@let`
-;;    ;; #:with bind-name (syntax-local-lift-expression #'ANAME)
-;;    (syntax-case #'BS ()
-;;      ;; FIXME: my ANAME should bind ANAME in BODY so that every (@%top
-;;      ;; . var) if BODY refers to a top variable.
-;;      ;; (define-syntax my-or (make-rename-transformer #'ANAME))
-;;      [() #'`(#%let (ANAME : ATYPE ,E) ,BODY)]
-;;      [_  #'(@let (B1) (@let BS BODY))])])
-
-;; (define-syntax-parser @%module-begin
-;;   [(_ CLASS:expr ... E:expr)
-;;    #:fail-when (check-class #'(CLASS ...)) "Duplicated class name"
-;;    ;; Check `CLASS ...` is a list of class definition
-;;    ;; #:when (forall is-class? (syntax->list #'(CLASS ...)))
-;;    ;; #:with PROG (syntax-local-expand-expression #'(CLASS ... E)
-;;    ;;                                             #f
-;;                              ;; )
-;;    #'(#%module-begin
-;;        (writeln `(#%prog ,CLASS ... ,E)))
-
-;;    ;; (syntax-case #'PROG ()
-;;    ;;   [(module nm lng (#%plain-module-begin . body))
-;;    ;;    #`(#%plain-module-begin
-;;    ;;       (#%require lng)
-;;    ;;       . #,((make-syntax-introducer) #'body))
-;;    ;;    ])
-;;    ;; #'(#%module-begin
-;;    ;;    (module surface-module "surface-desugar-lang.rkt"
-;;    ;;      prog))
-;;    ])
-
-;; (provide (rename-out
-;;           [@%module-begin #%module-begin]
-;;           [@%top #%top] ;; wrapped unbound variables
-;;           [@let let]
-;;           [@%app #%app]
-;;           )
-;;          class field def
-;;          ownership-scheme
-;;          ;; current-class
-;;          #%top-interaction
-;;          )
-
-;; ;; ---- Value
-;; ;; (define-syntax-parser @%datum
-;; ;;   [(_ . N:nat) #''(Num  N)])

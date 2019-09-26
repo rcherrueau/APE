@@ -1,6 +1,7 @@
 ;; #lang s-exp "surface-lang.rkt"
 #lang reader "surface-lang.rkt"
 
+
 (class Driver
   ;; ...
   )
@@ -19,16 +20,16 @@
   )
 
 (class Intermediate
-  (field [p1 : (rep   / (Pair rep norep))])
-  (field [p2 : (norep / (Pair rep norep))])
+  (field [p1 : (rep   / (Pair rep world))])
+  (field [p2 : (world / (Pair rep world))])
 
   ;; ;; Check duplicated field
-  ;; (field [p2 : (norep / (Pair rep norep))])
+  ;; (field [p2 : (world / (Pair rep world))])
 
-  (def (a → [rep   / (Pair rep norep)])
+  (def (a → [rep   / (Pair rep world)])
     (get-field this p1))
 
-  (def (b → [norep / (Pair rep norep)])
+  (def (b → [world / (Pair rep world)])
     p2)
 
   ;; ;; Check duplicated def
@@ -37,7 +38,7 @@
   (def (x → [rep / X])
     (get-field p1 fst))
 
-  (def (y → [norep / Y])
+  (def (y → [world / Y])
     (get-field p2 snd))
 
   (def (updateX → Unit)
@@ -45,16 +46,22 @@
 
   (def (get-engine [e : (rep / Engine)]
                    [b : (rep / (X a c))]
-                   → [rep / (Pair rep norep)])
+                   → [rep / (Pair rep world)])
     (get-field this p1))
+
+  (def (get-engine2 [e : (rep / Engine)]
+                    [b : (rep / (X a c))]
+                   → [rep / (Pair rep world)])
+    e)
+
   )
 
 (class Main []
-  (field [safe : (norep / Intermediate)])
+  (field [safe : (world / Intermediate)])
 
   (def (main → (rep Y))
-    (let ([a : (rep   / (Pair rep norep))  (get-field safe a)]
-          [b : (norep / (Pair rep norep))  (get-field safe b)]
+    (let ([a : (rep   / (Pair rep world))  (get-field safe a)]
+          [b : (world / (Pair rep world))  (get-field safe b)]
           [x : (rep   / X)                 (get-field safe x)])
       (get-field safe y))))
 
