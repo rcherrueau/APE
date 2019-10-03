@@ -32,10 +32,9 @@
 ;; are no duplicate.
 (define (check-class clss-stx)
   (define (get-class-name cls-stx)
-    (syntax-case cls-stx (class)
-      [(class name)       #'name]
-      [(class name _ ...) #'name]
-      [_ (raise-syntax-error #f "Bad syntax for class" cls-stx)]))
+    (syntax-parse cls-stx
+      #:literal-sets [*keyword-lits *expr-lits]
+      [(*class name _ ...) #'name]))
 
   (let* ([classes     (syntax->list clss-stx)]
          [class-names (map get-class-name classes)])
@@ -43,27 +42,27 @@
 
 ;; Returns the first duplicate field in the class or #f if there are
 ;; no duplicate.
-(define (field-twice? cls-stx)
+(define (field-twice? fields/defs-stx)
   (define (get-field-name field/def-stx)
-    (syntax-case field/def-stx (field :)
-      ;; (field [NAME : TYPE])
-      [(field [name : _]) #'name]
-      [_                  #f]))
+    (syntax-parse field/def-stx
+      #:literal-sets [*keyword-lits *expr-lits]
+      [(*field name _ ...) #'name]
+      [_                   #f]))
 
-  (let* ([fields/defs (syntax->list cls-stx)]
+  (let* ([fields/defs (syntax->list fields/defs-stx)]
          [field-names (filter-map get-field-name fields/defs)])
     (check-duplicate-identifier field-names)))
 
 ;; Returns the first duplicate def in the class or #f if there are
 ;; no duplicate.
-(define (def-twice? cls-stx)
+(define (def-twice? fields/defs-stx)
   (define (get-def-name field/def-stx)
-    (syntax-case field/def-stx (def : →)
-      ;; (def (NAME [ARG:NAME : ARG:TYPE] ... → RET:TYPE) E)
-      [(def (name _ ...) _) #'name]
-      [_                      #f]))
+    (syntax-parse field/def-stx
+      #:literal-sets [*keyword-lits *expr-lits]
+      [(*def (name _ ...) _) #'name]
+      [_                     #f]))
 
-  (let* ([fields/defs (syntax->list cls-stx)]
+  (let* ([fields/defs (syntax->list fields/defs-stx)]
          [def-names   (filter-map get-def-name fields/defs)])
     (check-duplicate-identifier def-names)))
 
@@ -82,19 +81,25 @@
   (λ (stx)
     (parameterize ([current-class-type C-TYPE]) (t stx))))
 
-;; binder> :: (BINDER: stx) -> (t: stx -> stx) -> (stx -> stx)
-(define (binder> BINDER t)
-  (λ (stx)
-    (let* ([binder-name  (syntax->datum (get-arg-name BINDER))]
-           [new-bindings (hash-set (local-bindings) binder-name BINDER)])
-      (parameterize ([local-bindings new-bindings]) (t stx)))))
+;; binder> :: (BINDERS: stx or [stx]) -> (t: stx -> stx) -> (stx -> stx)
+(define (binder> BINDERS t)
 
-;; binder*> :: (BINDERS: [stx]) -> (t: stx -> stx) -> (stx -> stx)
-(define (binder*> BINDERS t)
-  (match BINDERS
-    ['()           t]
-    [`(,b)         (binder> b t)]
-    [`(,b ,bs ...) (binder> b (binder*> bs t))]))
+  ;; binder1> :: (BINDER: stx) -> (t: stx -> stx) -> (stx -> stx)
+  (define (binder1> BINDER t)
+    (λ (stx)
+      (let* ([binder-name  (syntax->datum (get-arg-name BINDER))]
+             [new-bindings (hash-set (local-bindings) binder-name BINDER)])
+        (parameterize ([local-bindings new-bindings]) (t stx)))))
+
+  (syntax-parse BINDERS
+      ;; Match list of arg/id
+      [()         t]
+      [(b)        (binder1> #'b t)]
+      [(b bs ...) (binder1> #'b (binder> #'(bs ...) t))]
+
+      ;; Match unique arg/id
+      [b:id  (binder1> #'b t)]
+      [b:arg (binder1> #'b t)]))
 
 ;; put `foo in local-bindings
 ;; (+<binder #'foo (*d #'BODY))
@@ -158,6 +163,7 @@
   )
 
 (define (c-type+ stx)
+  ;; (printf "// ~s comes from class ~s~n" stx (current-class-type))
   (syntax-property stx 'class (current-class-type)))
 
 ;; (define-syntax-parser c-type+
@@ -171,6 +177,8 @@
   ;; (printf "-- ~s binded by ~s~n" stx (bind-ref stx))
   (syntax-property stx 'binder (bind-ref stx)))
 
+(define (binded? stx)
+  (syntax-property stx 'binder))
 ;; (define-syntax-parser binder+
 ;;   [(_ STX)
 ;;    ;; `bind-ref` Dynamic scoping for `bind-ref

@@ -1,6 +1,5 @@
 ;; #lang s-exp "surface-lang.rkt"
-#lang reader "surface-lang.rkt"
-
+#lang reader "lang.rkt"
 
 (class Driver
   ;; ...
@@ -32,8 +31,8 @@
   (def (b → [world / (Pair rep world)])
     p2)
 
-  ;; ;; Check duplicated def
-  ;; (def (b) void)
+  ;; ;; ;; Check duplicated def
+  ;; (def (b → [world / (Pair rep world)]) void)
 
   (def (x → [rep / X])
     (get-field p1 fst))
@@ -51,7 +50,7 @@
 
   (def (get-engine2 [e : (rep / Engine)]
                     [b : (rep / (X a c))]
-                   → [rep / (Pair rep world)])
+                    → [rep / (Pair rep world)])
     e)
 
   )
@@ -65,8 +64,10 @@
           [x : (rep   / X)                 (get-field safe x)])
       (get-field safe y))))
 
-(let ([main : Main (new Main)])
-  (send main main))
+;; (send (new Main) main)
+(let ([main : (world / Main) (new Main)])
+  (send main main)
+  )
 
 ;; Local Variables:
 ;; eval: (progn (defun racket/run-lang () (interactive) (save-buffer) (with-current-buffer "ctx-params-example.rkt" (racket-run))) (evil-define-key (quote normal) (quote racket-mode-map) (kbd "E") (quote racket/run-lang)))

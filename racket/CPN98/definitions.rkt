@@ -28,9 +28,14 @@
   #:datum-literals (: →)
   ())
 
-;; (define-literal-set expr*-lits
-;;   #:datum-literals (#%class #%field #%def #%let)
-;;   ())
+(define-literal-set *keyword-lits
+  #:datum-literals (*new *send *get-field *set-field! *this)
+  ())
+
+(define-literal-set *expr-lits
+  #:datum-literals (*prog *class *field *def *let)
+  ())
+
 
 ;; -- Syntax class for type and arg
 (define-syntax-class type
@@ -40,11 +45,11 @@
   (pattern (O:id / T:id)
            #:with OWNER #'O
            #:with TYPE #'T
-           #:with CPARAMS #''())
+           #:with CPARAMS #'())
   (pattern (O:id / (T:id PARAMS:id ...+))
            #:with OWNER #'O
            #:with TYPE #'T
-           #:with CPARAMS #''(PARAMS ...))
+           #:with CPARAMS #'(PARAMS ...))
   (pattern T:id
            #:with OWNER #''Θ
            #:with TYPE #'T
@@ -52,7 +57,7 @@
   (pattern (T:id PARAMS:id ...+)
            #:with OWNER #''Θ
            #:with TYPE #'T
-           #:with CPARAMS #''(PARAMS ...))
+           #:with CPARAMS #'(PARAMS ...))
   )
 
 (define-syntax-class arg
@@ -62,6 +67,17 @@
            #:attr OWNER #'T.OWNER
            #:attr TYPE  #'T.TYPE
            #:attr CPARAMS #'T.CPARAMS))
+
+;; (define (arg->ownership-scheme stx)
+;;   (syntax-parse stx
+;;     [A:arg (type->ownership-scheme #'A.T)]
+;;     [raise-syntax-error #f "Not an ownership argument" stx])
+;;   )
+
+;; (define (arg->ownership-scheme stx)
+;;   (syntax-parse stx
+;;     [ARG:arg #'()])
+;;   )
 
 ;; (get-arg-name #'(a : b))
 (define (get-arg-name stx)

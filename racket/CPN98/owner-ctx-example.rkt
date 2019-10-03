@@ -1,4 +1,5 @@
-#lang s-exp "lang.rkt"
+#lang reader "surface-lang.rkt"
+;; #lang s-exp "lang.rkt"
 
 (class Link [n]
   (field [next : (Θ / (Link n))])

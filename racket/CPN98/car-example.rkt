@@ -14,7 +14,7 @@
 
 (class Car [n m]
   (field [engine : (rep   / Engine)])
-  (field [driver : (norep / Driver)])
+  (field [driver : (world / Driver)])
 
   (def (init → Unit)
     (set-field! this engine (new Engine)))
@@ -28,8 +28,8 @@
   (def (go → Unit)
     (send engine start)))
 
-(let ([bob : (norep / Driver) (new (norep / Driver))]
-      [car : (norep / Car) (send (new (norep / Car)) init)]
+(let ([bob : (world / Driver) (new (world / Driver))]
+      [car : (world / Car) (send (new (world / Car)) init)]
       [_   : Unit (set-field! car driver bob)]
       [_   : Unit (send car go)]
       [e   : Engine (get-field car engine)]

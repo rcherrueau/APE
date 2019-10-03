@@ -25,6 +25,7 @@
          syntax/parse
          syntax/parse/define
          syntax/module-reader
+         syntax/stx
          (for-syntax syntax/parse
                      syntax/parse/define
                      racket/base
@@ -32,11 +33,13 @@
                      )
  )
 
+(provide ∗>)
+
 
 ;; Naming conventions:
 ;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
-;; - c-type>, binder> Introduce class-type/binder for the rest of thread
-;; - c-type+, binder+ Mark class-type/binder of the current syntax
+;; - c-type>, binder> Introduce class type/binder for the rest of thread
+;; - c-type+, binder+ Mark class type/binder of the current syntax
 
 
 ;; Desugaring syntax transformation (∗>)
@@ -48,13 +51,13 @@
 ;;   access.
 ;; - Mark fields with the name of their class
 ;; - Mark free identifiers with their binder
-;; - Check no duplicate class name, field, def
+;; - Expand types to ownership schemes
 
 ;; ∗> :: stx -> stx
 (define ∗> (syntax-parser
   #:literal-sets [keyword-lits expr-lits arg-lits]
 
-  ;; A prog is a list of classes and one expression.
+  ;; A prog is a list of CLASS and one expression E.
   ;;
   ;; (prog CLASS ... E)
   ;; ∗>  (*prog *CLASS ... *E)
@@ -63,97 +66,103 @@
   ;; `fail-when` failed, it will not backtrack and reach the `_`
   ;; case.
   [(prog ~! CLASS:expr ... E:expr)
-   #:fail-when (check-class #'(CLASS ...)) "Duplicated class name"
-   #:with [*CLASS ...] (map ∗> (syntax->list #'(CLASS ...)))
+   #:with [*CLASS ...] (stx-map ∗> #'(CLASS ...))
    #:with *E           (∗> #'E)
-   #'(*prog (*CLASS ...) *E)]
+   #'(*prog *CLASS ... *E)]
 
-  ;; A class is a `name`, an optional list of context parameters
-  ;; `CPARAM`, and a list of fields and definitions.
+  ;; A class is a NAME, an optional list of context parameters
+  ;; CPARAM, and a list of fields and definitions.
   ;;
-  ;; (class name (CPARAM ...)? FIELD ... DEF ...)
-  ;; ∗>  (*class name *FIELD ... *DEF ...)
-  [(class name:id [CPARAM:id ...] ~! FIELD/DEF:expr ...)
-   #:fail-when (field-twice? #'(FIELD/DEF ...)) "Duplicated field"
-   #:fail-when (def-twice? #'(FIELD/DEF ...))   "Duplicated def"
-   #:with [*FIELD/DEF ...] (map (#'name . c-type> . ∗>)
-                                (syntax->list #'(FIELD/DEF ...)))
-   #'(*class name [CPARAM ...] (*FIELD/DEF ...))]
+  ;; (class NAME (CPARAM ...)? FIELD ... DEF ...)
+  ;; ∗>  (*class NAME *FIELD ... *DEF ...)
+  [(class NAME:id [CPARAM:id ...] ~! FIELD/DEF:expr ...)
+   #:with [*FIELD/DEF ...]     (stx-map (#'NAME . c-type> . ∗>)
+                                        #'(FIELD/DEF ...))
+   #'(*class NAME [CPARAM ...] *FIELD/DEF ...)]
   ;; Transforms a `class` without `CPARAM ...` into a `class` with.
-  [(class name FIELD/DEF ...)
-   (∗> #'(class name [] FIELD/DEF ...))]
+  [(class NAME FIELD/DEF ...)
+   (∗> #'(class NAME [] FIELD/DEF ...))]
 
-  ;; A field declares one argument `ARG` (i.e., no initialization).
+  ;; A field declares one argument ARG (i.e., no initialization).
   ;;
   ;; (field ARG)
-  ;; ∗>  (*field ARG)
+  ;; ∗>  (*field NAME . OW-SCHEME)
+  ;; with OW-SCHEME is OWNER, TYPE, CPARAMS
   [(field ARG:arg)
-   #:with *ARG (c-type+ #'ARG)
-   #'(*field *ARG)]
+   #:with NAME      (c-type+ #'ARG.NAME)
+   #:with OW-SCHEME (type∗>ownership-scheme #'ARG.T)
+   #'(*field NAME . OW-SCHEME)]
 
-  ;; A def (i.e., method) is a `name`, a list of arguments `ARG`, a
-  ;; return type `ret` and the `BODY` of the def. The def binds
-  ;; `ARG` in the `BODY`. The binding relation is noted
-  ;; `(ARG ...) binder*> `.
+  ;; A def (i.e., method) is a NAME, a list of arguments ARG, a
+  ;; return type RET and the BODY of the def. The def binds
+  ;; ARG in the BODY. The binding relation is noted
+  ;;`(ARG ...) binder*>`.
   ;;
-  ;; (def (name ARG ... → ret) BODY)
-  ;; ∗>  (*def (name *ARG ... . ret) *BODY)
-  [(def (name:id ARG:arg ... → ret:type) BODY:expr)
-   #:with *BODY (((syntax->list #'(ARG ...)) . binder*> . ∗>) #'BODY)
-   #'(*def (name ARG ... . ret) *BODY)]
+  ;; (def (NAME ARG ... → RET) BODY)
+  ;; ∗>  (*def (NAME (A-NAME . A-OW-SCHEME) ... RET-OW-SCHEME) *BODY)
+  ;; with OW-SCHEME is OWNER, TYPE, CPARAMS
+  [(def (NAME:id ARG:arg ... → RET:type) BODY:expr)
+   #:with *BODY             ((#'(ARG ...) . binder> . ∗>) #'BODY)
+   #:with [A-NAME ...]      #'(ARG.NAME ...)
+   #:with [A-OW-SCHEME ...] (stx-map type∗>ownership-scheme #'(ARG.T ...))
+   #:with RET-OW-SCHEME     (type∗>ownership-scheme #'RET)
+   #'(*def (NAME (~@ (A-NAME . A-OW-SCHEME)) ... RET-OW-SCHEME) *BODY)]
 
-  ;; A let binds a variables `var` to expression `E` in a BODY. The
-  ;; binding relation is noted `binder> var`.
+  ;; A let binds a variables VAR with a type T to an expression E in a
+  ;; BODY. The binding relation is noted `binder> VAR`.
   ;;
-  ;; (let ([var : type E] ...) BODY)
-  ;; ∗>  (*let (var : type *E) (*let... (...) *BODY)
-  [(let ([var:id : t:type E:expr]) ~! BODY:expr)
-   #:with *E    (∗> #'E)
-   #:with *BODY ((#'var . binder> . ∗>) #'BODY)
-   #'(*let (var : t *E) *BODY)]
+  ;; (let ([VAR : T E] ...) BODY)
+  ;; ∗>  (*let (VAR OW-SCHEME *E) (*let... (...) *BODY)
+  ;; with OW-SCHEME is OWNER, TYPE, CPARAMS
+  [(let ([VAR:id : T:type E:expr]) ~! BODY:expr)
+   #:with (OW-SCHEME-VAL ...) (type∗>ownership-scheme #'T)
+   #:with *E                  (∗> #'E)
+   #:with *BODY               ((#'VAR . binder> . ∗>) #'BODY)
+   #'(*let (VAR OW-SCHEME-VAL ... *E) *BODY)]
   ;; Transforms a `let` with multiple binding into multiple nested
   ;; `let`s with one unique binding (such as the previous let)
   [(let (B1 BS ...) BODY:expr)
    (∗> #'(let (B1) (let (BS ...) BODY)))]
 
-  ;; A new takes the class type `c-type` of the class to instantiate
+  ;; A new takes the class type C-TYPE of the class to instantiate
   ;; (i.e., no constructor).
   ;;
-  ;; (new c-type)
-  ;; ∗>  (*new c-type)
-  [(new c-type:type)
-   #'(*class c-type)]
+  ;; (new C-TYPE)
+  ;; ∗>  (*new OW-SCHEME)
+  [(new C-TYPE:type)
+   #:with OW-SCHEME (type∗>ownership-scheme #'C-TYPE)
+   #'(*new . OW-SCHEME)]
 
-  ;; A get-field takes an expression `E` that should reduce to an
-  ;; object and the name of the field `fname` to get on that object.
+  ;; A get-field takes an expression E that should reduce to an
+  ;; object and the name of the field FNAME to get on that object.
   ;;
-  ;; (get-field E fname)
-  ;; ∗>  (*get-field *E fname)
-  [(get-field E:expr fname:id)
+  ;; (get-field E FNAME)
+  ;; ∗>  (*get-field *E FNAME)
+  [(get-field E:expr FNAME:id)
    #:with *E (∗> #'E)
-   #'(*get-field *E fname)]
+   #'(*get-field *E FNAME)]
 
-  ;; A set-field! takes an expression `E` that should reduce to an
-  ;; object, the name of the field `fname` to change the value of, and
-  ;; the `BODY` of the new value.
+  ;; A set-field! takes an expression E that should reduce to an
+  ;; object, the name of the field FNAME to change the value of, and
+  ;; the BODY of the new value.
   ;;
-  ;; (set-field! E fname BODY)
-  ;; ∗>  (*set-field! *E fname *BODY)
-  [(set-field! E:expr fname:id BODY:expr)
+  ;; (set-field! E FNAME BODY)
+  ;; ∗>  (*set-field! *E FNAME *BODY)
+  [(set-field! E:expr FNAME:id BODY:expr)
    #:with *E    (∗> #'E)
    #:with *BODY (∗> #'BODY)
-   #'(*set-field! *E fname *BODY)]
+   #'(*set-field! *E FNAME *BODY)]
 
-  ;; A send takes an expression `E` that should reduce to an object,
-  ;; the name of the def `dname` to call on that object, and a list of
+  ;; A send takes an expression E that should reduce to an object,
+  ;; the name of the def DNAME to call on that object, and a list of
   ;; expressions `E-ARG ...` to pass as arguments to the def.
   ;;
-  ;; (send E dname E-ARG ...)
-  ;; ∗>  (*get-field *E fname *E-ARG)
-  [(send E:expr dname:id E-ARG:expr ...)
+  ;; (send E DNAME E-ARG ...)
+  ;; ∗>  (*send *E DNAME *E-ARG)
+  [(send E:expr DNAME:id E-ARG:expr ...)
    #:with *E           (∗> #'E)
-   #:with [*E-ARG ...] (map ∗> (syntax->list #'(E-ARG ...)))
-   #'(*send *E dname *E-ARG ...)]
+   #:with [*E-ARG ...] (stx-map ∗> #'(E-ARG ...))
+   #'(*send *E DNAME *E-ARG ...)]
 
   ;; An identifier is either:
   ;;
@@ -163,8 +172,8 @@
    (c-type+ #'*this)]
   ;; - A local binding (from a def or let). Marked with its binder.
   [ID:id #:when (is-locally-binded? #'ID)
-         (binder+ #'ID)]
-  ;; - A top level binding (no binder). In that case, it presumably
+    (binder+ #'ID)]
+  ;; - A class level binding (no binder). In that case, it presumably
   ;;   refers to a field of the current class: A sort of shortcut for
   ;;   (get-field this id) -- i.e., `id` instead of `this.id` in terms
   ;;   of Java. E.g.,
@@ -176,12 +185,12 @@
   ;;   With line 3 a shortcut for
   ;;   > (def (get-id → A) (get-field this id))
   ;;
+  ;;   We remove it, so the desugared syntax contains no class level
+  ;;   binding.
   ;;   ID ∗> *(get-field this ID)
   [ID:id
-   #:with *ID (c-type+ #'ID)
-   (∗> #'(get-field this *ID))]
-
-  [_ (error "Unknown syntax" this-syntax)]))
+   ;; #:with *ID (c-type+ #'ID)
+   (∗> #'(get-field this ID))]))
 
 
 ;; Lang
@@ -252,45 +261,50 @@
 ;;     (parameterize ([local-bindings new-bindings]) (*d #'BODY)))
 
 
-(provide (rename-out
-          [surface-read read]
-          [surface-read-syntax read-syntax]))
+;; (provide (rename-out
+;;           [surface-read read]
+;;           [surface-read-syntax read-syntax]))
+
+(define (type∗>ownership-scheme stx)
+  (syntax-parse stx
+    [T:type #'(T.OWNER T.TYPE T.CPARAMS)]
+    [raise-syntax-error #f "Not an ownership type" stx]))
+
 
 ;; Reader
-(define (surface-read in)
-  (syntax->datum (surface-read-syntax #f in)))
+;; (define (surface-read in)
+;;   (syntax->datum (surface-read-syntax #f in)))
 
 
-(define (surface-read-syntax src in)
-  (define the-s-exps
-    (let s-exps ([s-exp (read-syntax src in)])
-      (if (eof-object? s-exp)
-          '()
-          (cons s-exp (s-exps (read-syntax src in))))))
+;; (define (surface-read-syntax src in)
+;;   (define the-s-exps
+;;     (let s-exps ([s-exp (read-syntax src in)])
+;;       (if (eof-object? s-exp)
+;;           '()
+;;           (cons s-exp (s-exps (read-syntax src in))))))
 
-  (define prog-sexp (quasisyntax/loc (car the-s-exps) (prog #,@the-s-exps)))
-  (pretty-print (syntax->datum (∗> prog-sexp)))
+;;   (define prog-sexp (quasisyntax/loc (car the-s-exps) (prog #,@the-s-exps)))
+;;   (pretty-print (syntax->datum (∗> prog-sexp)))
 
-    ;; (define the-s-exp #`(#,@(s-exps)))
-    ;; (d* #`(prog #,@the-s-exp)))
+;;     ;; (define the-s-exp #`(#,@(s-exps)))
+;;     ;; (d* #`(prog #,@the-s-exp)))
 
-  ;; ;;   (match (read-syntax src in)
-  ;; ;;     [eof '()]
-  ;; ;;     [_ (cons sexp (desugar))]
-  ;; ;;   ))
-  ;; ;; (letrec ([desugar (λ () (read-syntax src in))])
-  ;; ;;   ()
-  ;; ;;   )
+;;   ;; ;;   (match (read-syntax src in)
+;;   ;; ;;     [eof '()]
+;;   ;; ;;     [_ (cons sexp (desugar))]
+;;   ;; ;;   ))
+;;   ;; ;; (letrec ([desugar (λ () (read-syntax src in))])
+;;   ;; ;;   ()
+;;   ;; ;;   )
 
-  ;; ;; TODO: use `read-syntax' of s-exp then parten match on it
-  ;; (define prog (desugar))
-  ;; (displayln prog)
+;;   ;; ;; TODO: use `read-syntax' of s-exp then parten match on it
+;;   ;; (define prog (desugar))
+;;   ;; (displayln prog)
 
-  ;; #`(module m "surface-desugar-lang.rkt" #,@prog)
-  ;; (error "lala")
-  #'(module m racket/base (void))
-
-  )
+;;   ;; #`(module m "surface-desugar-lang.rkt" #,@prog)
+;;   ;; (error "lala")
+;;   #'(module m racket/base (void))
+;;   )
 
 ;; See, https://github.com/racket/racket/blob/2b567b4488ff92e2bc9c0fbd32bf7e2442cf89dc/pkgs/at-exp-lib/at-exp/lang/reader.rkt#L15
 ;; (define-values
