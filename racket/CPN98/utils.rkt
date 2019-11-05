@@ -1,105 +1,30 @@
 #lang racket/base
 
 (require (for-syntax racket/base
-                     syntax/parse
-                     syntax/parse/define
-                     racket/syntax
-                     racket/match
-                     "definitions.rkt"
-                     )
+                     racket/pretty
+                     racket/port)
+         racket/match
          syntax/parse
          syntax/parse/define
-         racket/match
-         racket/list
-         racket/syntax
-         "definitions.rkt"
-         )
+         "definitions.rkt")
 
 (provide (all-defined-out))
-
 
 
 (define ∘ compose1)
 
-;; -- Syntax checker in the form of
-;; https://docs.racket-lang.org/syntax/syntax-helpers.html#%28part._stxkeyword%29
-;; A check procedure consumes the syntax to check and a context
-;; syntax object for error reporting and either raises an error to
-;; reject the syntax or returns a value as its parsed
-;; representation.
+;; (syntax-property-symbol-keys
+;;   (syntax-property* #'() 'p1 'v1 'p2 'v2 'p3 'v3))
 ;;
-;; Returns the first duplicate class in the program or #f if there
-;; are no duplicate.
-(define (check-class clss-stx)
-  (define (get-class-name cls-stx)
-    (syntax-parse cls-stx
-      #:literal-sets [*keyword-lits *expr-lits]
-      [(*class name _ ...) #'name]))
-
-  (let* ([classes     (syntax->list clss-stx)]
-         [class-names (map get-class-name classes)])
-    (check-duplicate-identifier class-names)))
-
-;; Returns the first duplicate field in the class or #f if there are
-;; no duplicate.
-(define (field-twice? fields/defs-stx)
-  (define (get-field-name field/def-stx)
-    (syntax-parse field/def-stx
-      #:literal-sets [*keyword-lits *expr-lits]
-      [(*field name _ ...) #'name]
-      [_                   #f]))
-
-  (let* ([fields/defs (syntax->list fields/defs-stx)]
-         [field-names (filter-map get-field-name fields/defs)])
-    (check-duplicate-identifier field-names)))
-
-;; Returns the first duplicate def in the class or #f if there are
-;; no duplicate.
-(define (def-twice? fields/defs-stx)
-  (define (get-def-name field/def-stx)
-    (syntax-parse field/def-stx
-      #:literal-sets [*keyword-lits *expr-lits]
-      [(*def (name _ ...) _) #'name]
-      [_                     #f]))
-
-  (let* ([fields/defs (syntax->list fields/defs-stx)]
-         [def-names   (filter-map get-def-name fields/defs)])
-    (check-duplicate-identifier def-names)))
-
-
-;; (syntax-property* #'() 'p1 'v1 'p2 'v2 'p3 'v3)
+;; (syntax-property (syntax-property* #'() 'p1 'v1 'p2 'v2 'p3 'v3) 'p1) ;; 'v1
+;; (syntax-property (syntax-property* #'() 'p1 'v1 'p2 'v2 'p3 'v3) 'p2) ;; 'v2
+;; (syntax-property (syntax-property* #'() 'p1 'v1 'p2 'v2 'p3 'v3) 'p3) ;; 'v3
 (define-syntax-parser syntax-property*
   [(_ stx)
    #'stx]
-  [(_ stx key v ...+)
-   #:with [v-hd kv-tl ...] #'(v ...)
-   #'(syntax-property (syntax-property* stx kv-tl ...) key v-hd)])
+  [(_ stx key val kvs ...)
+   #'(syntax-property (syntax-property* stx kvs ...) key val)])
 
-;; c-type> :: (C-TYPE: stx) -> (t: stx -> stx) -> (stx -> stx)
-;; Parameterize the syntax transformer `t` with class type `C-TYPE`.
-(define (c-type> C-TYPE t)
-  (λ (stx)
-    (parameterize ([current-class-type C-TYPE]) (t stx))))
-
-;; binder> :: (BINDERS: stx or [stx]) -> (t: stx -> stx) -> (stx -> stx)
-(define (binder> BINDERS t)
-
-  ;; binder1> :: (BINDER: stx) -> (t: stx -> stx) -> (stx -> stx)
-  (define (binder1> BINDER t)
-    (λ (stx)
-      (let* ([binder-name  (syntax->datum (get-arg-name BINDER))]
-             [new-bindings (hash-set (local-bindings) binder-name BINDER)])
-        (parameterize ([local-bindings new-bindings]) (t stx)))))
-
-  (syntax-parse BINDERS
-      ;; Match list of arg/id
-      [()         t]
-      [(b)        (binder1> #'b t)]
-      [(b bs ...) (binder1> #'b (binder> #'(bs ...) t))]
-
-      ;; Match unique arg/id
-      [b:id  (binder1> #'b t)]
-      [b:arg (binder1> #'b t)]))
 
 ;; put `foo in local-bindings
 ;; (+<binder #'foo (*d #'BODY))
@@ -155,38 +80,46 @@
   ;;  #'(bind (B1) (bind* (BS ...) BODY))
   ;;  ])
 
-;; (interleave '(1 2 3) '(a b c))
-(define (interleave xs ys)
-  (match (list xs ys)
-    [`((,x ,xs ...) (,y ,ys ...)) (cons x (cons y (interleave xs ys)))]
-    [else '()])
-  )
-
-(define (c-type+ stx)
-  ;; (printf "// ~s comes from class ~s~n" stx (current-class-type))
-  (syntax-property stx 'class (current-class-type)))
-
-;; (define-syntax-parser c-type+
-;;   [(_ STX)
-;;    ;; `class-type` Dynamic scoping for current-class-type
-;;    ;; TODO: use syntax-parameter
-;;    #:with class-type (datum->syntax #'STX 'current-class-type)
-;;    #'(syntax-property STX 'class (class-type))])
-
-(define (binder+ stx)
-  ;; (printf "-- ~s binded by ~s~n" stx (bind-ref stx))
-  (syntax-property stx 'binder (bind-ref stx)))
-
-(define (binded? stx)
-  (syntax-property stx 'binder))
-;; (define-syntax-parser binder+
-;;   [(_ STX)
-;;    ;; `bind-ref` Dynamic scoping for `bind-ref
-;;    ;; TODO: use syntax-parameter
-;;    #:with bind-ref   (datum->syntax #'STX 'bind-ref)
-;;    #'(syntax-property STX 'binder (bind-ref STX))]
+;; ;; (interleave '(1 2 3) '(a b c))
+;; (define (interleave xs ys)
+;;   (match (list xs ys)
+;;     [`((,x ,xs ...) (,y ,ys ...)) (cons x (cons y (interleave xs ys)))]
+;;     [else '()])
 ;;   )
 
-;; (define-syntax-parser @bind/class
-;;   [(_ STX)
-;;    #'(@bind (@class STX))])
+(define current-class-type (make-parameter #f))
+(define local-bindings     (make-parameter #hash{}))
+
+;; Set the class type of a syntax object
+(define (c-type+ stx)
+  ;; (printf "// ~s comes from class ~s~n" stx (current-class-type))
+  (c-type-prop stx (current-class-type)))
+
+(define (bind-ref stx)
+  (let ([id-name (syntax->datum stx)])
+    (hash-ref (local-bindings) id-name)))
+
+;; Set the binder of a syntax object
+(define (binder+ stx)
+  ;; (printf "-- ~s binded by ~s~n" stx (bind-ref stx))
+  (binder-prop stx (bind-ref stx)))
+
+;; Test if a syntax object is binder.
+(define (binded? stx)
+  (binder-prop stx))
+
+(define-simple-macro (define-parser ID:id RHS ...)
+  (define ID (syntax-parser RHS ...)))
+
+;; (dbg (+ 1 2))
+(define-syntax-parser dbg
+  [(_ E:expr)
+   #`(let ([src    #,(syntax-source #'E)]
+           [line   #,(syntax-line #'E)]
+           [col    #,(syntax-column #'E)]
+           [datum  #,(call-with-output-string
+                      (λ (out-str) (pretty-print (syntax->datum #'E) out-str)))]
+           [res    E])
+       (define-values (base file _) (split-path src))
+       (printf "[~a:~s:~s] ~a = ~s~n" file line col datum res)
+       res)])

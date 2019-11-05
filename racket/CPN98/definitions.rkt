@@ -1,17 +1,27 @@
 #lang racket/base
 
-(require racket/match
-         racket/function
-         racket/list
-         racket/pretty
-         racket/syntax
-         syntax/parse
-         syntax/parse/define
-         syntax/module-reader)
+(require syntax/parse
+         syntax/srcloc
+         typed/racket/base
+         typed/racket/unsafe)
 
-(provide (all-defined-out))
+;; (require/typed racket/list
+;;   ;; Coerce `flatten` to only return Listof String (instead of Listof
+;;   ;; Any). This helps type-checking the `unlines` function.
+;;   [flatten (Any -> (Listof String))])
+
+;; (require/typed syntax/parse
+;;   ;; Coerce `flatten` to only return Listof String (instead of Listof
+;;   ;; Any). This helps type-checking the `unlines` function.
+;;   [syntax-parser (Any -> Any)])
+
+;; (provide (all-defined-out))
+
+;; Provide without the generation of contracts
+(unsafe-provide (all-defined-out))
 
 (define-literal-set keyword-lits
+  #:for-label
   ;; Note: I have to define new, send, ... as datum otherwise they
   ;; are going to be interpreted as identifier during macro
   ;; expansion and may risk an evaluation with new, send from
@@ -21,79 +31,136 @@
   ())
 
 (define-literal-set expr-lits
+  #:for-label
   #:datum-literals (prog class field def let)
   ())
 
-(define-literal-set arg-lits
-  #:datum-literals (: →)
-  ())
-
-(define-literal-set *keyword-lits
-  #:datum-literals (*new *send *get-field *set-field! *this)
-  ())
-
 (define-literal-set *expr-lits
-  #:datum-literals (*prog *class *field *def *let)
+  #:for-label
+  #:datum-literals (*prog *class *field *def *let *new *send
+                    *get-field *set-field! *this)
   ())
 
+
+(define-syntax-class *ow-scheme
+  #:description "Type with ownership and context parameters"
+  #:datum-literals [*ow-scheme]
+  #:attributes [OWNER CPARAMS TYPE]
+  (pattern (*ow-scheme ~! TYPE:id OWNER:id (CPARAM:id ...))
+           #:with CPARAMS #'(CPARAM ...)))
 
-;; -- Syntax class for type and arg
-(define-syntax-class type
-  #:description "class' type with ownership and context parameters"
-  #:attributes [TYPE OWNER CPARAMS]
-  #:datum-literals (/)  ;; Don't consider '/' as a pattern
-  (pattern (O:id / T:id)
-           #:with OWNER #'O
-           #:with TYPE #'T
-           #:with CPARAMS #'())
-  (pattern (O:id / (T:id PARAMS:id ...+))
-           #:with OWNER #'O
-           #:with TYPE #'T
-           #:with CPARAMS #'(PARAMS ...))
-  (pattern T:id
-           #:with OWNER #''Θ
-           #:with TYPE #'T
-           #:with CPARAMS #''())
-  (pattern (T:id PARAMS:id ...+)
-           #:with OWNER #''Θ
-           #:with TYPE #'T
-           #:with CPARAMS #'(PARAMS ...))
-  )
+(define (make-*ow-scheme stx-src TYPE OWNER CPARAMS)
+  (syntax/loc stx-src (*ow-scheme T.TYPE T.OWNER T.CPARAMS)))
 
-(define-syntax-class arg
-  #:description "argument with its type"
-  #:literal-sets [arg-lits]
-  (pattern (NAME:id : T:type)
-           #:attr OWNER #'T.OWNER
-           #:attr TYPE  #'T.TYPE
-           #:attr CPARAMS #'T.CPARAMS))
+
+(define-type BINDER (Syntaxof Any))
+(define-type C-TYPE (Syntaxof Any))
+(define-type FIELD (Syntaxof Any))
+(define-type DEF (Syntaxof Any))
+(define-type TYPE (Syntaxof Any))
 
-;; (define (arg->ownership-scheme stx)
-;;   (syntax-parse stx
-;;     [A:arg (type->ownership-scheme #'A.T)]
-;;     [raise-syntax-error #f "Not an ownership argument" stx])
-;;   )
+(define-type C-type Any)
+(define-type F-name Any)
+(define-type D-name Any)
+(define-type Type Any)
 
-;; (define (arg->ownership-scheme stx)
-;;   (syntax-parse stx
-;;     [ARG:arg #'()])
-;;   )
+;; Set or get the binder property of a syntax object.
+;;
+;; The binder property of a syntax object is another syntax object
+;; which is its binder.
+(: binder-prop
+   (All (a) (case->
+             [(Syntaxof a) -> BINDER]
+             [(Syntaxof a) BINDER -> (Syntaxof a)])))
+(define binder-prop
+  (case-lambda
+    ;; `(Syntaxof a) -> BINDER` requires a `cast` to type check
+    ;; because the type-checker doesn't know that 'binder prop of
+    ;; `syntax-property` stores BINDER.
+    [(stx)        (cast (syntax-property  stx 'binder) BINDER)]
+    [(stx BINDER) (syntax-property stx 'binder BINDER)]))
 
-;; (get-arg-name #'(a : b))
-(define (get-arg-name stx)
-  (syntax-parse stx
-    [ARG:arg #'ARG.NAME]
-    [ARG-NAME:id this-syntax]))
+;; Set or get the class type of a syntax object.
+(: c-type-prop
+   (All (a) (case->
+             [(Syntaxof a) -> C-TYPE]
+             [(Syntaxof a) C-TYPE -> (Syntaxof a)])))
+(define c-type-prop
+  (case-lambda
+    [(stx)        (cast (syntax-property stx 'c-type) C-TYPE)]
+    [(stx C-TYPE) (syntax-property stx 'c-type C-TYPE)]))
 
 
-(define current-class-type (make-parameter #f))
-(define local-bindings     (make-parameter #hash{}))
+;; Set or get the type of a syntax object.
+(: type-prop
+   (All (a) (case->
+             [(Syntaxof a) -> TYPE]
+             [(Syntaxof a) TYPE -> (Syntaxof a)])))
+(define type-prop
+  (case-lambda
+    [(stx)      (cast (syntax-property stx 'type) TYPE)]
+    [(stx TYPE) (syntax-property stx 'type TYPE)]))
 
-(define (is-locally-binded? stx)
-  ;; (writeln (local-bindings))
-  (let ([id-name (syntax->datum stx)])
-    (hash-has-key? (local-bindings) id-name)))
+
+;; List of Types. TODO: Make private
+(: CS (Boxof (Listof C-type)))
+(define CS (box '()))
 
-(define (bind-ref stx)
-  (let ([id-name (syntax->datum stx)])
-    (hash-ref (local-bindings) id-name)))
+(: CS-set! (CLASS -> Void))
+(define (CS-set! CLASS)
+  (define get-c-type
+    (syntax-parser
+      #:literal-sets [*expr-lits]
+      [(*class ~! NAME [CPARAM ...] FIELD/DEF ...) (syntax->datum #'NAME)]))
+
+  (define C-types (unbox CS))
+  (set-box! CS (cons (get-c-type CLASS) C-types)))
+
+
+;; (*class ~! NAME [CPARAM ...] FIELD/DEF ...)
+
+;; Map of Fields
+(: FS (Mutable-HashTable (Pairof C-type F-name) Type))
+(define FS (make-hash))
+
+(: FS-set! (C-TYPE FIELD -> Void))
+(define (FS-set! C-TYPE FIELD)
+  (define get-name/ow-type
+    (syntax-parser
+      #:literal-sets [*expr-lits]
+      [(*field NAME OWNER TYPE (CPARAM ...))
+       (values (syntax->datum #'NAME)
+               (syntax->datum #'(OWNER TYPE (CPARAM ...))))]))
+
+  (define-values (name ow-type) (get-name/ow-type FIELD))
+  (define c-type (syntax->datum C-TYPE))
+
+  (hash-set! FS (cons c-type name) ow-type))
+
+(define (FS-type CLASS F-NAME)
+  (define key (cons (syntax->datum CLASS)
+                    (syntax->datum F-NAME)))
+  (hash-ref FS key))
+
+(define (∉p CLASS F-NAME)
+  (define key (cons (syntax->datum CLASS) (syntax->datum F-NAME)))
+  (if (hash-has-key? FS key)
+      #f CLASS))
+
+;; Map of Defs
+(: DS (Mutable-HashTable (Pairof C-type D-name) Type))
+(define DS (make-hash))
+
+(: DS-set! (C-TYPE DEF -> Void))
+(define (DS-set! C-TYPE DEF)
+  (define get-name/ret-ow-type
+    (syntax-parser
+      #:literal-sets [*expr-lits]
+      [(*def ~! (NAME (A-NAME A-OWNER A-TYPE A-CPARAMS) ... (R-OWNER R-TYPE R-CPARAMS)) BODY)
+       (values (syntax->datum #'NAME)
+               (syntax->datum #'(R-OWNER R-TYPE R-CPARAMS)))]))
+
+  (define-values (name ret-ow-type) (get-name/ret-ow-type DEF))
+  (define c-type (syntax->datum C-TYPE))
+
+  (hash-set! DS (cons c-type name) ret-ow-type))

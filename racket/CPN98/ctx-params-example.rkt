@@ -1,4 +1,3 @@
-;; #lang s-exp "surface-lang.rkt"
 #lang reader "lang.rkt"
 
 (class Driver
@@ -7,7 +6,8 @@
 
 (class Pair [m n]
   (field [fst : (m / X)])
-  (field [snd : (n / Y)]))
+  (field [snd : (n / Y)])
+  )
 
 ;; ;; Check duplicated class
 ;; (class Pair []
@@ -31,7 +31,7 @@
   (def (b → [world / (Pair rep world)])
     p2)
 
-  ;; ;; ;; Check duplicated def
+  ;; ;; Check duplicated def
   ;; (def (b → [world / (Pair rep world)]) void)
 
   (def (x → [rep / X])
@@ -58,7 +58,7 @@
 (class Main []
   (field [safe : (world / Intermediate)])
 
-  (def (main → (rep Y))
+  (def (main → (rep / Y))
     (let ([a : (rep   / (Pair rep world))  (get-field safe a)]
           [b : (world / (Pair rep world))  (get-field safe b)]
           [x : (rep   / X)                 (get-field safe x)])

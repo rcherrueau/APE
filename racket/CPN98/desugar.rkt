@@ -1,40 +1,17 @@
 #lang racket/base
 
-;; @InProceedings{CPN98,
-;;   author    = {David G. Clarke and
-;;                John Potter and
-;;                James Noble},
-;;   title     = {Ownership Types for Flexible Alias Protection},
-;;   booktitle = {Proceedings of the 1998 {ACM} {SIGPLAN} Conference
-;;                on Object-Oriented Programming Systems, Languages
-;;                {\&} Applications {(OOPSLA} '98),
-;;                Vancouver, British Columbia, Canada, October 18-22, 1998.},
-;;   pages     = {48--64},
-;;   year      = {1998},
-;;   url       = {https://doi.org/10.1145/286936.286947},
-;;   doi       = {10.1145/286936.286947}
-;; }
-
-(require racket/match
-         racket/function
-         racket/list
-         racket/pretty
-         racket/syntax
-         "utils.rkt"
-         "definitions.rkt"
-         syntax/parse
-         syntax/parse/define
-         syntax/module-reader
-         syntax/stx
-         (for-syntax syntax/parse
-                     syntax/parse/define
-                     racket/base
+(require (for-syntax racket/base
                      "definitions.rkt"
                      )
+         racket/performance-hint
+         syntax/parse
+         syntax/parse/define
+         syntax/stx
+         "utils.rkt"
+         "definitions.rkt"
  )
 
 (provide ∗>)
-
 
 ;; Naming conventions:
 ;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
@@ -43,7 +20,7 @@
 
 
 ;; Desugaring syntax transformation (∗>)
-
+;;
 ;; - Introduce missing CPARAM
 ;; - Transform let with multiple binding into nested lets of one
 ;;   binding.
@@ -52,19 +29,18 @@
 ;; - Mark fields with the name of their class
 ;; - Mark free identifiers with their binder
 ;; - Expand types to ownership schemes
-
+;;
 ;; ∗> :: stx -> stx
-(define ∗> (syntax-parser
-  #:literal-sets [keyword-lits expr-lits arg-lits]
+(define-parser ∗>
+  #:literal-sets [keyword-lits expr-lits type-lits]
 
   ;; A prog is a list of CLASS and one expression E.
   ;;
   ;; (prog CLASS ... E)
   ;; ∗>  (*prog *CLASS ... *E)
   ;;
-  ;; The `~!` eliminate backtracking. Hence, if the next
-  ;; `fail-when` failed, it will not backtrack and reach the `_`
-  ;; case.
+  ;; Note: The `~!` eliminate backtracking. Hence, if the next
+  ;; `fail-when` failed, it will not backtrack and try other cases.
   [(prog ~! CLASS:expr ... E:expr)
    #:with [*CLASS ...] (stx-map ∗> #'(CLASS ...))
    #:with *E           (∗> #'E)
@@ -74,10 +50,9 @@
   ;; CPARAM, and a list of fields and definitions.
   ;;
   ;; (class NAME (CPARAM ...)? FIELD ... DEF ...)
-  ;; ∗>  (*class NAME *FIELD ... *DEF ...)
+  ;; ∗>  (*class NAME (CPARAM ...) *FIELD ... *DEF ...)
   [(class NAME:id [CPARAM:id ...] ~! FIELD/DEF:expr ...)
-   #:with [*FIELD/DEF ...]     (stx-map (#'NAME . c-type> . ∗>)
-                                        #'(FIELD/DEF ...))
+   #:with [*FIELD/DEF ...] (stx-map (#'NAME . c-type> . ∗>) #'(FIELD/DEF ...))
    #'(*class NAME [CPARAM ...] *FIELD/DEF ...)]
   ;; Transforms a `class` without `CPARAM ...` into a `class` with.
   [(class NAME FIELD/DEF ...)
@@ -88,36 +63,37 @@
   ;; (field ARG)
   ;; ∗>  (*field NAME . OW-SCHEME)
   ;; with OW-SCHEME is OWNER, TYPE, CPARAMS
-  [(field ARG:arg)
+  [(field ~! ARG:arg)
    #:with NAME      (c-type+ #'ARG.NAME)
-   #:with OW-SCHEME (type∗>ownership-scheme #'ARG.T)
+   #:with OW-SCHEME (type∗>ow-scheme #'ARG.T)
    #'(*field NAME . OW-SCHEME)]
 
-  ;; A def (i.e., method) is a NAME, a list of arguments ARG, a
-  ;; return type RET and the BODY of the def. The def binds
-  ;; ARG in the BODY. The binding relation is noted
-  ;;`(ARG ...) binder*>`.
+  ;; A def (i.e., method) is a NAME, a list of arguments ARG, a return
+  ;;type RET and the BODY of the def. The def binds ARG in the BODY.
+  ;;The binding relation is noted `(ARG ...) binder*>`. It puts `(ARG
+  ;;...)` in the binder context of ∗>.
   ;;
   ;; (def (NAME ARG ... → RET) BODY)
   ;; ∗>  (*def (NAME (A-NAME . A-OW-SCHEME) ... RET-OW-SCHEME) *BODY)
   ;; with OW-SCHEME is OWNER, TYPE, CPARAMS
-  [(def (NAME:id ARG:arg ... → RET:type) BODY:expr)
+  [(def ~! (NAME:id ARG:arg ... → RET:type) BODY:expr)
    #:with *BODY             ((#'(ARG ...) . binder> . ∗>) #'BODY)
    #:with [A-NAME ...]      #'(ARG.NAME ...)
-   #:with [A-OW-SCHEME ...] (stx-map type∗>ownership-scheme #'(ARG.T ...))
-   #:with RET-OW-SCHEME     (type∗>ownership-scheme #'RET)
+   #:with [A-OW-SCHEME ...] (stx-map type∗>ow-scheme #'(ARG.T ...))
+   #:with RET-OW-SCHEME     (type∗>ow-scheme #'RET)
    #'(*def (NAME (~@ (A-NAME . A-OW-SCHEME)) ... RET-OW-SCHEME) *BODY)]
 
   ;; A let binds a variables VAR with a type T to an expression E in a
-  ;; BODY. The binding relation is noted `binder> VAR`.
+  ;; BODY. The binding relation is noted `binder> VAR`. It puts VAR in
+  ;; the binder context of ∗>.
   ;;
   ;; (let ([VAR : T E] ...) BODY)
   ;; ∗>  (*let (VAR OW-SCHEME *E) (*let... (...) *BODY)
   ;; with OW-SCHEME is OWNER, TYPE, CPARAMS
   [(let ([VAR:id : T:type E:expr]) ~! BODY:expr)
-   #:with (OW-SCHEME-VAL ...) (type∗>ownership-scheme #'T)
+   #:with (OW-SCHEME-VAL ...) (type∗>ow-scheme #'T)
    #:with *E                  (∗> #'E)
-   #:with *BODY               ((#'VAR . binder> . ∗>) #'BODY)
+   #:with *BODY               ((#'(VAR : T) . binder> . ∗>) #'BODY)
    #'(*let (VAR OW-SCHEME-VAL ... *E) *BODY)]
   ;; Transforms a `let` with multiple binding into multiple nested
   ;; `let`s with one unique binding (such as the previous let)
@@ -129,8 +105,8 @@
   ;;
   ;; (new C-TYPE)
   ;; ∗>  (*new OW-SCHEME)
-  [(new C-TYPE:type)
-   #:with OW-SCHEME (type∗>ownership-scheme #'C-TYPE)
+  [(new ~! C-TYPE:type)
+   #:with OW-SCHEME (type∗>ow-scheme #'C-TYPE)
    #'(*new . OW-SCHEME)]
 
   ;; A get-field takes an expression E that should reduce to an
@@ -138,7 +114,7 @@
   ;;
   ;; (get-field E FNAME)
   ;; ∗>  (*get-field *E FNAME)
-  [(get-field E:expr FNAME:id)
+  [(get-field ~! E:expr FNAME:id)
    #:with *E (∗> #'E)
    #'(*get-field *E FNAME)]
 
@@ -148,7 +124,7 @@
   ;;
   ;; (set-field! E FNAME BODY)
   ;; ∗>  (*set-field! *E FNAME *BODY)
-  [(set-field! E:expr FNAME:id BODY:expr)
+  [(set-field! ~! E:expr FNAME:id BODY:expr)
    #:with *E    (∗> #'E)
    #:with *BODY (∗> #'BODY)
    #'(*set-field! *E FNAME *BODY)]
@@ -159,38 +135,37 @@
   ;;
   ;; (send E DNAME E-ARG ...)
   ;; ∗>  (*send *E DNAME *E-ARG)
-  [(send E:expr DNAME:id E-ARG:expr ...)
+  [(send ~! E:expr DNAME:id E-ARG:expr ...)
    #:with *E           (∗> #'E)
    #:with [*E-ARG ...] (stx-map ∗> #'(E-ARG ...))
    #'(*send *E DNAME *E-ARG ...)]
 
   ;; An identifier is either:
   ;;
-  ;; - The reserved keyword `this`. Marked with the current class
-  ;;   type.
+  ;; 1. The reserved keyword `this`. Marked with the current class
+  ;;    type.
   [this
    (c-type+ #'*this)]
-  ;; - A local binding (from a def or let). Marked with its binder.
+  ;; 2. A local binding (from a def or let). Marked with its binder.
   [ID:id #:when (is-locally-binded? #'ID)
     (binder+ #'ID)]
-  ;; - A class level binding (no binder). In that case, it presumably
-  ;;   refers to a field of the current class: A sort of shortcut for
-  ;;   (get-field this id) -- i.e., `id` instead of `this.id` in terms
-  ;;   of Java. E.g.,
+  ;; 3. A class level binding (no binder). In that case, it presumably
+  ;;    refers to a field of the current class: A sort of shortcut for
+  ;;    (get-field this id) -- i.e., `id` instead of `this.id` in
+  ;;    Java world. E.g.,
   ;;
-  ;;   1 (class C
-  ;;   2   (field [id : A])
-  ;;   3   (def (get-id → A) id))
+  ;;    1 (class C
+  ;;    2   (field [id : A])
+  ;;    3   (def (get-id → A) id))
   ;;
-  ;;   With line 3 a shortcut for
-  ;;   > (def (get-id → A) (get-field this id))
+  ;;    With line 3 a shortcut for
+  ;;    > (def (get-id → A) (get-field this id))
   ;;
-  ;;   We remove it, so the desugared syntax contains no class level
-  ;;   binding.
-  ;;   ID ∗> *(get-field this ID)
+  ;;    We remove it, so the desugared syntax contains no class level
+  ;;    binding.
+  ;;    ID ∗> *(get-field this ID)
   [ID:id
-   ;; #:with *ID (c-type+ #'ID)
-   (∗> #'(get-field this ID))]))
+   (∗> #'(get-field this ID))])
 
 
 ;; Lang
@@ -261,15 +236,84 @@
 ;;     (parameterize ([local-bindings new-bindings]) (*d #'BODY)))
 
 
-;; (provide (rename-out
-;;           [surface-read read]
-;;           [surface-read-syntax read-syntax]))
+;; Syntax for type and arg
 
-(define (type∗>ownership-scheme stx)
-  (syntax-parse stx
-    [T:type #'(T.OWNER T.TYPE T.CPARAMS)]
-    [raise-syntax-error #f "Not an ownership type" stx]))
+(define-literal-set type-lits
+  ;; Don't consider :, →, and / as patterns
+  #:datum-literals (: → /)
+  ())
 
+(define-syntax-class type
+  #:description "class type with ownership and context parameters"
+  #:literal-sets [type-lits]
+  #:attributes [TYPE OWNER CPARAMS]
+  (pattern (O:id / T:id)
+           #:with OWNER #'O
+           #:with TYPE #'T
+           #:with CPARAMS #'())
+  (pattern (O:id / (T:id PARAMS:id ...+))
+           #:with OWNER #'O
+           #:with TYPE #'T
+           #:with CPARAMS #'(PARAMS ...))
+  (pattern T:id
+           #:with OWNER #''Θ
+           #:with TYPE #'T
+           #:with CPARAMS #''())
+  (pattern (T:id PARAMS:id ...+)
+           #:with OWNER #''Θ
+           #:with TYPE #'T
+           #:with CPARAMS #'(PARAMS ...)))
+
+(define-syntax-class arg
+  #:description "argument with its type"
+  #:literal-sets [type-lits]
+  (pattern (NAME:id : T:type)
+           #:attr OWNER #'T.OWNER
+           #:attr TYPE  #'T.TYPE
+           #:attr CPARAMS #'T.CPARAMS))
+
+(define (is-locally-binded? stx)
+  ;; (writeln (local-bindings))
+  (let ([id-name (syntax->datum stx)])
+    (hash-has-key? (local-bindings) id-name)))
+
+
+;; Utils
+;; #:with OW-SCHEME (type∗>ow-scheme #'ARG.T)
+(define type∗>ow-scheme (syntax-parser
+  [T:type (make-*ow-scheme T T.TYPE T.OWNER T.CPARAMS)]))
+
+;; c-type> :: (C-TYPE: stx) -> (t: stx -> stx) -> (stx -> stx)
+;; Parameterize the syntax transformer `t` with class type `C-TYPE`.
+(define (c-type> C-TYPE t)
+  (λ (stx)
+    (parameterize ([current-class-type C-TYPE]) (t stx))))
+
+;; binder> :: (BINDERS: stx:arg or [stx:arg]) -> (t: stx -> stx) -> (stx -> stx)
+(define (binder> BINDERS t)
+
+  ;; (get-arg-name #'(a : b)) ;; (values 'a #<syntax b>)
+  (define (get-arg-name/OW-SCHEME stx)
+    (syntax-parse stx
+      [ARG:arg (values (syntax->datum #'ARG.NAME)
+                       (syntax->list (type∗>ow-scheme #'ARG.TYPE)))]))
+
+  ;; binder1> :: (BINDER: stx) -> (t: stx -> stx) -> (stx -> stx)
+  (define (binder1> BINDER t)
+    (λ (stx)
+      (let*-values ([(binder-name OW-SCHEME) (get-arg-name/OW-SCHEME BINDER)]
+                    [(new-bindings) (hash-set (local-bindings) binder-name OW-SCHEME)])
+        (parameterize ([local-bindings new-bindings]) (t stx)))))
+
+  (syntax-parse BINDERS
+    ;; Match unique arg/id
+    [b:id  (binder1> #'b t)]
+    [b:arg (binder1> #'b t)]
+
+    ;; Match list of arg/id
+    [()         t]
+    [(b)        (binder1> #'b t)]
+    [(b bs ...) (binder1> #'b (binder> #'(bs ...) t))]))
 
 ;; Reader
 ;; (define (surface-read in)
