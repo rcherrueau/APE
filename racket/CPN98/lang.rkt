@@ -1,5 +1,10 @@
 #lang racket/base
 
+;; ,-,-,-.
+;; `,| | |   ,-. . . ,-. ,-. . . ,-. ,-.
+;;   | ; | . ,-| | | |   ,-| | | |   | |
+;;   '   `-' `-^ `-^ `-' `-^ `-^ `-' `-'
+
 ;; Implementation of CPN98
 ;;
 ;; @InProceedings{CPN98,
@@ -19,6 +24,7 @@
 
 (require racket/port
          racket/pretty
+         "utils.rkt"
          "desugar.rkt"
          "definitions.rkt"
          "basic-checks.rkt")
@@ -32,25 +38,25 @@
   (syntax->datum (lang-read-syntax #f in)))
 
 (define (lang-read-syntax src in)
+  (define (s-exps rs)
+     (let s-exps ([s-exp (rs src in)])
+       (if (eof-object? s-exp)
+           '()
+           (cons s-exp (s-exps (rs src in))))))
 
-  ;; Vanilla prog
-  (define s-exps
-    (time
-    (let s-exps ([s-exp (read-syntax src in)])
-      (if (eof-object? s-exp)
-          '()
-          (cons s-exp (s-exps (read-syntax src in)))))))
-
+    ;; Vanilla prog
   (let* (;; Tower of transfo
+         [s-exps  (time (s-exps read-syntax))]
          [prog  (time (quasisyntax/loc (car s-exps) (prog #,@s-exps)))]  ;; Vanilla prog
-         [*prog (time (∗> prog))]                                        ;; Desugaring
-         [?prog (time (?> *prog))]                                       ;; Basic Checks
-         [datum-res (time (syntax->datum ?prog))]                        ;; Datum
+         [prog  (time (∗> prog))]                                        ;; Desugaring
+         ;; [prog  (time (?> prog))]                                        ;; Basic Checks
+         [datum-res (time (syntax->datum prog))]                         ;; Datum
 
          ;; Pretty print
          [datum-str (call-with-output-string
-                      (λ (out-str) (pretty-print datum-res out-str)))])
+                     (λ (out-str) (pretty-print datum-res out-str)))]
+         )
 
     #`(module cpn88-lang racket/base
-        (require racket/pretty)
-        (time (display #,datum-str)))))
+        (time (display #,datum-str))))
+  )

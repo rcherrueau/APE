@@ -3,15 +3,31 @@
 (require (for-syntax racket/base
                      racket/pretty
                      racket/port)
+         racket/exn
          racket/match
+         racket/string
          syntax/parse
          syntax/parse/define
+         errortrace/errortrace-key
          "definitions.rkt")
 
 (provide (all-defined-out))
 
 
 (define ∘ compose1)
+
+;; (zip '(1 2 3) '(a b c))
+;; > '((1 . a) (2 . b) (3 . c))
+(define (zip l1 l2)
+  (for/list ([i l1] [j l2]) (cons i j)))
+
+;; (unzip '((1 . a) (2 . b) (3 . c)))
+;; > '(1 2 3)
+;; > '(a b c)
+(define (unzip l)
+  (for/lists (firsts seconds #:result (values firsts seconds))
+             ([pr l])
+    (values (car pr) (cdr pr))))
 
 ;; (syntax-property-symbol-keys
 ;;   (syntax-property* #'() 'p1 'v1 'p2 'v2 'p3 'v3))
@@ -87,39 +103,35 @@
 ;;     [else '()])
 ;;   )
 
-(define current-class-type (make-parameter #f))
-(define local-bindings     (make-parameter #hash{}))
-
-;; Set the class type of a syntax object
-(define (c-type+ stx)
-  ;; (printf "// ~s comes from class ~s~n" stx (current-class-type))
-  (c-type-prop stx (current-class-type)))
-
-(define (bind-ref stx)
-  (let ([id-name (syntax->datum stx)])
-    (hash-ref (local-bindings) id-name)))
-
-;; Set the binder of a syntax object
-(define (binder+ stx)
-  ;; (printf "-- ~s binded by ~s~n" stx (bind-ref stx))
-  (binder-prop stx (bind-ref stx)))
-
-;; Test if a syntax object is binder.
-(define (binded? stx)
-  (binder-prop stx))
-
 (define-simple-macro (define-parser ID:id RHS ...)
   (define ID (syntax-parser RHS ...)))
 
+
+
+;; cms->srclocs : continuation-marks -> (listof srcloc)
+(define (cms->srclocs cms)
+  (map
+   (λ (x) (make-srcloc (list-ref x 1)
+                       (list-ref x 2)
+                       (list-ref x 3)
+                       (list-ref x 4)
+                       (list-ref x 5)))
+   (continuation-mark-set->list cms errortrace-key)))
+
+
 ;; (dbg (+ 1 2))
 (define-syntax-parser dbg
   [(_ E:expr)
-   #`(let ([src    #,(syntax-source #'E)]
-           [line   #,(syntax-line #'E)]
-           [col    #,(syntax-column #'E)]
-           [datum  #,(call-with-output-string
-                      (λ (out-str) (pretty-print (syntax->datum #'E) out-str)))]
-           [res    E])
-       (define-values (base file _) (split-path src))
-       (printf "[~a:~s:~s] ~a = ~s~n" file line col datum res)
+   #`(let*-values
+         ([(src)         #,(syntax-source #'E)]
+          [(base file _) (split-path src)]
+          [(line)        #,(syntax-line #'E)]
+          [(col)         #,(syntax-column #'E)]
+          [(datum)       #,(call-with-output-string
+                            (λ (out-str) (pretty-print (syntax->datum #'E)
+                                                       out-str
+                                                       #:newline? #f)))]
+          [(res)         E]
+          [($dbg-msg)    "; [dbg] ~a:~s:~s: ~a = ~s"])
+       (log-fatal $dbg-msg file line col datum res)
        res)])

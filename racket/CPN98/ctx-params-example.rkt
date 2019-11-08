@@ -1,8 +1,10 @@
 #lang reader "lang.rkt"
 
-(class Driver
-  ;; ...
-  )
+;; Type def
+(class X) (class Y) (class Unit) (class Engine)
+
+;; Prog
+(class Driver #;... )
 
 (class Pair [m n]
   (field [fst : (m / X)])
@@ -25,6 +27,9 @@
   ;; ;; Check duplicated field
   ;; (field [p2 : (world / (Pair rep world))])
 
+  ;; ;; Check unknown type
+  ;; (field [foo : (world / (Foo rep world))])
+
   (def (a → [rep   / (Pair rep world)])
     (get-field this p1))
 
@@ -34,13 +39,19 @@
   ;; ;; Check duplicated def
   ;; (def (b → [world / (Pair rep world)]) void)
 
+  ;; ;; Check unknow field
+  ;; (def (c → [rep   / (Pair rep world)])
+  ;;   foo)
+
   (def (x → [rep / X])
     (get-field p1 fst))
 
   (def (y → [world / Y])
-    (get-field p2 snd))
+    (get-field (get-field this p2) snd))
 
   (def (updateX → Unit)
+    ;; Check:
+    ;; (set-field! (get-field this p1) fstt (new X)))
     (set-field! (get-field this p1) fst (new X)))
 
   (def (get-engine [e : (rep / Engine)]
@@ -59,10 +70,10 @@
   (field [safe : (world / Intermediate)])
 
   (def (main → (rep / Y))
-    (let ([a : (rep   / (Pair rep world))  (get-field safe a)]
-          [b : (world / (Pair rep world))  (get-field safe b)]
-          [x : (rep   / X)                 (get-field safe x)])
-      (get-field safe y))))
+    (let ([a : (rep   / (Pair rep world))  (send safe a)]
+          [b : (world / (Pair rep world))  (send safe b)]
+          [x : (rep   / X)                 (send safe x)])
+      (send safe y))))
 
 ;; (send (new Main) main)
 (let ([main : (world / Main) (new Main)])
