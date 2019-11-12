@@ -11,24 +11,10 @@
   (field [snd : (n / Y)])
   )
 
-;; ;; Check duplicated class
-;; (class Pair []
-;;   ;; ...
-;;   )
-
-(class Pair_ []
-  ;; ...
-  )
 
 (class Intermediate
   (field [p1 : (rep   / (Pair rep world))])
   (field [p2 : (world / (Pair rep world))])
-
-  ;; ;; Check duplicated field
-  ;; (field [p2 : (world / (Pair rep world))])
-
-  ;; ;; Check unknown type
-  ;; (field [foo : (world / (Foo rep world))])
 
   (def (a → [rep   / (Pair rep world)])
     (get-field this p1))

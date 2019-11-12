@@ -19,6 +19,7 @@
 ;; - τ is the type of the current class
 
 (require (for-syntax racket/base)
+         racket/contract/base
          racket/function
          racket/list
          racket/match
@@ -74,7 +75,7 @@
    #:with [(field ~! F-NAME F-OW-SCHEME:ow-scheme) ...] #'(FIELD ...)
    #:when (stx-map ?> #'(F-OW-SCHEME ...))
    ;;   P,NAME ⊢m DEF ⇒ ?DEF
-   #:with [?DEF ...] (parameterize ([τ #'NAME]) (stx-map ?> #'(DEF ...)))
+   #:with [?DEF ...] (with-τ #'NAME (stx-map ?> #'(DEF ...)))
    ;; -------------------------------------------------------------------
    ;;   P ⊢d class FIELD ... DEF ... ⇒ class FIELD ... ?DEF ...
    this-syntax]
@@ -85,24 +86,16 @@
   ;; `DEF` in `τ` elaborates to `?DEF`
   ;;
   ;; [meth]
-  [(def ~! (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME:ow-scheme) E)
+  [(def ~! (NAME (ARG-NAME ARG-OW-SCHEME:ow-scheme) ... RET-OW-SCHEME:ow-scheme) E)
    #:with τ0 (τ)
    ;; Elaborate:
    ;;   P ⊢τ t
-   #:when (?> #'RET-OW-SCHEME)
-   ;;   P ⊢τ t
    #:when (stx-map ?> #'(ARG-OW-SCHEME ...))
+   ;;   P ⊢τ t
+   #:when (?> #'RET-OW-SCHEME)
    ;;   P,{this: τ0, ARG-NAME: ARG-OW-SCHEME.TYPE, ...} ⊢e E ⇒ ?E : RET-OW-SCHEME
-   #:with ?E
-   ;; (let* ([this (cons #'this #'τ0)]
-   ;;        [args (stx-map (syntax-parser
-   ;;                         [(VAR OWS:ow-scheme) (cons #'VAR #'OWS.TYPE)])
-   ;;                       #'([ARG-NAME ARG-OW-SCHEME] ...))])
-   ;;   (with-Γ (cons this args)
-   ;;     (?> #'E)))
-   ;; TODO:
-   (with-Γ (dbg #'((#'this #'τ0) (#'ARG-NAME #'ARG-OW-SCHE) ...))
-     (?> #'E))
+   #:with ?E (with-Γ #'((this . τ0) (ARG-NAME . ARG-OW-SCHEME.TYPE) ...)
+               (?> #'E))
    ;;
    ;; TODO:
    ;; #:with ?t (check-⊢e #'?E #'RET-OW-SCHEME.TYPE)
@@ -127,7 +120,7 @@
    ;; #:when (check-⊢e #'?E #'VAR-OW-SCHEME.TYPE)
    ;;   P,Γ{VAR-NAME: VAR-OW-SCHEME} ⊢e BODY => ?BODY : t
    #:with t (type-prop
-    (with-Γ (Γ-set #'VAR-NAME #'VAR-OW-SCHEME.TYPE)
+    (with-Γ (Γ-set #'(VAR-NAME . VAR-OW-SCHEME.TYPE))
       (?> #'BODY)))
    ;; ------------------------------------------------------------------
    ;;   P,Γ ⊢e *let (VAR-NAME VAR-OW-SCHEME E) BODY ⇒
@@ -196,7 +189,17 @@
 ;; Manage local binding
 ;; ~~~~~~~~~~~~~~~~~~~~
 
+;; Store the current class type
 (define τ (make-parameter #f))
+
+;; Make `the-τ` a new value for (τ) parameter in the context of STX.
+;; : TYPE (-> STX) -> STX
+(define (private:with-τ the-τ thunk-E)
+  (parameterize ([τ the-τ]) (thunk-E)))
+
+(define-syntax-parser with-τ
+  ;; Automatically create the `thunk` around E expression
+  [(_ THE-τ E:expr) #'(private:with-τ THE-τ (thunk E))])
 
 ;; Map of local bindings
 ;; : -> (Hash (Var . TYPE))
@@ -208,52 +211,64 @@
   (hash-has-key? (Γ) (syntax->datum VAR)))
 
 ;; Set TYPE of VAR in Γ
-;; : VAR -> Boolean
-(define (Γ-set VAR TYPE)
+;; : (VAR . TYPE) -> Boolean
+(define (Γ-set VAR.TYPE)
+  (define VAR (car (syntax-e VAR.TYPE)))
+  (define TYPE (cdr (syntax-e VAR.TYPE)))
   (hash-set (Γ) (syntax->datum VAR) TYPE))
 
 ;; Returns the TYPE of VAR.
 (define (Γ-ref VAR)
   (hash-ref (Γ) (syntax->datum VAR)))
 
-
 ;; Make `the-Γ` a new value for (Γ) parameter by mapping it into a
 ;; (Hash (Var . TYPE)) in the context of STX.
-;; : (U (Hash (Var . TYPE)) (List (VAR . TYPE)) (-> STX) -> Void
+;; : (U (Hash (Var . TYPE)) ((VAR . TYPE) ...) (-> STX) -> STX
 (define (private:with-Γ the-Γ thunk-E)
-  #;(define listof-datum? (listof symbol?))
+  (define listof-datum? (listof symbol?))
+  (define listof-stx? (listof syntax?))
+  (define (hashof-Var-TYPE? hs)
+    (and (hash? hs)                     ;; This is an hash, and
+         (or (hash-empty? hs)           ;; - Whether it is empty
+             (let ([ks (hash-keys hs)]  ;; - Or it hash (Var . TYPE) elems
+                   [vs (hash-values hs)])
+               (and (listof-datum? ks)
+                    (listof-stx? vs))))))
+
+  (define (VAR-TYPE...? xs)
+    ;; This is syntax object
+    (and (syntax? xs)
+         ;; That reduces to a list of pair of syntax objects
+         ;; ((VAR TYPE) ...)
+         (let ([XS  (syntax->list xs)])
+           (if XS
+               (let ([KVs (map syntax-e XS)])
+                 (for/and ([kv KVs])
+                   (if (and (pair? kv)
+                            (syntax? (car kv))
+                            (syntax? (cdr kv)))
+                       KVs #f)))
+               #f)
+           )))
+
 
   (parameterize
       ([Γ (cond
-            [(hash? the-Γ) the-Γ]
-            [(and (syntax? the-Γ) (stx->list the-Γ))
-             => (curry map syntax->datum)]
-            [(syntax? the-Γ) (list (syntax->datum the-Γ))]
-            #;[(listof-datum? the-Γ) the-Γ]
-            [(symbol? the-Γ) (list the-Γ)]
+            [(hashof-Var-TYPE? the-Γ) the-Γ]
+            [(VAR-TYPE...? the-Γ)
+             => (λ (the-Γ)
+                  (let-values ([(keys values) (unzip the-Γ)])
+                    (make-immutable-hash (zip (map syntax->datum keys) values))))]
             [else (raise-argument-error
                    'with-Γ
-                   "(or/c syntax? (listof syntax?) (listof datum?))"
+                   "(or/c syntax? (hash? datum? syntax?))"
                    the-Γ)])])
     (dbg (Γ))
     (thunk-E)))
 
-
 (define-syntax-parser with-Γ
-  ;; make THE-Γ a new value for (Γ). THE-Γ could be e new hashmap or a
-  ;; list of assoc to build the new hashmap from.
-  [(_ THE-Γ E:expr)
-   #'(let ([the-Γ THE-Γ]) ;; Reduce THE-Γ to compute it only once
-       (parameterize
-           ([Γ (if (hash? the-Γ)
-                   ;; It's an HASH, proceed,
-                   the-Γ
-                   ;; It's a list of assoc: make all keys of the assocs
-                   ;; a datum and then make the hash
-                   (let*-values ([(keys values) (unzip the-Γ)]
-                                 [(datums) (map syntax->datum keys)])
-                     (make-immutable-hash (zip datums values))))])
-         E))])
+  ;; Automatically create the `thunk` around E expression
+  [(_ THE-Γ E:expr) #'(private:with-Γ THE-Γ (thunk E))])
 
 
 ;; Utils
@@ -350,3 +365,63 @@
 ;;   doi =          {10.1145/268946.268961},
 ;;   url =          {https://doi.org/10.1145/268946.268961},
 ;; }
+
+
+;; Tests
+(module+ test
+  (require rackunit)
+
+  (test-exn "Duplicated class name"
+            #rx"Duplicated class name"
+            (thunk (?> #'(prog (class X []) (class X []) _))))
+
+  (test-exn "Duplicated field name"
+            #rx"Duplicated field name"
+            (thunk (?> #'(class X [] (field x _) (field x _)))))
+
+  (test-exn "Duplicated def name"
+            #rx"Duplicated def name"
+            (thunk (?> #'(class X [] (def (x _) _) (def (x _) _)))))
+
+  ;; No unbound identifier everywhere an `E` is expected. Desugaring
+  ;; ensures that all identifiers are binded with a let
+  (test-begin
+    (test-exn "Unbound identifier"
+              #rx"unbound identifier.+?in: id"
+              (thunk (?> #'id)))
+
+    (test-exn "Unbound identifier in prog"
+              #rx"unbound identifier.+?in: id"
+              (thunk (?> #'(prog (class X []) id))))
+
+    ;; FIXME:
+    ;; (test-exn "Unbound identifier in class"
+    ;;           #rx"unbound identifier.+?in: id"
+    ;;           (thunk (?> #'(class X []  id))))
+
+    )
+
+  (test-begin
+    (test-exn "Unknown type in field"
+              #rx"Unexpected Type.+?at: UnknownType"
+              (thunk (?> #'(class X [] (field x (ow-scheme UnknownType _ ()))))))
+
+    (test-exn "Unknown return type in def"
+              #rx"Unexpected Type.+?at: UnknownType"
+              (thunk (?> #'(def (x (ow-scheme UnknownType _ ())) _))))
+
+    (test-exn "Unknown arg type in def"
+              #rx"Unexpected Type.+?at: UnknownType"
+              (thunk (?> #'(def (x (_ (ow-scheme UnknownType _ ()))
+                                   (ow-scheme _ _ ())) _))))
+
+    (test-exn "Unknown type in let"
+              #rx"Unexpected Type.+?at: UnknownType"
+              (thunk (?> #'(let (x (ow-scheme UnknownType _ ()) _) _))))
+
+    (test-exn "Unknown type new"
+              #rx"Unexpected Type.+?at: UnknownType"
+              (thunk (?> #'(new (ow-scheme UnknownType _ ())))))
+      )
+
+  )

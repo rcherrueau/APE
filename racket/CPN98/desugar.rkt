@@ -211,7 +211,7 @@
 
 ;; Make `the-Γ` a new value for (Γ) parameter by mapping it into a
 ;; (List Var) in the context of STX.
-;; : (U (List VAR) VAR (List Var) Var) (-> STX) -> Void
+;; : (U (List VAR) VAR (List Var) Var) (-> STX) -> STX
 (define (private:with-Γ the-Γ thunk-E)
   (define listof-datum? (listof symbol?))
 
