@@ -49,7 +49,7 @@
          [s-exps  (time (s-exps read-syntax))]
          [prog  (time (quasisyntax/loc (car s-exps) (prog #,@s-exps)))]  ;; Vanilla prog
          [prog  (time (∗> prog))]                                        ;; Desugaring
-         ;; [prog  (time (?> prog))]                                        ;; Basic Checks
+         [prog  (time (?> prog))]                                        ;; Basic Checks
          [datum-res (time (syntax->datum prog))]                         ;; Datum
 
          ;; Pretty print

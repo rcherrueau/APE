@@ -9,7 +9,7 @@
 ;; - Checks no duplicate class/field/def names.
 ;; - Type checks the program (for simple type -- "simple" as in simply
 ;;   typed λ calculus, i.e., no ownership).
-;; - Based on [FKF98] (see Bibliography)
+;; - Based on [FKF98] (see Bibliography).
 ;;
 ;; Naming conventions:
 ;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
@@ -176,7 +176,8 @@
   [ID:id #:when (Γ? #'ID)
    #:with t (Γ-ref #'ID)
    (type-prop this-syntax #'t)]
-  [ID:id ;; Not locally binded? ⇒ unbound identifier
+  [ID:id ;; Not locally binded? ⇒ unbound identifier. This is not
+         ;; supposed to happened thanks to desugaring.
    (raise-syntax-error #f "unbound identifier :(" #'ID)]
 
   ;; P ⊢τ t
