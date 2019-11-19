@@ -2,14 +2,20 @@
 
 (require (for-syntax racket/base
                      racket/pretty
-                     racket/port)
+                     racket/port
+                     syntax/srcloc)
+         racket/dict
          racket/exn
+         racket/function
+         racket/list
          racket/match
          racket/string
+         rackunit
          syntax/parse
          syntax/parse/define
          errortrace/errortrace-key
-         "definitions.rkt")
+         ;; "definitions.rkt"
+         )
 
 (provide (all-defined-out))
 
@@ -107,6 +113,110 @@
   (define ID (syntax-parser RHS ...)))
 
 
+;; (define-type IdId (Syntaxof (Pairof Identifier Identifier)))
+;; (define-type (IdIdMap V) (Listof (Pairof IdId V)))
+
+
+;; (:idid? (IdId -> Boolean))
+(define (idid? X)
+  (if (syntax? X)
+      (let ([x (syntax-e X)])
+        (and (pair? x)
+             (identifier? (car x))
+             (identifier? (cdr x)) #t))
+      #f))
+
+;; (: idid-eq? (IdId IdId -> Boolean))
+(define (idid-eq? X Y)
+  (let* ([x (syntax-e X)]
+         [y (syntax-e Y)]
+         [x1 (car x)] [x2 (cdr x)]
+         [y1 (car y)] [y2 (cdr y)])
+    (if (and (eq? (syntax-e x1) (syntax-e y1))
+             (eq? (syntax-e x2) (syntax-e y2)))
+        #t #f)))
+
+;; (: ididmap-ref (IdIdMap IdId -> Identifier))
+(define (ididmap-ref ididmap key)
+  (cond
+    [(assoc key ididmap idid-eq?) => cdr]
+    [else (error "the key ~s does not exist in IdIdMap" key)]))
+
+;; (: ididmap-set
+;;    (IdIdMap IdId Identifier -> IdIdMap))
+(define (ididmap-set ididmap key val)
+  (cond
+    [(private:ididmap-index-of ididmap key)
+     => (λ (idx) (list-set ididmap idx (cons key val)))]
+    [else (cons (cons key val) ididmap)]))
+
+(define (private:ididmap-index-of ididmap key)
+  (let-values ([(keys _) (unzip ididmap)])
+    (index-of keys key idid-eq?)))
+
+;; (: ididmap-has-key?
+;;    (IdIdMap IdId -> Boolean))
+(define (ididmap-has-key? ididmap key)
+  (and (private:ididmap-index-of ididmap key) #t))
+
+(define (ididmap-eq? map1 map2 [v-eq? eq?])
+  (for/and ([kv1 map1]
+            [kv2 map2])
+    (let ([k1 (car kv1)] [v1 (cdr kv1)]
+          [k2 (car kv2)] [v2 (cdr kv2)])
+      (and (idid-eq? k1 k2) (v-eq? v1 v2)))))
+
+
+
+;; Returns `#t` if the syntax object is a field.
+;; field? : Syntax -> Boolean
+(define field?
+  (syntax-parser
+    #:datum-literals (field)
+    [(field x ...) #t]
+    [_ #f]))
+
+;; Returns `#t` if the syntax object is a def.
+;; def? : Syntax -> Boolean
+(define def?
+  (syntax-parser
+    #:datum-literals (def)
+    [(def _ ...) #t]
+    [_ #f]))
+
+;; From https://github.com/LiberalArtist/adjutor/blob/9d1bb66d2cb4751c72d8a8da4f11b982b282128c/kernel.rkt#L68
+(define-syntax values->list
+  (syntax-parser
+    [(_ body:expr ...+)
+     #'(call-with-values (λ () body ...) list)]))
+
+(define (list->values lst)
+  (apply values lst))
+
+;; > (sequence '((a 1 "foo") (b 2 "bar") (c 3 "baz")))
+;; '((a b c) (1 2 3) ("foo" "bar" "baz"))
+(define (sequence vs)
+  (define (vs->ls v ls)
+    (map (λ (a b) (cons a b)) v ls))
+  (foldr vs->ls (build-list (length (car vs)) (const '())) vs))
+
+
+#;(define-custom-hash-types priv:idid-map
+  #:key? (λ ([K : Idid])
+           (if (syntax? K)
+               (let ([k (syntax-e K)])
+                 (and (pair? k) (identifier? (car k)) (identifier? (cdr k))))
+               #f))
+  (λ ([X : Idid] [Y : Idid])
+    (let* ([x (syntax-e X)]
+           [y (syntax-e Y)]
+           [x1 (car x)] [x2 (cdr x)]
+           [y1 (car y)] [y2 (cdr y)])
+      (if (and (eq? (syntax-e x1) (syntax-e y1))
+               (eq? (syntax-e x2) (syntax-e y2)))
+          #t #f)))
+  )
+
 
 ;; cms->srclocs : continuation-marks -> (listof srcloc)
 (define (cms->srclocs cms)
@@ -118,20 +228,23 @@
                        (list-ref x 5)))
    (continuation-mark-set->list cms errortrace-key)))
 
+(define-simple-check (check-stx=? stx1 stx2)
+  (equal? (syntax->datum stx1) (syntax->datum stx2)))
+
 
 ;; (dbg (+ 1 2))
-(define-syntax-parser dbg
-  [(_ E:expr)
-   #`(let*-values
-         ([(src)         #,(syntax-source #'E)]
-          [(base file _) (split-path src)]
-          [(line)        #,(syntax-line #'E)]
-          [(col)         #,(syntax-column #'E)]
-          [(datum)       #,(call-with-output-string
-                            (λ (out-str) (pretty-print (syntax->datum #'E)
-                                                       out-str
-                                                       #:newline? #f)))]
-          [(res)         E]
-          [($dbg-msg)    "; [dbg] ~a:~s:~s: ~a = ~s"])
-       (log-fatal $dbg-msg file line col datum res)
-       res)])
+;; > ; [dbg] utils.rkt:149:5: '(+ 1 2) = 3
+;; > 3
+(define-syntax (dbg stx)
+  (syntax-case stx ()
+    [(_ E)
+     #`(let
+           ([srcloc #,(srcloc->string (build-source-location #'E))]
+            [datum  #,(call-with-output-string
+                       (λ (out-str) (pretty-print (syntax->datum #'E)
+                                                  out-str
+                                                  #:newline? #f)))]
+            [res         E]
+            [$dbg-msg    "; [dbg] ~a: ~a = ~s"])
+         (log-fatal $dbg-msg srcloc datum res)
+         res)]))

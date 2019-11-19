@@ -1,54 +1,78 @@
-#lang racket/base
+#lang typed/racket/base
 
-(require racket/function
+;; ,-,-,-.
+;; `,| | |   ,-. . . ,-. ,-. . . ,-. ,-.
+;;   | ; | . ,-| | | |   ,-| | | |   | |
+;;   '   `-' `-^ `-^ `-' `-^ `-^ `-' `-'
+;;
+;; Common definitions for parsers of the lang.
+
+(require (for-syntax racket/base)
+         ;; racket/dict
+         racket/function
          syntax/parse
-         syntax/srcloc
+         ;; syntax/srcloc
+         ;; syntax/parse/define
          ;; dbg macro.
          ;; TODO: remove this
-         (for-syntax racket/base
-                     racket/pretty
-                     racket/port)
-         syntax/parse/define
+         ;; (for-syntax racket/base
+         ;;             racket/pretty
+         ;;             racket/port)
          ;; END TODO
-         typed/racket/base
          typed/racket/unsafe
+         "_definitions.rkt"
          )
 
-;; (require/typed racket/list
-;;   ;; Coerce `flatten` to only return Listof String (instead of Listof
-;;   ;; Any). This helps type-checking the `unlines` function.
-;;   [flatten (Any -> (Listof String))])
+
+;; (define-type PairofId (Pairof Identifier Identifier))
+(define-type IdId        (Syntaxof (Pairof Identifier Identifier)))
+(define-type (IdIdMap a) (Listof (Pairof IdId a)))
+(define-type OW-SCHEME   (Syntaxof
+                          (List Identifier                         ;; Basic Type
+                                Identifier                         ;; Owner
+                                (Syntaxof (Listof Identifier)))))  ;; C-Params
+
 
 ;; (require/typed syntax/parse
 ;;   ;; Coerce `flatten` to only return Listof String (instead of Listof
 ;;   ;; Any). This helps type-checking the `unlines` function.
 ;;   [syntax-parser (Any -> Any)])
+(require/typed "utils.rkt"
+  [ididmap-ref (All (a) ((IdIdMap a) IdId -> a))]
+  [ididmap-set (All (a) ((IdIdMap a) IdId a -> (IdIdMap a)))]
+  [ididmap-has-key? (All (a) ((IdIdMap a) IdId -> Boolean))]
+  [ididmap-eq? (All (a) (->* ((IdIdMap a) (IdIdMap a)) ((a a -> Boolean)) Boolean))]
+  [check-stx=? (->* (Syntax Syntax) (String) Any)])
 
-;; (provide (all-defined-out))
+(provide (except-out (all-defined-out)
+                     keyword-lits expr-lits
+                     private:with-CS with-CS
+                     ;; FIXME: make them private and define a proper
+                     ;; interface to define them in order to ensure
+                     ;; type safety with contracts.
+                     private:CS private:FS
+                     )
+         (all-from-out "_definitions.rkt"))
 
 ;; Provide without the generation of contracts
-(unsafe-provide (all-defined-out))
+;;
+;; Macros defined in typed modules may not be used in untyped modules.
+;; A workaround for such macros is provided them with `unsafe-provide`
+;; which exports the macro without any contracts generated. See,
+;; https://docs.racket-lang.org/ts-guide/typed-untyped-interaction.html#%28part._.Using_.Typed_.Code_in_.Untyped_.Code%29
+;; https://groups.google.com/d/msg/racket-users/eowl6RpdDwY/1wrCluDcAwAJ
+(unsafe-provide keyword-lits expr-lits
+                private:CS private:FS
+                with-CS)
 
 
-;; (dbg (+ 1 2))
-(define-syntax-parser dbgg
-  [(_ E:expr)
-   #`(let ([src    #,(syntax-source #'E)]
-           [line   #,(syntax-line #'E)]
-           [col    #,(syntax-column #'E)]
-           [datum  #,(call-with-output-string
-                      (λ (out-str) (pretty-print (syntax->datum #'E) out-str #:newline? #f)))]
-           [res    E])
-       (define-values (base file _) (split-path src))
-       (printf "; [dbg] ~a:~s:~s: ~a = ~s~n" file line col datum res)
-       res)])
+;; Language definitions
 
 (define-literal-set keyword-lits
   #:for-label
-  ;; Note: I have to define new, send, ... as datum otherwise they
-  ;; are going to be interpreted as identifier during macro
-  ;; expansion and may risk an evaluation with new, send from
-  ;; racket/class.
+  ;; Note: The syntax/parse package require all literals to have a
+  ;; binding. To match identifier by their symbolic names, I have to
+  ;; use `#:datum-literals` instead.
   #:datum-literals (prog class field def)
   ;; I have no literals that should be interpreted.
   ())
@@ -58,161 +82,191 @@
   #:datum-literals (let new send get-field set-field! ???)
   ())
 
-(define-literal-set *expr-lits
-  #:for-label
-  #:datum-literals (prog class field def let new send
-                         get-field set-field!
-                          this ???)
-  ())
-
-(define *expr-lits? (literal-set->predicate *expr-lits))
-
-(define-literal-set *annotation-lits
-  #:for-label
-  #:datum-literals (ow-scheme)
-  ())
-
-(define-syntax-class ow-scheme
-  #:description "type with ownership and context parameters"
-  #:literal-sets [*annotation-lits]
-  #:attributes [OWNER CPARAMS TYPE]
-  (pattern (ow-scheme ~! TYPE:id OWNER:id (CPARAM:id ...))
-           #:with CPARAMS #'(CPARAM ...))
-  )
-
-(define (make-ow-scheme TYPE OWNER CPARAMS #:stx-src [stx-src #f])
-  (define ow-scheme-stx #`(ow-scheme #,TYPE #,OWNER #,CPARAMS))
-
-  (if stx-src
-    (quasisyntax/loc stx-src #,ow-scheme-stx)
-    ow-scheme-stx))
+;; > (ow-scheme? #'(a b ()))       ; #t
+;; > (ow-scheme? #'(a b [c d e]))  ; #t
+;; > (ow-scheme? #'(a 1 []))       ; #f
+(define-predicate ow-scheme? OW-SCHEME)
 
 
-(define-type BINDER (Syntaxof Any))
-(define-type C-TYPE (Syntaxof Any))
-(define-type FIELD (Syntaxof Any))
-(define-type DEF (Syntaxof Any))
-(define-type TYPE (Syntaxof Any))
+;; (define (make-ow-scheme OW-SCHEME OWNER CPARAMS #:stx-src [stx-src #f])
+;;   (define ow-scheme-stx #`(ow-scheme #,OW-SCHEME #,OWNER #,CPARAMS))
 
-(define-type C-type Any)
-(define-type F-name Any)
-(define-type D-name Any)
-(define-type Type Any)
+;;   (if stx-src
+;;     (quasisyntax/loc stx-src #,ow-scheme-stx)
+;;     ow-scheme-stx))
 
+;; ;; Returns `#t` if the syntax object is a def.
+;; ;; def? : Syntax -> Boolean
+;; (define def?
+;;   (syntax-parser
+;;     ;; #:literal-sets [expr-lits]
+;;     [(def _ ...) #t]
+;;     [_ #f]))
+
+
 ;; Set or get the binder property of a syntax object.
 ;;
 ;; The binder property of a syntax object is another syntax object
 ;; which is its binder.
-(: binder-prop
-   (All (a) (case->
-             [(Syntaxof a) -> BINDER]
-             [(Syntaxof a) BINDER -> (Syntaxof a)])))
-(define binder-prop
-  (case-lambda
-    ;; `(Syntaxof a) -> BINDER` requires a `cast` to type check
-    ;; because the type-checker doesn't know that 'binder prop of
-    ;; `syntax-property` stores BINDER.
-    [(stx)        (cast (syntax-property  stx 'binder) BINDER)]
-    [(stx BINDER) (syntax-property stx 'binder BINDER)]))
+;; (: binder-prop
+;;    (All (a) (case->
+;;              [(Syntaxof a) -> BINDER]
+;;              [(Syntaxof a) BINDER -> (Syntaxof a)])))
+;; (define binder-prop
+;;   (case-lambda
+;;     ;; `(Syntaxof a) -> BINDER` requires a `cast` to type check
+;;     ;; because the type-checker doesn't know that 'binder prop of
+;;     ;; `syntax-property` stores BINDER.
+;;     [(stx)        (cast (syntax-property  stx 'binder) BINDER)]
+;;     [(stx BINDER) (syntax-property stx 'binder BINDER)]))
 
-;; Set or get the class type of a syntax object.
-(: c-type-prop
-   (All (a) (case->
-             [(Syntaxof a) -> C-TYPE]
-             [(Syntaxof a) C-TYPE -> (Syntaxof a)])))
-(define c-type-prop
-  (case-lambda
-    [(stx)        (cast (syntax-property stx 'c-type) C-TYPE)]
-    [(stx C-TYPE) (syntax-property stx 'c-type C-TYPE)]))
+;; ;; Set or get the class type of a syntax object.
+;; (: c-type-prop
+;;    (All (a) (case->
+;;              [(Syntaxof a) -> C-TYPE]
+;;              [(Syntaxof a) C-TYPE -> (Syntaxof a)])))
+;; (define c-type-prop
+;;   (case-lambda
+;;     [(stx)        (cast (syntax-property stx 'c-type) C-TYPE)]
+;;     [(stx C-TYPE) (syntax-property stx 'c-type C-TYPE)]))
 
 
-;; Set or get the type of a syntax object.
+;; Get or set the type of a syntax object.
 (: type-prop
    (All (a) (case->
-             [(Syntaxof a) -> TYPE]
-             [(Syntaxof a) TYPE -> (Syntaxof a)])))
+             [(Syntaxof a) -> (U OW-SCHEME #f)]
+             ;; FIXME: remove `U ... (Syntaxof #f)` at the end of
+             ;; prototyping. Right now, this enables the propagation
+             ;; of not typed term. But it should disappear at the end
+             ;; of the prototyping.
+             ;;
+             ;; [(Syntaxof a) OW-SCHEME -> (Syntaxof a)])))
+             [(Syntaxof a) (U OW-SCHEME (Syntaxof #f)) -> (Syntaxof a)])))
 (define type-prop
   (case-lambda
-    [(stx)      (cast (syntax-property stx 'type) TYPE)]
-    [(stx TYPE) (syntax-property stx 'type TYPE)]))
+    ;; Get the type of a syntax object
+    [(stx) (let ([τ (syntax-property stx 'type)])
+             (if (ow-scheme? τ) τ #f))]
+    ;; Set the type of a syntax object
+    [(stx OW-SCHEME) (syntax-property stx 'type OW-SCHEME)]))
 
 
-;; List of Types. TODO: Make private
-(: CS (Boxof (Listof C-type)))
-(define CS (box '()))
+;; Environments
 
-(: CS-set! (CLASS -> Void))
-(define (CS-set! CLASS)
-  (define get-c-type
-    (syntax-parser
-      #:literal-sets [*expr-lits]
-      [(class ~! NAME [CPARAM ...] FIELD/DEF ...) (syntax->datum #'NAME)]))
+(: bound-id=? (Identifier Identifier -> Boolean))
+(define (bound-id=? id1 id2)
+  (eq? (syntax-e id1) (syntax-e id2)))
 
-  (define C-types (unbox CS))
-  (set-box! CS (cons (get-c-type CLASS) C-types)))
+;;~~~~~~~~~~~~~~~~~
+;; CS: Set of Types
 
-(: CS-member (Class -> Void))
-(define (CS-member CLASS)
-  (define class (syntax->datum CLASS))
-  (member class (unbox CS)))
+(: private:CS (Parameterof (Listof Identifier)))
+(define private:CS (make-parameter '()))
 
-;; (*class ~! NAME [CPARAM ...] FIELD/DEF ...)
+;; Is Identifier exists in CS?
+(: CS-member? (Identifier ->  Boolean))
+(define (CS-member? id-stx)
+  (if (findf (curry bound-id=? id-stx) (private:CS)) #t #f))
 
-;; Map of Fields
-(: FS (Mutable-HashTable (Pairof C-type F-name) Type))
-(define FS (make-hash))
+;; Make `the-CS` the value of `CS` in `A`.
+(: private:with-CS
+   (All (A) (U (Syntaxof (Listof Identifier)) (Listof Identifier)) (-> A) -> A))
+(define (private:with-CS the-CS thunk-E)
+  (parameterize
+      ([private:CS
+        (cond
+          [(and (syntax? the-CS) (syntax->list the-CS)) => identity]
+          [else the-CS])])
+    ;; (dbg (CS))
+    (thunk-E)))
 
-(: FS-set! (C-TYPE FIELD -> Void))
-(define (FS-set! C-TYPE FIELD)
-  (define get-name/ow-type
-    (syntax-parser
-      #:literal-sets [*expr-lits]
-      [(field NAME OWS:ow-scheme)
-       (values (syntax->datum #'NAME) #'OWS)]))
+;; Automatically create the `thunk` around E expressions
+(define-syntax (with-CS stx)
+  (syntax-case stx ()
+    [(_ THE-CS E ...) #'(private:with-CS THE-CS (thunk E ...))]))
 
-  (define c-type (syntax->datum C-TYPE))
-  (define-values (name ow-type) (get-name/ow-type FIELD))
+(module+ test/CS
+  (require typed/rackunit)
 
-  (hash-set! FS (cons c-type name) ow-type))
+  (with-CS #'(foo bar)
+    (check-true  (CS-member? #'foo))
+    (check-false (CS-member? #'baz)))
 
-(define (FS-type E F-NAME #:context? [CONTEXT? #f])
-  (define CLASS (type-prop E))
-  (define class (syntax->datum CLASS))
-  (define field (syntax->datum F-NAME))
-  (define error-msg "type ~s doesn't have field ~s")
+  (with-CS (list #'foo #'bar)
+    (check-true  (CS-member? #'foo))
+    (check-false (CS-member? #'baz))))
 
-  (hash-ref FS (cons class field)
-            (λ () (raise-syntax-error
-                   #f
-                   (format error-msg class field)
-                   CONTEXT?
-                   E
-                   ))))
+;;~~~~~~~~~~~~~~~~~~~
+;; FS: Map of Fields
+;;
+;; The syntax pair #'(Class-Type . Field-name) indexes the Map of
+;; Fields, and contains the Field type as value.
+(define-type FS (IdIdMap OW-SCHEME))
 
-(define (∉p CLASS F-NAME)
-  (define key (cons (syntax->datum CLASS) (syntax->datum F-NAME)))
-  (if (hash-has-key? FS key)
-      #f CLASS))
+(: private:FS (Parameterof FS))
+(define private:FS (make-parameter '()))
 
-;; Map of Defs
-(: DS (Mutable-HashTable (Pairof C-type D-name) Type))
-(define DS (make-hash))
+(: FS-member? (IdId -> Boolean))
+(define (FS-member? C-TYPE.FIELD)
+  (ididmap-has-key? (private:FS) C-TYPE.FIELD))
 
-(: DS-set! (C-TYPE DEF -> Void))
-(define (DS-set! C-TYPE DEF)
-  (define get-name/ret-ow-type
-    (syntax-parser
-      #:literal-sets [*expr-lits]
-      ;; [(def ~! (NAME (A-NAME A-OWS:ow-scheme) ... R-OWS:*ow-scheme) BODY)
-      [(def ~! (NAME _ ... R-OWS:ow-scheme) BODY)
-       (values (syntax->datum #'NAME) #'R-OWS)]))
+(: FS-set (IdId OW-SCHEME -> FS))
+(define (FS-set C-TYPE.FIELD OW-SCHEME)
+  (ididmap-set (private:FS) C-TYPE.FIELD OW-SCHEME))
 
-  (define c-type (syntax->datum C-TYPE))
-  (define-values (name ret-ow-type) (get-name/ret-ow-type DEF))
+(: FS-ref (IdId -> OW-SCHEME))
+(define (FS-ref C-TYPE.FIELD)
+  (ididmap-ref  (private:FS) C-TYPE.FIELD))
 
-  (hash-set! DS (cons c-type name) ret-ow-type))
+(module+ test/FS
+  (require typed/rackunit)
 
-(define (DS-type CLASS DEF-NAME)
-  (define key (cons (syntax->datum CLASS)
-                    (syntax->datum DEF-NAME)))
-  (hash-ref DS key))
+  (define test:τFoo #'(foo-type rep ()))
+  (define test:τBar #'(bar-type rep ()))
+
+  (: test:FS FS)
+  (define test:FS
+    `((,#'(c . foo) . ,test:τFoo)
+      (,#'(c . bar) . ,test:τBar)))
+
+  (: stx-eq? (OW-SCHEME OW-SCHEME -> Boolean))
+  (define (stx-eq? a b)
+    (equal? (syntax->datum a) (syntax->datum b)))
+
+  (parameterize ([private:FS test:FS])
+    (check-true  (FS-member? #'(c . foo)))
+    (check-false (FS-member? #'(C . foo)))
+    (check-false (FS-member? #'(c . Foo)))
+    (check-false (FS-member? #'(c . baz)))
+
+    (check-stx=? (FS-ref #'(c . foo)) test:τFoo)
+    (check-stx=? (FS-ref #'(c . bar)) test:τBar)
+
+    (check-true  (ididmap-eq? test:FS (FS-set #'(c . foo) test:τFoo) stx-eq?))
+    (check-false (ididmap-eq? test:FS (FS-set #'(C . foo) test:τFoo) stx-eq?))
+    (check-false (ididmap-eq? test:FS (FS-set #'(c . Foo) test:τFoo) stx-eq?))
+    (check-false (ididmap-eq? test:FS (FS-set #'(c . foo) test:τBar) stx-eq?))
+    (check-false (ididmap-eq? test:FS (FS-set #'(c . baz) test:τBar) stx-eq?))))
+
+;; ;; Removes all mapping of Defs
+;; (: DS-clear! (-> Void))
+;; (define (DS-clear!) (hash-clear! DS))
+
+;; (: DS-set! (C-TYPE DEF -> Void))
+;; (define (DS-set! C-TYPE DEF)
+;;   (define get-name/ret-ow-type
+;;     (syntax-parser
+;;       #:literal-sets [*expr-lits]
+;;       ;; [(def ~! (NAME (A-NAME A-OWS:ow-scheme) ... R-OWS:*ow-scheme) BODY)
+;;       [(def ~! (NAME _ ... R-OWS:ow-scheme) BODY)
+;;        (values (syntax->datum #'NAME) #'R-OWS)]))
+
+;;   (define c-type (syntax->datum C-TYPE))
+;;   (define-values (name ret-ow-type) (get-name/ret-ow-type DEF))
+
+;;   (hash-set! DS (cons c-type name) ret-ow-type))
+
+;; (define (DS-type CLASS DEF-NAME)
+;;   (define key (cons (syntax->datum CLASS)
+;;                     (syntax->datum DEF-NAME)))
+;;   (hash-ref DS key))

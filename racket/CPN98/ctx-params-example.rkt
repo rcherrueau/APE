@@ -22,6 +22,9 @@
   (def (b → [world / (Pair rep world)])
     p2)
 
+  ;; Check duplicated field
+  ;; (field [p1 : (rep   / (Pair rep world))])
+
   ;; ;; Check duplicated def
   ;; (def (b → [world / (Pair rep world)]) void)
 
@@ -35,10 +38,11 @@
   (def (y → [world / Y])
     (get-field (get-field this p2) snd))
 
-  (def (updateX → Unit)
+  (def (updateX → [rep / X])
     ;; Check:
     ;; (set-field! (get-field this p1) fstt (new X)))
     (set-field! (get-field this p1) fst (new X)))
+
 
   (def (get-engine [e : (rep / Engine)]
                    [b : (rep / (X a c))]
@@ -47,9 +51,14 @@
 
   (def (get-engine2 [e : (rep / Engine)]
                     [b : (rep / (X a c))]
-                    → [rep / (Pair rep world)])
+                    → [rep / Engine])
     e)
 
+  ;; Check: type mismatch get-field
+  ;; (def (get-engine-bad [e : (rep / Engine)]
+  ;;                      [b : (rep / (X a c))]
+  ;;                      → [rep / Engine])
+  ;;   (get-field this p1))
   )
 
 (class Main []
@@ -59,7 +68,7 @@
     (let ([a : (rep   / (Pair rep world))  (send safe a)]
           [b : (world / (Pair rep world))  (send safe b)]
           [x : (rep   / X)                 (send safe x)])
-      (send safe y))))
+      (send safe y a b x))))
 
 ;; (send (new Main) main)
 (let ([main : (world / Main) (new Main)])
