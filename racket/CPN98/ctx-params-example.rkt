@@ -7,14 +7,16 @@
 (class Driver #;... )
 
 (class Pair [m n]
-  (field [fst : (m / X)])
+  (field [fst : m/X])
   (field [snd : (n / Y)])
   )
 
 
 (class Intermediate
-  (field [p1 : (rep   / (Pair rep world))])
-  (field [p2 : (world / (Pair rep world))])
+  ;; Check wrong owner/type stx
+  ;; (field [p1 : rep/(Pair rep world)])
+  (field [p1 : (rep / (Pair rep world))])
+  (field [p2 : (world/Pair rep world)])
 
   (def (a → [rep   / (Pair rep world)])
     (get-field this p1))
@@ -32,26 +34,26 @@
   ;; (def (c → [rep   / (Pair rep world)])
   ;;   foo)
 
-  (def (x → [rep / X])
+  (def (x → rep/X)
     (get-field p1 fst))
 
-  (def (y → [world / Y])
+  (def (y → world/Y)
     (get-field (get-field this p2) snd))
 
-  (def (updateX → [rep / X])
+  (def (updateX → rep/X)
     ;; Check:
     ;; (set-field! (get-field this p1) fstt (new X)))
-    (set-field! (get-field this p1) fst (new X)))
+    (set-field! (get-field this p1) fst (new rep/X)))
 
 
-  (def (get-engine [e : (rep / Engine)]
-                   [b : (rep / (X a c))]
-                   → [rep / (Pair rep world)])
+  (def (get-engine [e : rep/Engine]
+                   [b : (rep/X a c)]
+                   → [rep/Pair rep world])
     (get-field this p1))
 
-  (def (get-engine2 [e : (rep / Engine)]
-                    [b : (rep / (X a c))]
-                    → [rep / Engine])
+  (def (get-engine2 [e : rep/Engine]
+                    [b : (rep/X a c)]
+                    → rep/X)
     e)
 
   ;; Check: type mismatch get-field
@@ -62,16 +64,16 @@
   )
 
 (class Main []
-  (field [safe : (world / Intermediate)])
+  (field [safe : world/Intermediate])
 
-  (def (main → (rep / Y))
+  (def (main → rep/Y)
     (let ([a : (rep   / (Pair rep world))  (send safe a)]
           [b : (world / (Pair rep world))  (send safe b)]
-          [x : (rep   / X)                 (send safe x)])
+          [x : rep/X                       (send safe x)])
       (send safe y a b x))))
 
 ;; (send (new Main) main)
-(let ([main : (world / Main) (new Main)])
+(let ([main : world/Main (new world/Main)])
   (send main main)
   )
 

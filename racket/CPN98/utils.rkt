@@ -1,4 +1,4 @@
-#lang racket/base
+#lang typed/racket/base/no-check
 
 (require (for-syntax racket/base
                      racket/pretty
@@ -14,7 +14,6 @@
          syntax/parse
          syntax/parse/define
          errortrace/errortrace-key
-         ;; "definitions.rkt"
          )
 
 (provide (all-defined-out))
@@ -24,16 +23,35 @@
 
 ;; (zip '(1 2 3) '(a b c))
 ;; > '((1 . a) (2 . b) (3 . c))
-(define (zip l1 l2)
-  (for/list ([i l1] [j l2]) (cons i j)))
+(: zip (All (a b) ((Listof a) (Listof b) -> (Listof (Pairof a b)))))
+(define (zip l1 l2) (map cons l1 l2))
 
 ;; (unzip '((1 . a) (2 . b) (3 . c)))
 ;; > '(1 2 3)
 ;; > '(a b c)
+(: unzip (All (a b) ((Listof (Pairof a b)) -> (Values (Listof a) (Listof b)))))
 (define (unzip l)
-  (for/lists (firsts seconds #:result (values firsts seconds))
-             ([pr l])
-    (values (car pr) (cdr pr))))
+  (struct (X Y) 2-tuple ([fst : X] [snd : Y])
+    #:constructor-name mk-2-tuple)
+
+  (: unzip-l (2-tuple (Listof a) (Listof b)))
+  (define unzip-l
+    (foldr (λ ([v : (Pairof a b)]
+             [as-bs : (2-tuple (Listof a) (Listof b))])
+           (let ([as (2-tuple-fst as-bs)]
+                 [bs (2-tuple-snd as-bs)])
+             (mk-2-tuple (cons (car v) as)
+                         (cons (cdr v) bs))))
+         (mk-2-tuple '() '())
+         l))
+
+  (values (2-tuple-fst unzip-l) (2-tuple-snd unzip-l)))
+
+;; (string-contains-once? "lala+lala"  #\+)   ; #t
+;; (string-contains-once? "lala+lala+" #\+)  ; #f
+(: string-contains-once? (String Char -> Boolean))
+(define (string-contains-once? str contained)
+  (eq? (length (indexes-of (string->list str) contained)) 1))
 
 ;; (syntax-property-symbol-keys
 ;;   (syntax-property* #'() 'p1 'v1 'p2 'v2 'p3 'v3))
@@ -111,61 +129,6 @@
 
 (define-simple-macro (define-parser ID:id RHS ...)
   (define ID (syntax-parser RHS ...)))
-
-
-;; (define-type IdId (Syntaxof (Pairof Identifier Identifier)))
-;; (define-type (IdIdMap V) (Listof (Pairof IdId V)))
-
-
-;; (:idid? (IdId -> Boolean))
-(define (idid? X)
-  (if (syntax? X)
-      (let ([x (syntax-e X)])
-        (and (pair? x)
-             (identifier? (car x))
-             (identifier? (cdr x)) #t))
-      #f))
-
-;; (: idid-eq? (IdId IdId -> Boolean))
-(define (idid-eq? X Y)
-  (let* ([x (syntax-e X)]
-         [y (syntax-e Y)]
-         [x1 (car x)] [x2 (cdr x)]
-         [y1 (car y)] [y2 (cdr y)])
-    (if (and (eq? (syntax-e x1) (syntax-e y1))
-             (eq? (syntax-e x2) (syntax-e y2)))
-        #t #f)))
-
-;; (: ididmap-ref (IdIdMap IdId -> Identifier))
-(define (ididmap-ref ididmap key)
-  (cond
-    [(assoc key ididmap idid-eq?) => cdr]
-    [else (error "the key ~s does not exist in IdIdMap" key)]))
-
-;; (: ididmap-set
-;;    (IdIdMap IdId Identifier -> IdIdMap))
-(define (ididmap-set ididmap key val)
-  (cond
-    [(private:ididmap-index-of ididmap key)
-     => (λ (idx) (list-set ididmap idx (cons key val)))]
-    [else (cons (cons key val) ididmap)]))
-
-(define (private:ididmap-index-of ididmap key)
-  (let-values ([(keys _) (unzip ididmap)])
-    (index-of keys key idid-eq?)))
-
-;; (: ididmap-has-key?
-;;    (IdIdMap IdId -> Boolean))
-(define (ididmap-has-key? ididmap key)
-  (and (private:ididmap-index-of ididmap key) #t))
-
-(define (ididmap-eq? map1 map2 [v-eq? eq?])
-  (for/and ([kv1 map1]
-            [kv2 map2])
-    (let ([k1 (car kv1)] [v1 (cdr kv1)]
-          [k2 (car kv2)] [v2 (cdr kv2)])
-      (and (idid-eq? k1 k2) (v-eq? v1 v2)))))
-
 
 
 ;; Returns `#t` if the syntax object is a field.

@@ -24,6 +24,9 @@
          racket/contract/base
          racket/function
          racket/list
+         racket/match
+         racket/string
+         racket/syntax
          ;; racket/set
          ;; syntax/id-set
          syntax/parse
@@ -359,9 +362,17 @@
   ())
 
 (define-syntax-class type
-  #:description "class type with ownership and context parameters"
+  #:description "a ownership type: owner/type or (owner/type ctx params ...)"
   #:literal-sets [type-lits]
   #:attributes [TYPE OWNER CPARAMS]
+  (pattern T:id #:when (is-stx-owner/type? #'T)
+           #:with [OWNER . TYPE] (owner/type->OWNER.TYPE #'T)
+           #:with CPARAMS #'())
+  (pattern (T:id PARAMS:id ...+)
+           #:when (is-stx-owner/type? #'T)
+           #:with [OWNER . TYPE] (owner/type->OWNER.TYPE #'T)
+           #:with CPARAMS #'(PARAMS ...))
+  ;; legacy
   (pattern (O:id / T:id)
            #:with OWNER #'O
            #:with TYPE #'T
@@ -370,17 +381,26 @@
            #:with OWNER #'O
            #:with TYPE #'T
            #:with CPARAMS #'(PARAMS ...))
-  (pattern T:id
-           #:with OWNER #'Θ
-           #:with TYPE #'T
-           #:with CPARAMS #'())
-  (pattern (T:id PARAMS:id ...+)
-           #:with OWNER #'Θ
-           #:with TYPE #'T
-           #:with CPARAMS #'(PARAMS ...)))
+  )
+
+;; (is-stx-owner/type? #'owner/type)   ; #t
+;; (is-stx-owner/type? #'ownertype)    ; #f
+;; (is-stx-owner/type? #'owner/t/ype)  ; #f
+(define (is-stx-owner/type? stx)
+  (and (identifier? stx)
+       (string-contains-once? (symbol->string (syntax-e stx)) #\/)))
+
+;; (owner/type->OWNER.TYPE #'owner/type)  ; #'(owner . type)
+(define (owner/type->OWNER.TYPE stx)
+  (match-define (list owner-str type-str)
+    (string-split (symbol->string (syntax-e stx)) "/"))
+
+  (let ([OWNER (format-id stx "~a" owner-str #:source stx)]
+        [TYPE  (format-id stx "~a" type-str #:source stx)])
+    #`(#,OWNER . #,TYPE)))
 
 (define-syntax-class arg
-  #:description "argument with its type"
+  #:description "an argument with its type"
   #:literal-sets [type-lits]
   (pattern (NAME:id : T:type)
            #:attr OWNER #'T.OWNER

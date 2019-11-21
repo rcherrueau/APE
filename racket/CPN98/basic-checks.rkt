@@ -177,24 +177,23 @@
   [(send ~! E DNAME PARAM ...)
    ;; #:and (~do (dbg this-syntax))
    ;; Check P,Γ ⊢e E ⇒ ?E : t
-   #:with [?E t] (get-τ (?> #'E))
+   #:with [?E t:ow-scheme] (get-τ (?> #'E))
    ;; Check P,Γ ⊢e PARAM ... ⇒ (?PARAM : t) ...
-   #:with [(?PARAM t-param) ...] (stx-map (∘ get-τ ?>) #'(PARAM ...))
-   ;; ;; TODO
-   ;; ;; Check (t DNAME (t-param ...)) ∈ dom(DS)
-   ;; ;;;; The method DNAME with parameters (t-param ...) is defined in
-   ;; ;;;; the class t.
-   ;; #:with KEY #'(t.TYPE DNAME (t-param ...))
-   ;; #:fail-unless (DS-member? #'KEY)
-   ;; (format "~a with arguments ~a is not a method of ~a"
-   ;;         (syntax->datum #'DNAME)
-   ;;         (syntax->datum #'(t-param ...))
-   ;;         (syntax->datum #'(t.TYPE)))
+   #:with [(?PARAM t-param:ow-scheme) ...] (stx-map (∘ get-τ ?>) #'(PARAM ...))
+   ;; Check (t DNAME (t-param ...)) ∈ dom(DS)
+   ;;;; The method DNAME with parameters (t-param ...) is defined in
+   ;;;; the class t.
+   #:with DS-key #'(t.TYPE DNAME (t-param ...))
+   #:fail-unless (DS-member? #'DS-key)
+   (format "~a with arguments ~a is not a method of ~a"
+           (syntax->datum #'DNAME)
+           (syntax->datum #'(t-param.TYPE ...))
+           (syntax->datum #'(t.TYPE)))
+   ;; TODO
    ;; ;; ----------------------------------------------------------------
    ;; ;; P,Γ ⊢e (set-field E FNAME BODY) ⇒
    ;; ;;          (set-field (?E : t) FNAME ?BODY) : FS(t . FNAME)
-   ;; ;; (add-τ this-syntax (DS-ref? #'KEY))]
-   this-syntax]
+   (add-τ this-syntax (DS-ref #'DS-key))]
 
 
   ;; [let]
@@ -225,7 +224,7 @@
    this-syntax]
   [OWS:ow-scheme ;; Not exists? ⇒ unexpected type.
    ;; #:and (~do (dbg this-syntax))
-   (raise-syntax-error #f "Unexpected Type" #'OWS.TYPE)])
+   (raise-syntax-error #f "Unknown Type" #'OWS.TYPE)])
 
 
 ;; Environment
@@ -349,19 +348,14 @@
      (cond
        [(bound-id=? #'ow1.TYPE #'ow2.TYPE) #t]
        [else
-        (define $err "type mismatch;~n  expected: ~s~n  given: ~s")
+        (define $err (string-append
+                      "type mismatch~n"
+                      "  The body elaborate to the type: ~s~n"
+                      "  But the expected type is: ~s")
+                      )
         (define given (syntax->datum #'ow1.TYPE))
         (define expected (syntax->datum #'ow2.TYPE))
         (raise-syntax-error #f (format $err expected given) ctx)])]
-    [(~or (#f _) (_ #f))
-     (log-fatal (string-append "; "
-                               "~a from ~a is not a proper pair of "
-                               "ownership types because one of theme "
-                               "comes from an untyped term. "
-                               "However, we make the type checking to "
-                               "work for prototyping reasons. ")
-                (syntax->datum this-syntax)
-                (syntax->datum ctx)) #t]
     [_ (error 'т=? "~a from ~a is not a proper pair of ownership types"
               (syntax->datum this-syntax)
               (syntax->datum ctx))]))

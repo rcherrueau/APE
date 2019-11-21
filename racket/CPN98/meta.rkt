@@ -43,7 +43,8 @@
   ;; Transforms ctype-fields to an FS
   (values
    ctype
-   (foldr (λ (v l) (append (mk-fs (car v) (cdr v)) l) ) '() ctype-fields))
+   (foldr (λ (v l) (append (mk-fs (car v) (cdr v)) l) ) '() ctype-fields)
+   (foldr (λ (v l) (append (mk-ds (car v) (cdr v)) l) ) '() ctype-defs))
   )
 
 
@@ -62,12 +63,28 @@
 ;; -> (listof (pairof (syntaxof (pairof name field-name)) field-type-stx))
 (define (mk-fs C-TYPE FIELD...)
   (define mk-fs-item (syntax-parser
-    #:literal-sets [keyword-lits]
-    [(field NAME OWS:ow-scheme)
-     #:with C-TYPE C-TYPE
-     (cons #'(C-TYPE . NAME) #'OWS)]))
+      #:literal-sets [keyword-lits]
+      [(field NAME OWS:ow-scheme)
+       #:with C-TYPE C-TYPE
+       (cons #'(C-TYPE . NAME) #'OWS)]))
 
   (stx-map mk-fs-item FIELD...))
+
+
+;; output:
+;; (Syntaxof
+;;  (List Identifier                     ; Class type
+;;        Identifier                     ; Def name
+;;        (Syntaxof (Listof OW-SCHEME))  ; Type of def args
+;;        ))
+(define (mk-ds C-TYPE DEF...)
+  (define mk-ds-item (syntax-parser
+      #:literal-sets [keyword-lits]
+      [(def (NAME (A-NAME A-OWS:ow-scheme) ...  R-OWS:ow-scheme) BODY)
+       #:with C-TYPE C-TYPE
+       (cons #'(C-TYPE NAME (A-OWS ...)) #'R-OWS)]))
+
+  (stx-map mk-ds-item DEF...))
 
 (define get-name
   (syntax-parser

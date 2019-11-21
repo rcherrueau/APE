@@ -38,8 +38,8 @@
   ;; Desugaring
   (define *prog (∗> prog))
   ;; Meta-information
-  (define-values (CS FS) (M> *prog))
-  (parameterize ([private:CS CS][private:FS FS])
+  (define-values (CS FS DS) (M> *prog))
+  (parameterize ([private:CS CS][private:FS FS][private:DS DS])
     ;; Basic Checks
     (define ?prog (?> *prog))
     ;; Datum
@@ -51,7 +51,7 @@
        (λ (out-str) (pretty-print datum-res out-str))))
 
     ;; Execution
-    #`(module cpn88-lang racket/base
+    #`(module cpn98-lang racket/base
         (time (display #,datum-str))))
   )
 
