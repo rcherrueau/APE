@@ -31,7 +31,13 @@
          syntax/srcloc
          syntax/stx
          "utils.rkt"
-         "definitions.rkt")
+         (rename-in "definitions.rkt"
+                    ;; Overloaded FS and DS definitions to instantiate
+                    ;; ow-scheme into simple type
+                    [FS-member? def/FS-member?]
+                    [FS-ref     def/FS-ref]
+                    [DS-member? def/DS-member?]
+                    [DS-ref     def/DS-ref]))
 
 (provide ?>)
 
@@ -93,9 +99,9 @@
    #:when (stx-map ?> #'(ARG-OW-SCHEME ... RET-OW-SCHEME))
    ;; Check P,{this: τ0, ARG-NAME: ARG-OW-SCHEME, ...} ⊢e E ⇒ ?E : RET-OW-SCHEME
    #:with [?E t-e] (get-τ
-                    (with-Γ #'{(this . (τ0 Θ ()))
-                               (ARG-NAME . ARG-OW-SCHEME)
-                               ...}
+                    (with-Γ #'{ (this     . (τ0 Θ ()))
+                                (???      . RET-OW-SCHEME)
+                                (ARG-NAME . ARG-OW-SCHEME) ... }
                       (?> #'E)))
    #:when (τ=? #'t-e #'RET-OW-SCHEME #:srcloc #'?E)
    ;; ----------------------------------------------------------------
@@ -120,9 +126,8 @@
 
   ;; [var]
   ;; Check ID ∈ dom(Γ)
-  ;;;; ID is locally bound
+  ;;;; ID is locally bound (including `this` and `???`).
   [ID:id #:when (Γ-member? #'ID)
-   ;; #:and (~do (dbg this-syntax))
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e ID ⇒ ID : Γ(ID)
    (add-τ this-syntax (Γ-ref #'ID))]
@@ -137,35 +142,35 @@
   [(get-field ~! E FNAME)
    ;; #:and (~do (dbg this-syntax))
    ;; Check P,Γ ⊢e E ⇒ ?E : ?t
-   #:with [?E t:ow-scheme] (get-τ (?> #'E))
+   #:with [?E t] (get-τ (?> #'E))
    ;; Check (t . FNAME) ∈ dom(FS)
    ;;;; The field FNAME is defined in the class t
-   #:fail-unless (FS-member? #'(t.TYPE . FNAME))
+   #:fail-unless (FS-member? #'(t . FNAME))
    (format "~a is not a field of ~a"
            (syntax->datum #'FNAME)
-           (syntax->datum #'(t.TYPE)))
+           (syntax->datum (ow-scheme->type #'t)))
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e (get-field E FNAME) ⇒
    ;;          (get-field (?E : t) FNAME) : FS(t . FNAME)
-   (add-τ this-syntax (FS-ref #'(t.TYPE . FNAME)))]
+   (add-τ this-syntax (FS-ref #'(t . FNAME)))]
 
 
   ;; [set]
   [(set-field! ~! E FNAME BODY)
    ;; #:and (~do (dbg this-syntax))
    ;; Check P,Γ ⊢e E ⇒ ?E : ?t
-   #:with [?E t:ow-scheme] (get-τ (?> #'E))
+   #:with [?E t] (get-τ (?> #'E))
    ;; Check (t . FNAME) ∈ dom(FS)
    ;;;; The field FNAME is defined in the class t
-   #:fail-unless (FS-member? #'(t.TYPE . FNAME))
+   #:fail-unless (FS-member? #'(t . FNAME))
    (format "~a is not a field of ~a"
            (syntax->datum #'FNAME)
-           (syntax->datum #'(t.TYPE)))
+           (syntax->datum (ow-scheme->type #'t)))
    ;; Check P,Γ ⊢e BODY ⇒ ?BODY : FS(t . FNAME)
    ;;;; The BODY has to elaborate to something that fit into the
    ;;;; field.
    #:with [?BODY t-body] (get-τ (?> #'BODY))
-   #:with t-field (FS-ref #'(t.TYPE . FNAME))
+   #:with t-field (FS-ref #'(t . FNAME))
    #:when (τ=? #'t-body #'t-field)
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e (set-field E FNAME BODY) ⇒
@@ -177,22 +182,21 @@
   [(send ~! E DNAME PARAM ...)
    ;; #:and (~do (dbg this-syntax))
    ;; Check P,Γ ⊢e E ⇒ ?E : t
-   #:with [?E t:ow-scheme] (get-τ (?> #'E))
+   #:with [?E t] (get-τ (?> #'E))
    ;; Check P,Γ ⊢e PARAM ... ⇒ (?PARAM : t) ...
-   #:with [(?PARAM t-param:ow-scheme) ...] (stx-map (∘ get-τ ?>) #'(PARAM ...))
+   #:with [(?PARAM t-param) ...] (stx-map (∘ get-τ ?>) #'(PARAM ...))
    ;; Check (t DNAME (t-param ...)) ∈ dom(DS)
    ;;;; The method DNAME with parameters (t-param ...) is defined in
    ;;;; the class t.
-   #:with DS-key #'(t.TYPE DNAME (t-param ...))
+   #:with DS-key #'(t DNAME (t-param ...))
    #:fail-unless (DS-member? #'DS-key)
    (format "~a with arguments ~a is not a method of ~a"
            (syntax->datum #'DNAME)
-           (syntax->datum #'(t-param.TYPE ...))
-           (syntax->datum #'(t.TYPE)))
-   ;; TODO
-   ;; ;; ----------------------------------------------------------------
-   ;; ;; P,Γ ⊢e (set-field E FNAME BODY) ⇒
-   ;; ;;          (set-field (?E : t) FNAME ?BODY) : FS(t . FNAME)
+           (syntax->datum (stx-map ow-scheme->type #'(t-param ...)))
+           (syntax->datum (ow-scheme->type #'t)))
+   ;; ----------------------------------------------------------------
+   ;; P,Γ ⊢e (send E DNAME PARAM ...) ⇒
+   ;;          (send (?E : t) DNAME ?PARAM ...) : DS(t DNAME PARAM ...)
    (add-τ this-syntax (DS-ref #'DS-key))]
 
 
@@ -202,15 +206,15 @@
    ;; Check P ⊢τ VAR-OW-SCHEME
    #:when (?> #'VAR-OW-SCHEME)
    ;; Check  P,Γ ⊢e E => ?E : VAR-OW-SCHEME
-   #:with [?E t] (get-τ (?> #'E))
+   #:with [?E t] (get-τ (with-Γ (Γ-set #'(??? . VAR-OW-SCHEME))
+                          (?> #'E)))
    #:when (τ=? #'t #'VAR-OW-SCHEME #:srcloc #'?E)
    ;; Check P,Γ{VAR-NAME: VAR-OW-SCHEME} ⊢e BODY => ?BODY : t
-   #:with [_ t-body] (get-τ
-                      (with-Γ (Γ-set #'(VAR-NAME . VAR-OW-SCHEME))
+   #:with [_ t-body] (get-τ (with-Γ (Γ-set #'(VAR-NAME . VAR-OW-SCHEME))
                         (?> #'BODY)))
    ;; ------------------------------------------------------------------
-   ;;   P,Γ ⊢e *let (VAR-NAME VAR-OW-SCHEME E) BODY ⇒
-   ;;             *let (VAR-NAME VAR-OW-SCHEME ?E) ?BODY : t
+   ;; P,Γ ⊢e *let (VAR-NAME VAR-OW-SCHEME E) BODY ⇒
+   ;;           *let (VAR-NAME VAR-OW-SCHEME ?E) ?BODY : t
    (add-τ this-syntax #'t-body)]
 
 
@@ -229,6 +233,9 @@
 
 ;; Environment
 
+;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+;;;; Manage the current class type τ
+
 ;; Store the current class type
 (define τ (make-parameter #f))
 
@@ -241,8 +248,8 @@
   ;; Automatically create the `thunk` around E expression
   [(_ THE-τ E:expr ...) #'(private:with-τ THE-τ (thunk E ...))])
 
-;; ~~~~~~~~~~~~~~~~~~~~
-;; Manage local binding
+;; ~~~~~~~~~~~~~~~~~~~~~~
+;; Manage local binding Γ
 
 ;;
 ;; Map Γ of local bindings.
@@ -255,44 +262,65 @@
 (define-custom-hash-types id-hash
   #:key? identifier?
   bound-id=?)
-(define Γ (make-parameter (make-immutable-id-hash)))
+(define private:Γ (make-parameter (make-immutable-id-hash)))
 
 ;; Is VAR bounded in Γ?
 ;; : VAR -> Boolean
 (define (Γ-member? VAR)
-  (dict-has-key? (Γ) VAR))
+  (dict-has-key? (private:Γ) VAR))
 
 ;; Set TYPE of VAR in Γ
 ;; > (Γ-set #'(VAR . TYPE))
 ;; : #'(VAR . TYPE) -> Boolean
-(define (Γ-set VAR.TYPE)
-  (let* ([VAR-&-TYPE (syntax-e VAR.TYPE)]
+(define (Γ-set VAR.TYPE [the-Γ #f])
+  (let* ([the-Γ (if the-Γ the-Γ (private:Γ))]
+         [VAR-&-TYPE (syntax-e VAR.TYPE)]
          [VAR (car VAR-&-TYPE)]
          [TYPE (cdr VAR-&-TYPE)])
-    (dict-set (Γ) VAR TYPE)))
+    (dict-set the-Γ VAR TYPE)))
+
+(define (Γ-set* VAR.TYPEs)
+  (foldr Γ-set (private:Γ) (syntax->list VAR.TYPEs)))
 
 ;; Returns the TYPE of VAR in Γ
 ;; : VAR -> TYPE
 (define (Γ-ref VAR)
-  (dict-ref (Γ) VAR))
+  (dict-ref (private:Γ) VAR))
 
-;; Make `the-Γ` a new value for (Γ) parameter by mapping it into a
+;; Make `the-Γ` a new value for Γ parameter by mapping it into a
 ;; (Hash (Var . TYPE)) in the context of STX.
 ;; : (U (Id-Hash (VAR . TYPE)) ((VAR . TYPE) ...) (-> STX) -> STX
 (define (private:with-Γ the-Γ thunk-E)
   (parameterize
-    ([Γ (cond
+    ([private:Γ (cond
           [(immutable-id-hash? the-Γ) the-Γ]
           [(and (syntax? the-Γ) (stx->list the-Γ))
            => (∘ make-immutable-id-hash (curry map syntax-e))]
           [else (raise-argument-error
                  'with-Γ "(or/c syntax? immutable-id-hash?)" the-Γ)])])
-    ;; (dbg (dict->list (Γ)))
+    ;; (dbg (dict->list (private:Γ)))
     (thunk-E)))
 
 (define-syntax-parser with-Γ
   ;; Automatically create the `thunk` around E expression
   [(_ THE-Γ E:expr ...) #'(private:with-Γ THE-Γ (thunk E ...))])
+
+
+;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+;; Access fields FS and defs DS info
+
+;; Lift FS, DS to works.
+;;
+;; In DS, use the `type=?` relation to compare ow-schemes: Compare two
+;; ow-scheme, but does not instantiate the owner and context
+;; parameters. So it only ensures that both basic types are bound and
+;; both contains the same number of context parameters.
+(define FS-member? (curry lift/ow-scheme->type def/FS-member?))
+(define FS-ref     (curry lift/ow-scheme->type def/FS-ref))
+(define DS-member? (curry lift/ow-scheme->type
+                          (curry def/DS-member? type=?)))
+(define DS-ref     (curry lift/ow-scheme->type
+                          (curry def/DS-ref type=?)))
 
 
 ;; Exceptions
@@ -318,27 +346,28 @@
           (list (syntax-taint ID)))))
 
 ;;;; Type mismatch
-;; (struct exn:type-mismatch exn:fail:syntax ()
-;;   #:extra-constructor-name make-exn:type-mismatch
-;;   #:transparent)
-;;
-;; (define (raise-type-mismatch ID IDs)
-;;   (define srcloc-msg (srcloc->string (build-source-location ID)))
-;;   (define id (format "~s" (syntax->datum ID)))
-;;   (define err-msg "multiple declaration")
-;;   (define previous-ID (findf (curry bound-identifier=? ID) IDs))
-;;   (define previous-ID-msg (format "~n  previously seen at line ~a:~a"
-;;                                   (syntax-line previous-ID)
-;;                                   (syntax-column previous-ID)))
-;;
-;;   (raise (make-exn:name-clash
-;;           (string-append srcloc-msg ": " id ": " err-msg
-;;                          previous-ID-msg)
-;;           (current-continuation-marks)
-;;           (list (syntax-taint ID)))))
+(struct exn:type-mismatch exn:fail:syntax ()
+  #:extra-constructor-name make-exn:type-mismatch
+  #:transparent)
+
+(define (raise-type-mismatch ID IDs)
+  (define srcloc-msg (srcloc->string (build-source-location ID)))
+  (define id (format "~s" (syntax->datum ID)))
+  (define err-msg "multiple declaration")
+  (define previous-ID (findf (curry bound-identifier=? ID) IDs))
+  (define previous-ID-msg (format "~n  previously seen at line ~a:~a"
+                                  (syntax-line previous-ID)
+                                  (syntax-column previous-ID)))
+
+  (raise (make-exn:name-clash
+          (string-append srcloc-msg ": " id ": " err-msg
+                         previous-ID-msg)
+          (current-continuation-marks)
+          (list (syntax-taint ID)))))
 
 
 ;; Utils
+
 (define (get-τ stx)
   #`(#,stx #,(type-prop stx)))
 
@@ -382,37 +411,36 @@
     ;; Everything is fine
     [else #t]))
 
-;; Returns (type-prop E) if (type-prop E) has type TYPE, raise a
-;; syntax error otherwise
-(define (check-⊢e E TYPE)
-  (define expected-type (syntax->datum TYPE))
-  (define e-type (syntax->datum (type-prop E)))
+;; Instantiate a ow-scheme into a type of [FKF98]
+(define ow-scheme->type (syntax-parser [ow:ow-scheme #'ow.TYPE]))
 
-  (cond
-    [(eq? expected-type e-type) (type-prop E)]
-    [else
-     (define $err "type mismatch;~n  expected: ~s~n  given: ~s")
-     (raise-syntax-error #f (format $err expected-type e-type) E)]))
+;; Project the first ow-scheme to get the class type in FS, DS.
+(define (lift/ow-scheme->type f stx)
+  (syntax-parse (dbg stx)
+    ;; DS-key
+    [(ow:ow-scheme d-name params)
+     #:with t #'ow.TYPE
+     (f #'(t d-name params))]
+    ;; FS-key
+    [(ow:ow-scheme . f-name)
+     #:with t #'ow.TYPE
+     (f #'(t . f-name))]
+    ))
 
-;; Extracts from an OW-SCHEME a SIMPLE-TYPE
-(define ow-type->simple-type (syntax-parser [(_ t _) #'t]))
+;; ;; Returns (type-prop E) if (type-prop E) has type TYPE, raise a
+;; ;; syntax error otherwise
+;; (define (check-⊢e E TYPE)
+;;   (define expected-type (syntax->datum TYPE))
+;;   (define e-type (syntax->datum (type-prop E)))
 
-
-;; Bibliography
-;;
-;; @InProceedings{FKF98,
-;;   author =       {Matthew Flatt and Shriram Krishnamurthi and Matthias
-;;                   Felleisen},
-;;   title =        {Classes and Mixins},
-;;   booktitle =    {{POPL} '98, Proceedings of the 25th {ACM}
-;;                   {SIGPLAN-SIGACT} Symposium on Principles of
-;;                   Programming Languages, San Diego, CA, USA, January
-;;                   19-21, 1998},
-;;   year =         1998,
-;;   pages =        {171--183},
-;;   doi =          {10.1145/268946.268961},
-;;   url =          {https://doi.org/10.1145/268946.268961},
-;; }
+;;   (cond
+;;     [(eq? expected-type e-type) (type-prop E)]
+;;     [else
+;;      (define $err "type mismatch;~n  expected: ~s~n  given: ~s")
+;;      (raise-syntax-error #f (format $err expected-type e-type) E)]))
+
+;; ;; Extracts from an OW-SCHEME a SIMPLE-TYPE
+;; (define ow-type->simple-type (syntax-parser [(_ t _) #'t]))
 
 
 ;; Tests
@@ -594,3 +622,20 @@
   ;; ensures that all identifiers are binded with a let
 
   )
+
+
+;; Bibliography
+;;
+;; @InProceedings{FKF98,
+;;   author =       {Matthew Flatt and Shriram Krishnamurthi and Matthias
+;;                   Felleisen},
+;;   title =        {Classes and Mixins},
+;;   booktitle =    {{POPL} '98, Proceedings of the 25th {ACM}
+;;                   {SIGPLAN-SIGACT} Symposium on Principles of
+;;                   Programming Languages, San Diego, CA, USA, January
+;;                   19-21, 1998},
+;;   year =         1998,
+;;   pages =        {171--183},
+;;   doi =          {10.1145/268946.268961},
+;;   url =          {https://doi.org/10.1145/268946.268961},
+;; }

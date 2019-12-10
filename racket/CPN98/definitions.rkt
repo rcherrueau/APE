@@ -8,19 +8,10 @@
 ;; Common definitions for parsers of the lang.
 
 (require (for-syntax racket/base)
-         ;; racket/dict
          racket/function
          racket/list
          racket/match
          syntax/parse
-         ;; syntax/srcloc
-         ;; syntax/parse/define
-         ;; dbg macro.
-         ;; TODO: remove this
-         ;; (for-syntax racket/base
-         ;;             racket/pretty
-         ;;             racket/port)
-         ;; END TODO
          typed/racket/unsafe
          "_definitions.rkt"
          )
@@ -76,7 +67,7 @@
 
 (define-literal-set expr-lits
   #:for-label
-  #:datum-literals (let new send get-field set-field! ???)
+  #:datum-literals (let new send get-field set-field! this ???)
   ())
 
 (define-type OW-SCHEME   (Syntaxof
@@ -90,24 +81,38 @@
 ;; > (ow-scheme? #'(a 1 []))       ; #f
 (define-predicate ow-scheme? OW-SCHEME)
 
+;; Compare two ow-scheme, but does not instantiate the owner and
+;; context parameters. So it only ensures that both basic types are
+;; bound and both contains the same number of context parameters.
+;;
+;; > (type=? #'(a b ()) #'(a b ()))            ; #t
+;; > (type=? #'(a b [c d e]) #'(a b [c d e]))  ; #t
+;; > (type=? #'(a b [c d e]) #'(a b [e d c]))  ; #t
+;; > (type=? #'(a b [c d e]) #'(a z [c d e]))  ; #t
+;; > (type=? #'(a b ()) #'(c b ()))            ; #f
+(: type=? (OW-SCHEME OW-SCHEME -> Boolean))
+(define (type=? ow1 ow2)
+  (match-let ([(list TYPE1 OWNER1 CPARAMS1) (syntax-e ow1)]
+              [(list TYPE2 OWNER2 CPARAMS2) (syntax-e ow2)])
+    (and (bound-id=? TYPE1 TYPE2)
+         (eq? (length (syntax->list CPARAMS1))
+              (length (syntax->list CPARAMS2)))
+         )))
+
 ;; > (ow-scheme-eq? #'(a b ()) #'(a b ()))            ; #t
 ;; > (ow-scheme-eq? #'(a b [c d e]) #'(a b [c d e]))  ; #t
-;; > (ow-scheme-eq? #'(a b ()) #'(c b ()))            ; #f
 ;; > (ow-scheme-eq? #'(a b [c d e]) #'(a b [e d c]))  ; #f
+;; > (ow-scheme-eq? #'(a b [c d e]) #'(a z [c d e]))  ; #f
+;; > (ow-scheme-eq? #'(a b ()) #'(c b ()))            ; #f
 (: ow-scheme-eq? (OW-SCHEME OW-SCHEME -> Boolean))
 (define (ow-scheme-eq? ow1 ow2)
   (match-let ([(list TYPE1 OWNER1 CPARAMS1) (syntax-e ow1)]
               [(list TYPE2 OWNER2 CPARAMS2) (syntax-e ow2)])
     (and (bound-id=? TYPE1 TYPE2)
-         ;; FIXME: I have to instantiate the scheme to know if they
-         ;; are eq?
-         #;(bound-id=? OWNER1 OWNER2)
-         #;(for/and ([id1 (syntax->list CPARAMS1)]
+         (bound-id=? OWNER1 OWNER2)
+         (for/and ([id1 (syntax->list CPARAMS1)]
                    [id2 (syntax->list CPARAMS2)])
-             (bound-id=? id1 id2))
-         (eq? (length (syntax->list CPARAMS1))
-              (length (syntax->list CPARAMS2)))
-         )))
+           (bound-id=? id1 id2)))))
 
 ;; ;; (ids-eq? #'(a b c d) #'(a b c d))
 ;; ;; > #t
@@ -299,12 +304,13 @@
 (: private:DS (Parameterof DS))
 (define private:DS (make-parameter '()))
 
+;; (define (ow-scheme=?))
 ;; (ds-key=? #'(a b ()) #'(a b ()))                  ; #t
 ;; (ds-key=? #'(a b [(c d ())]) #'(a b [(c d ())]))  ; #t
 ;; (ds-key=? #'(a b ()) #'(c d ()))                  ; #f
 ;; (ds-key=? #'(a b [(c d ())]) #'(a b [(d c ())]))  ; #f
-(: ds-key=? (DS-key DS-key -> Boolean))
-(define (ds-key=? key1-stx key2-stx)
+(: ds-key=? ((OW-SCHEME OW-SCHEME -> Boolean) DS-key DS-key -> Boolean))
+(define (ds-key=? ow-scheme=? key1-stx key2-stx)
   (match-let ([(list C-TYPE1 D-NAME1 ARGs-OW-SCHEME1) (syntax-e key1-stx)]
               [(list C-TYPE2 D-NAME2 ARGs-OW-SCHEME2) (syntax-e key2-stx)])
     (and
@@ -312,19 +318,19 @@
      (bound-id=? D-NAME1 D-NAME2)
      (for/and ([ow1 (syntax->list ARGs-OW-SCHEME1)]
                [ow2 (syntax->list ARGs-OW-SCHEME2)])
-       (ow-scheme-eq? ow1 ow2)))))
+       (ow-scheme=? ow1 ow2)))))
 
-(: DS-member? (DS-key -> Boolean))
-(define (DS-member? ds-key)
-  (map-has-key? (private:DS) ds-key ds-key=?))
+(: DS-member? ((OW-SCHEME OW-SCHEME -> Boolean) DS-key  -> Boolean))
+(define (DS-member? ow-scheme=? ds-key)
+  (map-has-key? (private:DS) ds-key (curry ds-key=? ow-scheme=?)))
 
-(: DS-set (DS-key OW-SCHEME -> DS))
-(define (DS-set ds-key OW-SCHEME)
-  (map-set (private:DS) ds-key OW-SCHEME ds-key=?))
+(: DS-set ((OW-SCHEME OW-SCHEME -> Boolean) DS-key OW-SCHEME -> DS))
+(define (DS-set ow-scheme=? ds-key OW-SCHEME)
+  (map-set (private:DS) ds-key OW-SCHEME (curry ds-key=? ow-scheme=?)))
 
-(: DS-ref (DS-key -> OW-SCHEME))
-(define (DS-ref ds-key)
-  (map-ref (private:DS) ds-key ds-key=?))
+(: DS-ref ((OW-SCHEME OW-SCHEME -> Boolean) DS-key -> OW-SCHEME))
+(define (DS-ref ow-scheme=? ds-key)
+  (map-ref (private:DS) ds-key (curry ds-key=? ow-scheme=?)))
 
 
 ;; Utils

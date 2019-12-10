@@ -50,7 +50,7 @@
   ;; ∗>  (prog *CLASS ... *E)
   ;;
   ;; Note: The `~!` eliminate backtracking. Hence, if the next
-  ;; `fail-when` failed, it will not backtrack and try other cases.
+  ;; `fail-when` failed, it will not backtrack to try other cases.
   [(prog ~! CLASS:expr ... E:expr)
    ;; #:and (~do (dbg this-syntax))
    #:with [*CLASS ...] (stx-map ∗> #'(CLASS ...))
@@ -171,6 +171,9 @@
   ;;   keyword in the case we are in the context of a def.
   [ID:id #:when (Γ-member? #'ID)
    ;; #:and (~do (dbg this-syntax))
+   this-syntax]
+  ;; - The debug placeholder ???
+  [???
    this-syntax]
   ;; - A class level binding (no binder). In that case, it presumably
   ;;   refers to a field of the current class: A sort of shortcut for
@@ -358,45 +361,58 @@
 
 (define-literal-set type-lits
   ;; Don't consider :, →, and / as patterns
-  #:datum-literals (: → /)
+  #:datum-literals (: →)
   ())
 
 (define-syntax-class type
-  #:description "a ownership type: owner/type or (owner/type ctx params ...)"
+  #:description (string-append
+                 "a ownership type: one of the form "
+                 "`owner/type`, "
+                 "`(owner/type param ...)`, "
+                 "`type`, or "
+                 "`(type param ...)` with owner implicitly "
+                 "bound to `world` in the last two forms."
+                 )
   #:literal-sets [type-lits]
   #:attributes [TYPE OWNER CPARAMS]
+  ;; owner/type
   (pattern T:id #:when (is-stx-owner/type? #'T)
            #:with [OWNER . TYPE] (owner/type->OWNER.TYPE #'T)
            #:with CPARAMS #'())
+  ;; (owner/type ctx params ...)
   (pattern (T:id PARAMS:id ...+)
            #:when (is-stx-owner/type? #'T)
            #:with [OWNER . TYPE] (owner/type->OWNER.TYPE #'T)
            #:with CPARAMS #'(PARAMS ...))
-  ;; legacy
-  (pattern (O:id / T:id)
-           #:with OWNER #'O
+  ;; type -- owner is implicitly world
+  (pattern T:id
+           #:with OWNER #'world
            #:with TYPE #'T
            #:with CPARAMS #'())
-  (pattern (O:id / (T:id PARAMS:id ...+))
-           #:with OWNER #'O
+  ;; (type ctx params ...) -- owner is implicitly world
+  (pattern (T:id PARAMS:id ...+)
+           #:with OWNER #'world
            #:with TYPE #'T
            #:with CPARAMS #'(PARAMS ...))
   )
 
 ;; (is-stx-owner/type? #'owner/type)   ; #t
+;; (is-stx-owner/type? #'owner/t/ype)  ; #t
 ;; (is-stx-owner/type? #'ownertype)    ; #f
-;; (is-stx-owner/type? #'owner/t/ype)  ; #f
 (define (is-stx-owner/type? stx)
   (and (identifier? stx)
-       (string-contains-once? (symbol->string (syntax-e stx)) #\/)))
+       (string-contains? (symbol->string (syntax-e stx)) "/")))
 
 ;; (owner/type->OWNER.TYPE #'owner/type)  ; #'(owner . type)
+;; (owner/type->OWNER.TYPE #'owner/ty/pe) ; #'(owner . ty/pe)
 (define (owner/type->OWNER.TYPE stx)
-  (match-define (list owner-str type-str)
+  (match-define (list owner-str type-str ...)
     (string-split (symbol->string (syntax-e stx)) "/"))
 
-  (let ([OWNER (format-id stx "~a" owner-str #:source stx)]
-        [TYPE  (format-id stx "~a" type-str #:source stx)])
+  (let ([OWNER (format-id stx #:source stx
+                          "~a" owner-str)]
+        [TYPE  (format-id stx #:source stx
+                          "~a" (string-join type-str "/"))])
     #`(#,OWNER . #,TYPE)))
 
 (define-syntax-class arg

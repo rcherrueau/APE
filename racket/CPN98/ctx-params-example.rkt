@@ -8,24 +8,24 @@
 
 (class Pair [m n]
   (field [fst : m/X])
-  (field [snd : (n / Y)])
+  (field [snd : n/Y])
   )
 
 
 (class Intermediate
   ;; Check wrong owner/type stx
   ;; (field [p1 : rep/(Pair rep world)])
-  (field [p1 : (rep / (Pair rep world))])
-  (field [p2 : (world/Pair rep world)])
+  (field [p1 : (rep/Pair rep world)])
+  (field [p2 : (Pair rep world)])
 
-  (def (a → [rep   / (Pair rep world)])
+  (def (a → [rep/Pair rep world])
     (get-field this p1))
 
-  (def (b → [world / (Pair rep world)])
+  (def (b → [world/Pair rep world])
     p2)
 
   ;; Check duplicated field
-  ;; (field [p1 : (rep   / (Pair rep world))])
+  (field [p1 : (rep/Pair rep world)])
 
   ;; ;; Check duplicated def
   ;; (def (b → [world / (Pair rep world)]) void)
@@ -37,7 +37,7 @@
   (def (x → rep/X)
     (get-field p1 fst))
 
-  (def (y → world/Y)
+  (def (y → Y)
     (get-field (get-field this p2) snd))
 
   (def (updateX → rep/X)
@@ -53,7 +53,7 @@
 
   (def (get-engine2 [e : rep/Engine]
                     [b : (rep/X a c)]
-                    → rep/X)
+                    → rep/Engine)
     e)
 
   ;; Check: type mismatch get-field
@@ -61,19 +61,24 @@
   ;;                      [b : (rep / (X a c))]
   ;;                      → [rep / Engine])
   ;;   (get-field this p1))
+
+  (def (get-engine3 [e : rep/Engine]
+                    [b : (rep/X a c)]
+                    → rep/Engine)
+    ???)
   )
 
 (class Main []
-  (field [safe : world/Intermediate])
+  (field [safe : Intermediate])
 
   (def (main → rep/Y)
-    (let ([a : (rep   / (Pair rep world))  (send safe a)]
-          [b : (world / (Pair rep world))  (send safe b)]
-          [x : rep/X                       (send safe x)])
+    (let ([a : (rep/Pair rep world)  (send safe a)]
+          [b : (Pair rep world)      (send safe b)]
+          [x : rep/X                 (send safe x)])
       (send safe y a b x))))
 
 ;; (send (new Main) main)
-(let ([main : world/Main (new world/Main)])
+(let ([main : Main (new Main)])
   (send main main)
   )
 
