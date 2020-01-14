@@ -3,6 +3,8 @@
 (require (for-syntax racket/base
                      racket/pretty
                      racket/port
+                     racket/string
+                     racket/syntax
                      syntax/srcloc)
          racket/dict
          racket/exn
@@ -47,11 +49,39 @@
 
   (values (2-tuple-fst unzip-l) (2-tuple-snd unzip-l)))
 
-;; (string-contains-once? "lala+lala"  #\+)   ; #t
+;; (string-contains-once? "lala+lala"  #\+)  ; #t
 ;; (string-contains-once? "lala+lala+" #\+)  ; #f
 (: string-contains-once? (String Char -> Boolean))
 (define (string-contains-once? str contained)
   (eq? (length (indexes-of (string->list str) contained)) 1))
+
+;; Syntax to string
+(define (stx->string stx #:newline? [newline? #t])
+  (call-with-output-string
+   (λ (out-str)
+     (pretty-print (syntax->datum stx)
+                   out-str
+                   #:newline? newline?))))
+
+;; Extract the name of a syntax expression.
+;;
+;; (extract-exp-name #'foo)               ; 'foo
+;; (extract-exp-name #'(foo bar))         ; 'foo
+;; (extract-exp-name #'(foo [bar baz]))   ; 'foo
+;;
+;; From https://github.com/racket/racket/blob/738d2b7a81aad981a03884d27a7d0429940eccaf/racket/src/expander/syntax/error.rkt#L105-L115
+(: extract-exp-name ((All a) (Syntaxof a) -> (U Identifier #f)))
+(define (extract-exp-name stx)
+  (cond
+    [(syntax? stx)
+     (define e (syntax-e stx))
+     (cond
+       [(symbol? e) e]
+       [(and (pair? e)
+             (identifier? (car e)))
+        (syntax-e (car e))]
+       [else #f])]
+    [else #f]))
 
 ;; (syntax-property-symbol-keys
 ;;   (syntax-property* #'() 'p1 'v1 'p2 'v2 'p3 'v3))
@@ -65,61 +95,6 @@
   [(_ stx key val kvs ...)
    #'(syntax-property (syntax-property* stx kvs ...) key val)])
 
-
-;; put `foo in local-bindings
-;; (+<binder #'foo (*d #'BODY))
-;; ;; Expand to:
-;; ;; (let* ([arg-name-stxs (syntax-parse #'(ARG ...)
-;; ;;                         [(A:arg ...) (syntax->list #'(A.NAME ...))])]
-;; ;;        [arg-names (map syntax->datum arg-name-stxs)]
-;; ;;        [arg-stxs (syntax->list #'(ARG ...))]
-;; ;;        [binders (interleave arg-names arg-stxs)]
-;; ;;        [new-bindings (apply hash-set* (local-bindings) binders)])
-;; ;;  (parameterize ([local-bindings new-bindings]) (*d #'BODY))))
-;; (define-syntax-parser binder>
-;;   [(_ BINDERS BODY)
-;;    ;; `bindings` Dynamic scoping for local-bindings
-;;    ;; TODO: use syntax-parameter
-;;    #:with bindings (datum->syntax #'BINDERS 'local-bindings)
-;;    #'(let* ([binder-stxs  ;; Put the BINDERS in a list
-;;              ;; BINDERS could be a list of id, such as in def:
-;;              ;;   (+<bind #'(ARG ...))
-;;              ;; Or a simple id, such as in let:
-;;              ;;   (+<bind #'ARG)
-;;              ;; The `syntax->list' returns #f is the second case.
-;;              (match (syntax->list BINDERS) [#f (list BINDERS)] [bs bs])]
-;;             [binder-name-stxs (map get-arg-name binder-stxs)]
-;;             [binder-names (map syntax->datum binder-name-stxs)]
-;;             [binders (interleave binder-names binder-stxs)]
-;;             [new-bindings (apply hash-set* (bindings) binders)])
-;;        (parameterize ([bindings new-bindings]) BODY))])
-
-;; (define (bind binding-table binder body)
-;;    ;; Dynamic scoping for local-binding-table
-;;    ;; #:with binding-table (datum->syntax #'BINDER 'local-binding)
-;;    ;; Put BINDER in the local binding table and parameterize the BODY
-;;    ;; with the new local-binding-table
-;;   (let* ([binder-name  (syntax->datum binder)]
-;;          [new-binding-table (hash-set (binding-table) binder-name binder)])
-;;     (parameterize ([binding-table new-binding-table]) (body))))
-
-;; (define (bind* name binders body)
-;;   (match binders
-;;     ['(x) (bind x (body))])
-
-;;   (writeln name)
-;;   (writeln binders)
-;;   (body)
-
-;;   )
-  ;; [(_ (BINDER) BODY)
-  ;;  #'(bind BINDER BODY)]
-  ;; [(_ (B1 BS ...) BODY)
-  ;;  (writeln #'B1)
-  ;;  (writeln #'(BS ...))
-  ;;  #'(bind (B1) (bind* (BS ...) BODY))
-  ;;  ])
-
 ;; ;; (interleave '(1 2 3) '(a b c))
 ;; (define (interleave xs ys)
 ;;   (match (list xs ys)
@@ -127,10 +102,61 @@
 ;;     [else '()])
 ;;   )
 
-(define-simple-macro (define-parser ID:id RHS ...)
-  (define ID (syntax-parser RHS ...)))
+(define-syntax (set-box!-values stx)
+  (syntax-parse stx
+    [(_ (ID:id ...) E:expr)
+     #:with [vID ...] (generate-temporaries #'(ID ...))
+     #'(let-values ([(vID ...) E])
+         (set-box! ID vID) ...
+         )]))
 
 
+;; Macro for a new transformation
+;;
+;; > (define-parser ?>
+;; >   #:literal-sets [keyword-lits expr-lits]
+;; >
+;; >   ;; Environment variables
+;; >   #:CS '(...)
+;; >   #:FS '(...)
+;; >   #:DS '(...)
+;; >
+;; >   ;; Clauses ...
+;; >   [(class NAME FIELD/DEF ...) #'(...)] ...)
+(define-syntax (define-parser parser-stx)
+  ;; Strip the `#:` from a (Syntaxof Keyword)
+  (define (strip#: KEYWORD)
+    (define keyword (keyword->string (syntax-e KEYWORD)))
+    (datum->syntax KEYWORD (string->symbol keyword)))
+
+  ;; Make the parser
+  (syntax-parse parser-stx
+    [(_ ID:id                          ;; Parser name (e.g., `?>`)
+        #:literal-sets ls              ;; Literals
+        (~seq K:keyword Env:expr) ...  ;; Environment variables
+        CLAUSE ...+)                   ;; Clauses of the transfo
+     #:with [def-K ...] (map strip#: (syntax->list #'(K ...)))
+     #:with PARSER-ID         (generate-temporary)
+     #'(begin
+         ;; Define environment variables as global parameter
+         (define def-K (make-parameter #f)) ...
+         (define topCall (make-parameter #t))
+
+         ;; Define parser as an internal def
+         (define PARSER-ID
+           (syntax-parser
+             #:literal-sets ls
+             CLAUSE ...))
+
+         ;; Define the parser as a global definition
+         (define (ID stx)
+
+           ;; Parameterize the parser call with `Env` values at the
+           ;; top Call (not recursive ones)
+           (if (topCall)
+               (parameterize ([def-K Env] ... [topCall #f]) (PARSER-ID stx))
+               (PARSER-ID stx))))]))
+
 ;; Returns `#t` if the syntax object is a field.
 ;; field? : Syntax -> Boolean
 (define field?
@@ -147,6 +173,7 @@
     [(def _ ...) #t]
     [_ #f]))
 
+
 ;; From https://github.com/LiberalArtist/adjutor/blob/9d1bb66d2cb4751c72d8a8da4f11b982b282128c/kernel.rkt#L68
 (define-syntax values->list
   (syntax-parser
@@ -162,7 +189,6 @@
   (define (vs->ls v ls)
     (map (λ (a b) (cons a b)) v ls))
   (foldr vs->ls (build-list (length (car vs)) (const '())) vs))
-
 
 #;(define-custom-hash-types priv:idid-map
   #:key? (λ ([K : Idid])
@@ -194,7 +220,16 @@
 (define-simple-check (check-stx=? stx1 stx2)
   (equal? (syntax->datum stx1) (syntax->datum stx2)))
 
+;; Equivalent to (for/and ([i (syntax->list STXL)]) BODY ...).
+(define-syntax (stx-for/and stx)
+  (syntax-case stx ()
+    [(_ ([FOR-CLAUSE-ID FOR-CLAUSE-STXL] ...) BODY ...)
+     #'(for/and ([FOR-CLAUSE-ID (syntax->list FOR-CLAUSE-STXL)] ...)
+         BODY ...)]))
+
 
+
+
 ;; (dbg (+ 1 2))
 ;; > ; [dbg] utils.rkt:149:5: '(+ 1 2) = 3
 ;; > 3
@@ -203,11 +238,16 @@
     [(_ E)
      #`(let
            ([srcloc #,(srcloc->string (build-source-location #'E))]
-            [datum  #,(call-with-output-string
-                       (λ (out-str) (pretty-print (syntax->datum #'E)
-                                                  out-str
-                                                  #:newline? #f)))]
+            [datum  #,(stx->string #'E)]
             [res         E]
             [$dbg-msg    "; [dbg] ~a: ~a = ~s"])
          (log-fatal $dbg-msg srcloc datum res)
          res)]))
+
+
+(define-for-syntax (stx->string stx)
+  (call-with-output-string
+   (λ (out-str)
+     (pretty-print (syntax->datum stx)
+                   out-str
+                   #:newline? #f))))

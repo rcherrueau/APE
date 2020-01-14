@@ -14,11 +14,11 @@
 ;;   this field).
 ;; - Expand types to ownership schemes.
 ;;
-;; Naming conventions:
-;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
-;;
 ;; Environment:
 ;; - Γ is the set of locally bounded variables
+;;
+;; Naming conventions:
+;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
 
 (require (for-syntax racket/base)
          racket/contract/base
@@ -27,8 +27,6 @@
          racket/match
          racket/string
          racket/syntax
-         ;; racket/set
-         ;; syntax/id-set
          syntax/parse
          syntax/parse/define
          syntax/quote
@@ -40,9 +38,20 @@
 (provide ∗>)
 
 
-;; ∗> :: stx -> stx
+;; Transformation (∗>)
+
 (define-parser ∗>
   #:literal-sets [keyword-lits expr-lits type-lits]
+
+  ;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ;;;; Environment declaration and first init
+
+  ;; Set of local bindings.
+  ;; (: Γ (Listof Identifier))
+  #:Γ '()
+
+  ;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ;;;; Clauses
 
   ;; A prog is a list of CLASS and one expression E.
   ;;
@@ -52,9 +61,9 @@
   ;; Note: The `~!` eliminate backtracking. Hence, if the next
   ;; `fail-when` failed, it will not backtrack to try other cases.
   [(prog ~! CLASS:expr ... E:expr)
-   ;; #:and (~do (dbg this-syntax))
    #:with [*CLASS ...] (stx-map ∗> #'(CLASS ...))
    #:with *E           (∗> #'E)
+   ;; #this-loc'(prog *CLASS ... *E)]
    (stx/this-loc (prog *CLASS ... *E))]
 
   ;; A class is a NAME, an optional list of context parameters
@@ -63,12 +72,10 @@
   ;; (class NAME (CPARAM ...)? FIELD ... DEF ...)
   ;; ∗>  (class NAME (CPARAM ...) *FIELD ... *DEF ...)
   [(class NAME:id [CPARAM:id ...] ~! FIELD/DEF:expr ...)
-   ;; #:and (~do (dbg this-syntax))
    #:with [*FIELD/DEF ...] (stx-map ∗> #'(FIELD/DEF ...))
    (stx/this-loc (class NAME [CPARAM ...] *FIELD/DEF ...))]
   ;; Transforms a `class` without `CPARAM ...` into a `class` with.
   [(class ~! NAME FIELD/DEF ...)
-   ;; #:and (~do (dbg this-syntax))
    (∗> (stx/this-loc (class NAME [] FIELD/DEF ...)))]
 
   ;; A field declares one argument ARG (i.e., no initialization).
@@ -78,7 +85,6 @@
   ;; with
   ;;     OW-SCHEME := (ow-scheme TYPE OWNER CPARAMS)
   [(field ~! ARG:arg)
-   ;; #:and (~do (dbg this-syntax))
    #:with NAME      #'ARG.NAME
    #:with OW-SCHEME (type∗>ow-scheme #'ARG.T)
    (stx/this-loc (field NAME OW-SCHEME))]
@@ -93,7 +99,6 @@
   ;; with
   ;;     α-OW-SCHEME := (ow-scheme α-TYPE α-OWNER α-CPARAMS)
   [(def ~! (NAME:id ARG:arg ... → RET:type) BODY:expr)
-   ;; #:and (~do (dbg this-syntax))
    #:with [A-NAME ...]      #'(ARG.NAME ...)
    #:with [A-OW-SCHEME ...] (stx-map type∗>ow-scheme #'(ARG.T ...))
    #:with RET-OW-SCHEME     (type∗>ow-scheme #'RET)
@@ -109,7 +114,6 @@
   ;; with
   ;;     OW-SCHEME := (ow-scheme TYPE OWNER CPARAMS)
   [(let ([VAR:id : T:type E:expr]) ~! BODY:expr)
-   ;; #:and (~do (dbg this-syntax))
    #:with OW-SCHEME (type∗>ow-scheme #'T)
    #:with *E        (∗> #'E)
    #:with *BODY     (with-Γ (Γ-add #'VAR) (∗> #'BODY))
@@ -127,7 +131,6 @@
   ;; with
   ;;     OW-SCHEME := (ow-scheme TYPE OWNER CPARAMS)
   [(new ~! C-TYPE:type)
-   ;; #:and (~do (dbg this-syntax))
    #:with OW-SCHEME (type∗>ow-scheme #'C-TYPE)
    (stx/this-loc (new OW-SCHEME))]
 
@@ -137,7 +140,6 @@
   ;; (get-field E FNAME)
   ;; ∗>  (get-field *E FNAME)
   [(get-field ~! E:expr FNAME:id)
-   ;; #:and (~do (dbg this-syntax))
    #:with *E (∗> #'E)
    (stx/this-loc (get-field *E FNAME))]
 
@@ -148,7 +150,6 @@
   ;; (set-field! E FNAME BODY)
   ;; ∗>  (set-field! *E FNAME *BODY)
   [(set-field! ~! E:expr FNAME:id BODY:expr)
-   ;; #:and (~do (dbg this-syntax))
    #:with *E    (∗> #'E)
    #:with *BODY (∗> #'BODY)
    (stx/this-loc (set-field! *E FNAME *BODY))]
@@ -160,58 +161,50 @@
   ;; (send E DNAME E-ARG ...)
   ;; ∗>  (send *E DNAME *E-ARG)
   [(send ~! E:expr DNAME:id E-ARG:expr ...)
-   ;; #:and (~do (dbg this-syntax))
    #:with *E           (∗> #'E)
    #:with [*E-ARG ...] (stx-map ∗> #'(E-ARG ...))
    (stx/this-loc (send *E DNAME *E-ARG ...))]
 
   ;; An identifier is either:
   ;;
-  ;; - A local binding (from a def or let). It include the `this`
-  ;;   keyword in the case we are in the context of a def.
+  ;;;; A local binding (from a def or let). It include the `this`
+  ;;;;  keyword in the case we are in the context of a def.
   [ID:id #:when (Γ-member? #'ID)
-   ;; #:and (~do (dbg this-syntax))
    this-syntax]
-  ;; - The debug placeholder ???
+  ;;;; The debug placeholder ???
   [???
    this-syntax]
-  ;; - A class level binding (no binder). In that case, it presumably
-  ;;   refers to a field of the current class: A sort of shortcut for
-  ;;   (get-field this id) -- i.e., `id` instead of `this.id` in Java
-  ;;   world. E.g.,
-  ;;
-  ;;   1 (class C
-  ;;   2   (field [id : A])
-  ;;   3   (def (get-id → A) id))
-  ;;
-  ;;   With line 3, a shortcut for
-  ;;   > (def (get-id → A) (get-field this id))
-  ;;
-  ;;   We remove it, so the desugared syntax contains no class level
-  ;;   binding.
-  ;;   ID ∗> *(get-field this ID)
+  ;;;; A class level binding (no binder). In that case, it presumably
+  ;;;; refers to a field of the current class: A sort of shortcut for
+  ;;;; (get-field this id) -- i.e., `id` instead of `this.id` in Java
+  ;;;; world. E.g.,
+  ;;;;
+  ;;;; 1 (class C
+  ;;;; 2   (field [id : A])
+  ;;;; 3   (def (get-id → A) id))
+  ;;;;
+  ;;;; With line 3, a shortcut for
+  ;;;; > (def (get-id → A) (get-field this id))
+  ;;;;
+  ;;;; We remove it, so the desugared syntax contains no class level
+  ;;;; binding.
+  ;;;; ID ∗> *(get-field this ID)
   [ID:id
-   ;; #:and (~do (dbg this-syntax))
-   (∗> (stx/this-loc (get-field this ID)))]
-  )
+   (∗> (stx/this-loc (get-field this ID)))])
 
 
 ;; Environment
 
 ;; ~~~~~~~~~~~~~~~~~~~~
-;; Manage local binding
-
-;; Set Γ of local bindings.
-;; : -> (List VAR)
-(define Γ (make-parameter '()))
+;; Manage local binding (Γ)
 
 ;; Is VAR bounded in Γ?
-;; : VAR -> Boolean
+;; : Identifier -> Boolean
 (define (Γ-member? VAR)
   (if (findf (curry bound-id=? VAR) (Γ)) #t #f))
 
 ;; Add a VAR to Γ.
-;; : VAR -> List VAR
+;; : Identifier -> List Identifier
 (define (Γ-add VAR)
   (if (Γ-member? VAR)
       (Γ)
@@ -226,9 +219,8 @@
     ([Γ (cond
           [(listof-id? the-Γ) the-Γ]
           [(and (syntax? the-Γ) (stx->list the-Γ)) => identity]
-          [else
-           (raise-argument-error
-            'with-Γ "(or/c syntax? (listof syntax?))" the-Γ)])])
+          [else (raise-argument-error
+                 'with-Γ "(or/c syntax? (listof syntax?))" the-Γ)])])
     ;; (dbg (bound-id-set->list (Γ)))
     (thunk-E)))
 
@@ -371,8 +363,7 @@
                  "`(owner/type param ...)`, "
                  "`type`, or "
                  "`(type param ...)` with owner implicitly "
-                 "bound to `world` in the last two forms."
-                 )
+                 "bound to `world` in the last two forms.")
   #:literal-sets [type-lits]
   #:attributes [TYPE OWNER CPARAMS]
   ;; owner/type
@@ -426,21 +417,13 @@
 
 ;; Utils
 
-;; For
-;; #:with OW-SCHEME (type∗>ow-scheme #'ARG.T)
+;; From a `type` syntax class to a `ow-scheme` syntax class.
+;; (: type∗>ow-scheme (TYPE -> OW-SCHEME))
 (define type∗>ow-scheme (syntax-parser
-  [T:type (make-ow-scheme #'T.TYPE #'T.OWNER #'T.CPARAMS
-                          #:srcloc #'T)]))
+    [T:type
+     #:with OW-SCHEME #'(T.TYPE T.OWNER T.CPARAMS)
+     (syntax/loc #'T OW-SCHEME)]))
 
+;; Make a syntax object with the loc of `this-syntax`.
 (define-syntax-rule (stx/this-loc pattern)
   (syntax/loc this-syntax pattern))
-
-;; See, https://github.com/racket/racket/blob/2b567b4488ff92e2bc9c0fbd32bf7e2442cf89dc/pkgs/at-exp-lib/at-exp/lang/reader.rkt#L15
-;; (define-values
-;;   (surface-read surface-read-syntax surface-get-info)
-;;   (make-meta-reader
-;;    'surface-lang
-;;    "language path"
-;;    lang-reader-module-paths
-;;    s-reader
-;;    TODO...))

@@ -12,7 +12,6 @@
 ;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
 
 (require racket/contract/base
-         racket/dict
          racket/function
          racket/list
          racket/match

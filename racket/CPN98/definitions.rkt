@@ -14,10 +14,9 @@
          syntax/parse
          typed/racket/unsafe
          "_definitions.rkt"
+         "utils.rkt"
          )
 
-
-;; (define-type PairofId (Pairof Identifier Identifier))
 
 ;; (require/typed syntax/parse
 ;;   ;; Coerce `flatten` to only return Listof String (instead of Listof
@@ -27,18 +26,18 @@
   [check-stx=? (->* (Syntax Syntax) (String) Any)]
   [zip (All (a b) ((Listof a) (Listof b) -> (Listof (Pairof a b))))]
   [unzip (All (a b) ((Listof (Pairof a b)) -> (Values (Listof a) (Listof b))))])
+
 (require/typed racket/list
-  ;; (index-of keys key ids-eq?)
   [index-of (All (a) ((Listof a) a (a a -> Boolean) -> (U Nonnegative-Integer #f)))])
 
 (provide (except-out (all-defined-out)
                      keyword-lits expr-lits
-                     private:with-CS with-CS
-                     private:map-index-of
+                     private:dict-index-of
+                     dict-set
                      ;; FIXME: make them private and define a proper
                      ;; interface to define them in order to ensure
                      ;; type safety with contracts.
-                     private:CS private:FS
+                     meta:FS
                      )
          (all-from-out "_definitions.rkt"))
 
@@ -50,8 +49,107 @@
 ;; https://docs.racket-lang.org/ts-guide/typed-untyped-interaction.html#%28part._.Using_.Typed_.Code_in_.Untyped_.Code%29
 ;; https://groups.google.com/d/msg/racket-users/eowl6RpdDwY/1wrCluDcAwAJ
 (unsafe-provide keyword-lits expr-lits
-                private:CS private:FS
-                with-CS)
+                meta:FS)
+
+
+;; Utils
+
+(: bound-id=? (Identifier Identifier -> Boolean))
+(define (bound-id=? id1 id2)
+  (eq? (syntax-e id1) (syntax-e id2)))
+
+;; A dict with custom function for comparing keys.
+(define-type (Dict k v) (Listof (Pairof k v)))
+
+;; Returns the length of `the-dict`
+(: dict-length (All (k v) ((Dict k v) -> Index)))
+(define (dict-length the-dict)
+  (length the-dict))
+
+;; Returns the value for `key` in `the-dict` using `key-eq?` comparison
+(: dict-ref (All (k v) ((Dict k v) k (k k -> Boolean) -> v)))
+(define (dict-ref the-dict key key-eq?)
+  (cond
+    [(assoc key the-dict key-eq?) => cdr]
+    [else (error "the key ~s does not exist in Dict" key)]))
+
+;; Functionally extends `the-dict` by mapping `key` to `val`,
+;; overwriting any existing mapping for `key`, and returning an
+;; extended dict.
+(: dict-set (All (k v) ((Dict k v) k v (k k -> Boolean) -> (Dict k v))))
+(define (dict-set the-dict key val key-eq?)
+  (cond
+    [(private:dict-index-of the-dict key key-eq?)
+     => (λ (idx) (list-set the-dict idx (cons key val)))]
+    [else (cons (cons key val) the-dict)]))
+
+;; Indice of the `key` in `the-dict`
+(: private:dict-index-of
+   (All (k v) ((Dict k v) k (k k -> Boolean) -> (U Nonnegative-Integer #f))))
+(define (private:dict-index-of the-dict key key-eq?)
+  (let-values ([(keys _) (unzip the-dict)])
+    (index-of keys key key-eq?)))
+
+;; Returns `#t` if `the-dict` contains a value for the given `key`,
+;; `#f` otherwise.
+(: dict-has-key? (All (k v) ((Dict k v) k (k k -> Boolean) -> Boolean)))
+(define (dict-has-key? the-dict key key-eq?)
+  (and (private:dict-index-of the-dict key key-eq?) #t))
+
+;; Returns `#t` if `dict1` is equal to `dict2` according to `k-eq?` to
+;; compare keys and `v-eq?` to compare values.
+(: dict-eq?
+   (All (k v) ((Dict k v) (Dict k v) (k k -> Boolean) (v v -> Boolean) -> Boolean)))
+(define (dict-eq? dict1 dict2 k-eq? v-eq?)
+  (cond
+    ;; Both dict should contain the same number of entries
+    [(not (eq? (dict-length dict1) (dict-length dict2))) #f]
+    [else
+     (for/and ([kv dict1])
+       (let ([k (car kv)]
+             [v (cdr kv)])
+         (and
+          ;; k exists in dict2
+          (dict-has-key? dict2 k k-eq?)
+          ;; value of dict1(k) and dict2(k) are equal
+          (v-eq? v (dict-ref dict2 k k-eq?)))))]))
+
+;; Maps values of `the-dict` with `f`
+(: dict-map (All (k v w) ((v -> w) (Dict k v) -> (Dict k w))))
+(define (dict-map f the-dict)
+  (map (λ ([kv : (Pairof k v)])
+         (let ([k (car kv)]
+               [v (cdr kv)])
+           (cons k (f v))))
+       the-dict))
+
+;; Maps keys of `the-dict` with `f`
+(: dict-kmap (All (k l v) ((k -> l) (Dict k v) -> (Dict l v))))
+(define (dict-kmap f the-dict)
+  (map (λ ([kv : (Pairof k v)])
+         (let ([k (car kv)]
+               [v (cdr kv)])
+           (cons (f k) v)))
+       the-dict))
+
+;; Make a dict
+(: make-dict (All (a b) ((Parameterof (Dict a b))
+                        (a a -> Boolean) ->
+                        (Values
+                         ;; dict-ref
+                         (a -> b)
+                         ;; dict-set
+                         (a b -> (Dict a b))
+                         ;; dict-has-key?
+                         (a -> Boolean)
+                         ;; dict-eq?
+                         ((Dict a b) (b b -> Boolean) -> Boolean)))))
+(define (make-dict the-dict k-eq?)
+  (values
+   (λ (key) (dict-ref (the-dict) key k-eq?))
+   (λ (key val) (dict-set (the-dict) key val k-eq?))
+   (λ (key) (dict-has-key? (the-dict) key k-eq?))
+   (λ (dict2 v-eq?) (dict-eq? (the-dict) dict2 k-eq? v-eq?))))
 
 
 ;; Language definitions
@@ -70,16 +168,30 @@
   #:datum-literals (let new send get-field set-field! this ???)
   ())
 
-(define-type OW-SCHEME   (Syntaxof
-                          (List Identifier                         ;; Basic Type
-                                Identifier                         ;; Owner
-                                (Syntaxof (Listof Identifier)))))  ;; C-Params
 
+(define-type B-TYPE Identifier)                        ;; Basic Type
+(define-type OWNER Identifier)                         ;; Owner
+(define-type C-PARAMS (Syntaxof (Listof Identifier)))  ;; List of ctx params
+
+;; Ownership scheme
+;; #'(a b ())
+;; #'(a b [c d])
+(define-type OW-SCHEME (Syntaxof (List B-TYPE OWNER C-PARAMS)))
 
 ;; > (ow-scheme? #'(a b ()))       ; #t
 ;; > (ow-scheme? #'(a b [c d e]))  ; #t
 ;; > (ow-scheme? #'(a 1 []))       ; #f
 (define-predicate ow-scheme? OW-SCHEME)
+(define-predicate b-type? B-TYPE)
+(define-predicate owner? OWNER)
+(define-predicate c-params? C-PARAMS)
+
+(: ow-scheme->b-type   (OW-SCHEME -> B-TYPE))
+(: ow-scheme->owner    (OW-SCHEME -> Identifier))
+(: ow-scheme->c-params (OW-SCHEME -> (Syntaxof (Listof Identifier))))
+(define (ow-scheme->b-type ows) (car (syntax-e ows)))
+(define (ow-scheme->owner ows) (cadr (syntax-e ows)))
+(define (ow-scheme->c-params ows) (caddr (syntax-e ows)))
 
 ;; Compare two ow-scheme, but does not instantiate the owner and
 ;; context parameters. So it only ensures that both basic types are
@@ -129,22 +241,6 @@
 ;;       (eq? (syntax-e id1) (syntax-e id2)))))
 
 
-;; (define (make-ow-scheme OW-SCHEME OWNER CPARAMS #:stx-src [stx-src #f])
-;;   (define ow-scheme-stx #`(ow-scheme #,OW-SCHEME #,OWNER #,CPARAMS))
-
-;;   (if stx-src
-;;     (quasisyntax/loc stx-src #,ow-scheme-stx)
-;;     ow-scheme-stx))
-
-;; ;; Returns `#t` if the syntax object is a def.
-;; ;; def? : Syntax -> Boolean
-;; (define def?
-;;   (syntax-parser
-;;     ;; #:literal-sets [expr-lits]
-;;     [(def _ ...) #t]
-;;     [_ #f]))
-
-
 ;; Set or get the binder property of a syntax object.
 ;;
 ;; The binder property of a syntax object is another syntax object
@@ -172,18 +268,18 @@
 ;;     [(stx C-TYPE) (syntax-property stx 'c-type C-TYPE)]))
 
 
-;; Get or set the type of a syntax object.
+;; Get or set the basic type of a syntax object.
 (: type-prop
    (All (a) (case->
-             [(Syntaxof a) -> (U OW-SCHEME #f)]
-             [(Syntaxof a) OW-SCHEME -> (Syntaxof a)])))
+             [(Syntaxof a) -> (U B-TYPE #f)]
+             [(Syntaxof a) B-TYPE -> (Syntaxof a)])))
 (define type-prop
   (case-lambda
-    ;; Get the type of a syntax object
-    [(stx) (let ([τ (syntax-property stx 'type)])
-             (if (ow-scheme? τ) τ #f))]
-    ;; Set the type of a syntax object
-    [(stx OW-SCHEME) (syntax-property stx 'type OW-SCHEME)]))
+    ;; Get the b-type of a syntax object.
+    [(stx) (let ([τ (syntax-property stx 'b-type)])
+             (and (b-type? τ) τ))]
+    ;; Set the basic type of a syntax object
+    [(stx B-TYPE) (syntax-property stx 'b-type B-TYPE)]))
 
 
 ;; Environments
@@ -191,104 +287,106 @@
 ;;~~~~~~~~~~~~~~~~~
 ;; CS: Set of Types
 
-(: private:CS (Parameterof (Listof Identifier)))
-(define private:CS (make-parameter '()))
+(: meta:CS (Boxof (Listof Identifier)))
+(define meta:CS (box '()))
 
-;; Is Identifier exists in CS?
-(: CS-member? (Identifier ->  Boolean))
-(define (CS-member? id-stx)
-  (if (findf (curry bound-id=? id-stx) (private:CS)) #t #f))
+;; ;; Make `the-CS` the value of `CS` in `A`.
+;; (: private:with-CS
+;;    (All (A) (U (Syntaxof (Listof Identifier)) (Listof Identifier)) (-> A) -> A))
+;; (define (private:with-CS the-CS thunk-E)
+;;   (parameterize
+;;       ([meta:CS
+;;         (cond
+;;           [(and (syntax? the-CS) (syntax->list the-CS)) => identity]
+;;           [else the-CS])])
+;;     ;; (dbg (CS))
+;;     (thunk-E)))
 
-;; Make `the-CS` the value of `CS` in `A`.
-(: private:with-CS
-   (All (A) (U (Syntaxof (Listof Identifier)) (Listof Identifier)) (-> A) -> A))
-(define (private:with-CS the-CS thunk-E)
-  (parameterize
-      ([private:CS
-        (cond
-          [(and (syntax? the-CS) (syntax->list the-CS)) => identity]
-          [else the-CS])])
-    ;; (dbg (CS))
-    (thunk-E)))
-
-;; Automatically create the `thunk` around E expressions
-(define-syntax (with-CS stx)
-  (syntax-case stx ()
-    [(_ THE-CS E ...) #'(private:with-CS THE-CS (thunk E ...))]))
+;; ;; Automatically create the `thunk` around E expressions
+;; (define-syntax (with-CS stx)
+;;   (syntax-case stx ()
+;;     [(_ THE-CS E ...) #'(private:with-CS THE-CS (thunk E ...))]))
 
 (module+ test
   (require typed/rackunit)
 
-  (with-CS #'(foo bar)
-    (check-true  (CS-member? #'foo))
-    (check-false (CS-member? #'baz)))
-
-  (with-CS (list #'foo #'bar)
-    (check-true  (CS-member? #'foo))
-    (check-false (CS-member? #'baz))))
+  ;; (with-CS #'(foo bar)
+  ;;   (check-true  (CS-member? #'foo))
+  ;;   (check-false (CS-member? #'baz)))
+  ;;
+  ;; (with-CS (list #'foo #'bar)
+  ;;   (check-true  (CS-member? #'foo))
+  ;;   (check-false (CS-member? #'baz)))
+  )
 
 ;;~~~~~~~~~~~~~~~~~~
 ;; FS: Map of fields
 ;;
 ;; With the syntax #'(Class-type . Field-name) as key and the Field
-;; type as value.
-(define-type FS-key (Syntaxof (Pairof Identifier Identifier)))
-(define-type FS (Map FS-key OW-SCHEME))
-(: private:FS (Parameterof FS))
-(define private:FS (make-parameter '()))
+;; OW-SCHEME as value.
+(define-type FS-key (Syntaxof (Pairof B-TYPE Identifier)))
+(define-type FS (Dict FS-key OW-SCHEME))
+(: meta:FS (Boxof FS))
+(define meta:FS (box '()))
 
-;; (fs-key=? #'(a . b) #'(a . b))  ; #t
-;; (fs-key=? #'(a . b) #'(c . d))  ; #f
-;; (fs-key=? #'(a . 1) #'(a . 1))  ; #f
-(: fs-key=? (FS-key FS-key -> Boolean))
-(define (fs-key=? key1-stx key2-stx)
-  (match-let ([(cons C-TYPE1 F-NAME1) (syntax-e key1-stx)]
-              [(cons C-TYPE2 F-NAME2) (syntax-e key2-stx)])
-    (and
-     (bound-id=? C-TYPE1 C-TYPE2)
-     (bound-id=? F-NAME1 F-NAME2))))
+;; (: make-FS
+;;    ((FS-key FS-key -> Boolean) ->
+;;     (Values
+;;      ;; dict-ref
+;;      (FS-key -> OW-SCHEME)
+;;      ;; dict-set
+;;      (FS-key OW-SCHEME -> FS)
+;;      ;; dict-has-key?
+;;      (FS-key -> Boolean)
+;;      ;; dict-eq?
+;;      (FS (OW-SCHEME OW-SCHEME -> Boolean) -> Boolean))))
+;; (define (make-FS fs-key=?) (make-dict meta:FS fs-key=?))
 
-(: FS-member? (FS-key -> Boolean))
-(define (FS-member? C-TYPE.FIELD)
-  (map-has-key? (private:FS) C-TYPE.FIELD fs-key=?))
-
-(: FS-set (FS-key OW-SCHEME -> FS))
-(define (FS-set C-TYPE.FIELD OW-SCHEME)
-  (map-set (private:FS) C-TYPE.FIELD OW-SCHEME fs-key=?))
-
-(: FS-ref (FS-key -> OW-SCHEME))
-(define (FS-ref C-TYPE.FIELD)
-  (map-ref (private:FS) C-TYPE.FIELD fs-key=?))
 
 (module+ test
   (require typed/rackunit)
 
-  (define test:τFoo #'(foo-type rep ()))
-  (define test:τBar #'(bar-type rep ()))
+  ;; Test two FS-key are equals
+  ;; (fs-key=? #'(a . b) #'(a . b))  ; #t
+  ;; (fs-key=? #'(a . b) #'(c . d))  ; #f
+  ;; (fs-key=? #'(a . 1) #'(a . 1))  ; #f
+  (: fs-key=? (FS-key FS-key -> Boolean))
+  (define (fs-key=? key1-stx key2-stx)
+    (match-let ([(cons C-TYPE1 F-NAME1) (syntax-e key1-stx)]
+                [(cons C-TYPE2 F-NAME2) (syntax-e key2-stx)])
+      (and
+       (bound-id=? C-TYPE1 C-TYPE2)
+       (bound-id=? F-NAME1 F-NAME2))))
 
-  (: test:FS FS)
-  (define test:FS
-    `((,#'(c . foo) . ,test:τFoo)
-      (,#'(c . bar) . ,test:τBar)))
+  ;; Test FS with `fs-key=?`
+  ;; (define-values (FS-ref FS-set FS-member? FS-eq?) (make-FS fs-key=?))
+  ;; (define test:τFoo #'(foo-type rep ()))
+  ;; (define test:τBar #'(bar-type rep ()))
 
-  (: stx-eq? (OW-SCHEME OW-SCHEME -> Boolean))
-  (define (stx-eq? a b)
-    (equal? (syntax->datum a) (syntax->datum b)))
+  ;; (: test:FS FS)
+  ;; (define test:FS
+  ;;   `((,#'(c . foo) . ,test:τFoo)
+  ;;     (,#'(c . bar) . ,test:τBar)))
 
-  (parameterize ([private:FS test:FS])
-    (check-true  (FS-member? #'(c . foo)))
-    (check-false (FS-member? #'(C . foo)))
-    (check-false (FS-member? #'(c . Foo)))
-    (check-false (FS-member? #'(c . baz)))
+  ;; (: stx-eq? (OW-SCHEME OW-SCHEME -> Boolean))
+  ;; (define (stx-eq? a b)
+  ;;   (equal? (syntax->datum a) (syntax->datum b)))
 
-    (check-stx=? (FS-ref #'(c . foo)) test:τFoo)
-    (check-stx=? (FS-ref #'(c . bar)) test:τBar)
+  ;; (parameterize ([meta:FS test:FS])
+  ;;   (check-true  (FS-member? #'(c . foo)))
+  ;;   (check-false (FS-member? #'(C . foo)))
+  ;;   (check-false (FS-member? #'(c . Foo)))
+  ;;   (check-false (FS-member? #'(c . baz)))
 
-    (check-true  (map-eq? test:FS (FS-set #'(c . foo) test:τFoo) fs-key=? stx-eq?))
-    (check-false (map-eq? test:FS (FS-set #'(C . foo) test:τFoo) fs-key=? stx-eq?))
-    (check-false (map-eq? test:FS (FS-set #'(c . Foo) test:τFoo) fs-key=? stx-eq?))
-    (check-false (map-eq? test:FS (FS-set #'(c . foo) test:τBar) fs-key=? stx-eq?))
-    (check-false (map-eq? test:FS (FS-set #'(c . baz) test:τBar) fs-key=? stx-eq?))))
+  ;;   (check-stx=? (FS-ref #'(c . foo)) test:τFoo)
+  ;;   (check-stx=? (FS-ref #'(c . bar)) test:τBar)
+
+  ;;   (check-true  (FS-eq? (FS-set #'(c . foo) test:τFoo) stx-eq?))
+  ;;   (check-false (FS-eq? (FS-set #'(C . foo) test:τFoo) stx-eq?))
+  ;;   (check-false (FS-eq? (FS-set #'(c . Foo) test:τFoo) stx-eq?))
+  ;;   (check-false (FS-eq? (FS-set #'(c . foo) test:τBar) stx-eq?))
+  ;;   (check-false (FS-eq? (FS-set #'(c . baz) test:τBar) stx-eq?)))
+  )
 
 ;;~~~~~~~~~~~~~~~~~~~~~~~
 ;; DS: Map of definitions
@@ -300,9 +398,9 @@
                            Identifier                     ; Def name
                            (Syntaxof (Listof OW-SCHEME))  ; Type of def args
                            )))
-(define-type DS (Map DS-key OW-SCHEME))
-(: private:DS (Parameterof DS))
-(define private:DS (make-parameter '()))
+(define-type DS (Dict DS-key OW-SCHEME))
+(: meta:DS (Boxof DS))
+(define meta:DS (box '()))
 
 ;; (define (ow-scheme=?))
 ;; (ds-key=? #'(a b ()) #'(a b ()))                  ; #t
@@ -320,56 +418,14 @@
                [ow2 (syntax->list ARGs-OW-SCHEME2)])
        (ow-scheme=? ow1 ow2)))))
 
-(: DS-member? ((OW-SCHEME OW-SCHEME -> Boolean) DS-key  -> Boolean))
-(define (DS-member? ow-scheme=? ds-key)
-  (map-has-key? (private:DS) ds-key (curry ds-key=? ow-scheme=?)))
+;; (: DS-member? ((OW-SCHEME OW-SCHEME -> Boolean) DS-key  -> Boolean))
+;; (define (DS-member? ow-scheme=? ds-key)
+;;   (dict-has-key? (meta:DS) ds-key (curry ds-key=? ow-scheme=?)))
 
-(: DS-set ((OW-SCHEME OW-SCHEME -> Boolean) DS-key OW-SCHEME -> DS))
-(define (DS-set ow-scheme=? ds-key OW-SCHEME)
-  (map-set (private:DS) ds-key OW-SCHEME (curry ds-key=? ow-scheme=?)))
+;; (: DS-set ((OW-SCHEME OW-SCHEME -> Boolean) DS-key OW-SCHEME -> DS))
+;; (define (DS-set ow-scheme=? ds-key OW-SCHEME)
+;;   (dict-set (meta:DS) ds-key OW-SCHEME (curry ds-key=? ow-scheme=?)))
 
-(: DS-ref ((OW-SCHEME OW-SCHEME -> Boolean) DS-key -> OW-SCHEME))
-(define (DS-ref ow-scheme=? ds-key)
-  (map-ref (private:DS) ds-key (curry ds-key=? ow-scheme=?)))
-
-
-;; Utils
-
-(: bound-id=? (Identifier Identifier -> Boolean))
-(define (bound-id=? id1 id2)
-  (eq? (syntax-e id1) (syntax-e id2)))
-
-;; A typable map with custom function for comparing keys
-(define-type (Map a b) (Listof (Pairof a b)))
-
-(: map-ref (All (a b) ((Map a b) a (a a -> Boolean) -> b)))
-(define (map-ref the-map key key-eq?)
-  (cond
-    [(assoc key the-map key-eq?) => cdr]
-    [else (error "the key ~s does not exist in Map" key)]))
-
-(: map-set (All (a b) ((Map a b) a b (a a -> Boolean) -> (Map a b))))
-(define (map-set the-map key val key-eq?)
-  (cond
-    [(private:map-index-of the-map key key-eq?)
-     => (λ (idx) (list-set the-map idx (cons key val)))]
-    [else (cons (cons key val) the-map)]))
-
-(: private:map-index-of
-   (All (a b) ((Map a b) a (a a -> Boolean) -> (U Nonnegative-Integer #f))))
-(define (private:map-index-of the-map key key-eq?)
-  (let-values ([(keys _) (unzip the-map)])
-    (index-of keys key key-eq?)))
-
-(: map-has-key? (All (a b) ((Map a b) a (a a -> Boolean) -> Boolean)))
-(define (map-has-key? the-map key key-eq?)
-  (and (private:map-index-of the-map key key-eq?) #t))
-
-(: map-eq?
-   (All (a b) ((Map a b) (Map a b) (a a -> Boolean) (b b -> Boolean) -> Boolean)))
-(define (map-eq? map1 map2 k-eq? v-eq?)
-  (for/and ([kv1 map1]
-            [kv2 map2])
-    (let ([k1 (car kv1)] [v1 (cdr kv1)]
-          [k2 (car kv2)] [v2 (cdr kv2)])
-      (and (k-eq? k1 k2) (v-eq? v1 v2)))))
+;; (: DS-ref ((OW-SCHEME OW-SCHEME -> Boolean) DS-key -> OW-SCHEME))
+;; (define (DS-ref ow-scheme=? ds-key)
+;;   (dict-ref (meta:DS) ds-key (curry ds-key=? ow-scheme=?)))

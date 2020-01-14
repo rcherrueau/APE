@@ -6,18 +6,6 @@
 ;;   '   `-' `-^ `-^ `-' `-^ `-^ `-' `-'
 ;; Ownership Types Checker.
 ;;
-;; Basic checking transformation (?>)
-;; - Checks no duplicate class/field/def names.
-;; - Type checks the program (for simple type -- "simple" as in simply
-;;   typed λ calculus, i.e., no ownership).
-;; - Based on [FKF98] (see Bibliography).
-;;
-;; Naming conventions:
-;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
-;;
-;; Environments:
-;; - Γ is the map (VAR . TYPE) of locally bounded variables
-;; - τ is the type of the current class
 
 (require (for-syntax racket/base)
          racket/contract/base
@@ -32,19 +20,80 @@
          syntax/stx
          "utils.rkt"
          (rename-in "definitions.rkt"
-                    ;; Overloaded FS and DS definitions to instantiate
-                    ;; ow-scheme into simple type
-                    [FS-member? def/FS-member?]
-                    [FS-ref     def/FS-ref]
-                    [DS-member? def/DS-member?]
-                    [DS-ref     def/DS-ref]))
+                    [dict-ref      def/dict-ref]
+                    [dict-has-key? def/dict-has-key?]
+                    [dict-map      def/dict-map]))
 
 (provide ?>)
 
+;; Basic checking transformation (?>)
+;; - Checks no duplicate class/field/def names.
+;; - Type checks the program (for simple type -- "simple" as in simply
+;;   typed λ calculus, i.e., no ownership).
+;; - Based on [FKF98] (see Bibliography).
+;;
+;; Environments:
+;; - Γ is the map of locally bound variables
+;; - τ is the type of the current class
+;; - CS is the set of defined types
+;; - FS is the map of fields
+;; - DS is the map of definitions
+;;
+;; Naming conventions:
+;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
+;;
+;; Global:
+;; - meta:CS is the set of defined ownership scheme
+;; - meta:FS is the map of fields with ownership scheme field as value
+;; - meta:DS is the map of definitions with return ownership sheme as
+;;   value
+
 
-;; ?> :: stx -> stx
+;; Transformation (?>)
+
 (define-parser ?>
   #:literal-sets [keyword-lits expr-lits]
+
+  ;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ;;; Environment declaration and first init
+
+  ;; Map of locally bound variables.
+  ;;
+  ;; (: Γ (HashTable Identifier B-TYPE))
+  #:Γ (make-immutable-id-hash)
+
+  ;; Store of the current class type
+  ;;
+  ;; (: τ B-TYPE)
+  #:τ 'Unit
+
+  ;; Set of types
+  ;;
+  ;; (: CS (Listof B-TYPE))
+  #:CS (unbox meta:CS)
+
+  ;; Map of fields
+  ;;
+  ;; With the syntax #'(Class-type . Field-name) as key and the
+  ;; Field type as value.
+  ;;
+  ;; (: FS (Dict (Syntaxof (Pairof (B-TYPE Identifier))) B-TYPE))
+  #:FS (def/dict-map
+         (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
+         (unbox meta:FS))
+
+  ;; Map of definitions
+  ;;
+  ;; With the syntax #'(Class-type Def-name (Def-arg-type ...)) as key
+  ;; and the Def return type as value.
+  ;;
+  ;; (: DS (Dict (Syntaxof (B-TYPE Identifier (Listof B-TYPE))) B-TYPE))
+  #:DS (def/dict-map
+         (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
+         (unbox meta:DS))
+
+  ;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ;;;; Clauses
 
   ;; ⊢p P ⇒ ?P : t
   ;;
@@ -76,9 +125,9 @@
    ;; Check no duplicated field and def names
    #:when (no-name-clash? #'(FIELD ...))
    #:when (no-name-clash? #'(DEF ...))
-   ;; Check P ⊢τ t on field
-   #:with [(field ~! F-NAME F-OW-SCHEME) ...] #'(FIELD ...)
-   #:when (stx-map ?> #'(F-OW-SCHEME ...))
+   ;; Check P ⊢τ t on fields
+   #:with [(field ~! F-NAME F:ow-scheme) ...] #'(FIELD ...)
+   #:when (stx-for/and ([TYPE #'(F.TYPE ...)]) (⊢τ TYPE))
    ;; Check P,NAME ⊢m DEF ⇒ ?DEF
    #:with [?DEF ...] (with-τ #'NAME (stx-map ?> #'(DEF ...)))
    ;; ----------------------------------------------------------------
@@ -91,19 +140,19 @@
   ;; `DEF` in `τ` elaborates to `?DEF`
   ;;
   ;; [meth]
-  [(def ~! (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) E)
+  [(def ~! (NAME (ARG-NAME ARG:ow-scheme) ... RET:ow-scheme) E)
    ;; #:and (~do (dbg this-syntax))
    ;; Get current class type store in τ environment
    #:with τ0 (τ)
    ;; Check P ⊢τ t on args and return type
-   #:when (stx-map ?> #'(ARG-OW-SCHEME ... RET-OW-SCHEME))
-   ;; Check P,{this: τ0, ARG-NAME: ARG-OW-SCHEME, ...} ⊢e E ⇒ ?E : RET-OW-SCHEME
+   #:when (stx-for/and ([TYPE #'(ARG.TYPE ... RET.TYPE)]) (⊢τ TYPE))
+   ;; Check P,{this: τ0, ARG-NAME: ARG-TYPE, ...} ⊢e E ⇒ ?E : RET-TYPE
    #:with [?E t-e] (get-τ
-                    (with-Γ #'{ (this     . (τ0 Θ ()))
-                                (???      . RET-OW-SCHEME)
-                                (ARG-NAME . ARG-OW-SCHEME) ... }
+                    (with-Γ #'{ (this     . τ0)
+                                (???      . RET.TYPE)
+                                (ARG-NAME . ARG.TYPE) ... }
                       (?> #'E)))
-   #:when (τ=? #'t-e #'RET-OW-SCHEME #:srcloc #'?E)
+   #:when (τ=? #'t-e #'RET.TYPE #:srcloc #'?E)
    ;; ----------------------------------------------------------------
    ;; P,τ0 ⊢m (def (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) E) ⇒
    ;;           (def (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) ?E)
@@ -115,27 +164,23 @@
   ;; `E` elaborates to `?E` with type `t`
   ;;
   ;; [new]
-  [(new ~! OW-SCHEME)
+  [(new ~! SCHEME:ow-scheme)
    ;; #:and (~do (dbg this-syntax))
    ;; Check P ⊢τ VAR-OW-SCHEME
-   #:when (?> #'OW-SCHEME)
+   #:when (⊢τ #'SCHEME.TYPE)
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e (new C) ⇒ (new C) : C
-   (add-τ this-syntax #'OW-SCHEME)]
+   (add-τ this-syntax #'SCHEME.TYPE)]
 
 
   ;; [var]
   ;; Check ID ∈ dom(Γ)
   ;;;; ID is locally bound (including `this` and `???`).
   [ID:id #:when (Γ-member? #'ID)
+   ;; #:and (~do (dbg this-syntax))
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e ID ⇒ ID : Γ(ID)
    (add-τ this-syntax (Γ-ref #'ID))]
-  [ID:id ;; Not locally bound? ⇒ unbound identifier.
-   ;; #:and (~do (dbg this-syntax))
-   ;;;; This is not supposed to happened thanks to desugaring, but who
-   ;;;; knows ...
-   (raise-syntax-error #f "unbound identifier" #'ID)]
 
 
   ;; [get]
@@ -148,7 +193,7 @@
    #:fail-unless (FS-member? #'(t . FNAME))
    (format "~a is not a field of ~a"
            (syntax->datum #'FNAME)
-           (syntax->datum (ow-scheme->type #'t)))
+           (syntax->datum #'t))
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e (get-field E FNAME) ⇒
    ;;          (get-field (?E : t) FNAME) : FS(t . FNAME)
@@ -165,7 +210,7 @@
    #:fail-unless (FS-member? #'(t . FNAME))
    (format "~a is not a field of ~a"
            (syntax->datum #'FNAME)
-           (syntax->datum (ow-scheme->type #'t)))
+           (syntax->datum #'t))
    ;; Check P,Γ ⊢e BODY ⇒ ?BODY : FS(t . FNAME)
    ;;;; The BODY has to elaborate to something that fit into the
    ;;;; field.
@@ -192,8 +237,8 @@
    #:fail-unless (DS-member? #'DS-key)
    (format "~a with arguments ~a is not a method of ~a"
            (syntax->datum #'DNAME)
-           (syntax->datum (stx-map ow-scheme->type #'(t-param ...)))
-           (syntax->datum (ow-scheme->type #'t)))
+           (syntax->datum #'(t-param ...))
+           (syntax->datum #'t))
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e (send E DNAME PARAM ...) ⇒
    ;;          (send (?E : t) DNAME ?PARAM ...) : DS(t DNAME PARAM ...)
@@ -201,16 +246,15 @@
 
 
   ;; [let]
-  [(let ~! (VAR-NAME VAR-OW-SCHEME E) BODY)
+  [(let ~! (VAR-NAME VAR-SCHEME:ow-scheme E) BODY)
    ;; #:and (~do (dbg this-syntax))
-   ;; Check P ⊢τ VAR-OW-SCHEME
-   #:when (?> #'VAR-OW-SCHEME)
+   #:when (⊢τ #'VAR-SCHEME.TYPE)
    ;; Check  P,Γ ⊢e E => ?E : VAR-OW-SCHEME
-   #:with [?E t] (get-τ (with-Γ (Γ-set #'(??? . VAR-OW-SCHEME))
+   #:with [?E t] (get-τ (with-Γ (Γ-set #'(??? . VAR-SCHEME.TYPE))
                           (?> #'E)))
-   #:when (τ=? #'t #'VAR-OW-SCHEME #:srcloc #'?E)
+   #:when (τ=? #'t #'VAR-SCHEME.TYPE #:srcloc #'?E)
    ;; Check P,Γ{VAR-NAME: VAR-OW-SCHEME} ⊢e BODY => ?BODY : t
-   #:with [_ t-body] (get-τ (with-Γ (Γ-set #'(VAR-NAME . VAR-OW-SCHEME))
+   #:with [_ t-body] (get-τ (with-Γ (Γ-set #'(VAR-NAME . VAR-SCHEME.TYPE))
                         (?> #'BODY)))
    ;; ------------------------------------------------------------------
    ;; P,Γ ⊢e *let (VAR-NAME VAR-OW-SCHEME E) BODY ⇒
@@ -218,26 +262,17 @@
    (add-τ this-syntax #'t-body)]
 
 
-  ;; P ⊢τ t
-  ;;
-  ;; `t` exists (in `P`)
-  ;;
-  ;; [type]
-  [OWS:ow-scheme #:when (CS-member? #'OWS.TYPE)
+  [ID:id ;; Not locally bound? ⇒ unbound identifier.
    ;; #:and (~do (dbg this-syntax))
-   this-syntax]
-  [OWS:ow-scheme ;; Not exists? ⇒ unexpected type.
-   ;; #:and (~do (dbg this-syntax))
-   (raise-syntax-error #f "Unknown Type" #'OWS.TYPE)])
+   ;;;; This is not supposed to happened thanks to desugaring, but who
+   ;;;; knows ...
+   (raise-syntax-error #f "unbound identifier" #'ID)])
 
 
 ;; Environment
 
 ;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ;;;; Manage the current class type τ
-
-;; Store the current class type
-(define τ (make-parameter #f))
 
 ;; Make `the-τ` a new value for (τ) parameter in the context of STX.
 ;; : TYPE (-> STX) -> STX
@@ -248,84 +283,116 @@
   ;; Automatically create the `thunk` around E expression
   [(_ THE-τ E:expr ...) #'(private:with-τ THE-τ (thunk E ...))])
 
-;; ~~~~~~~~~~~~~~~~~~~~~~
-;; Manage local binding Γ
+;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+;;;; Manage local binding Γ
 
-;;
-;; Map Γ of local bindings.
-;;
-;; Keys of the map are `identifier?`, and keys are compared with a
-;; sort of `bound-identifier=?` (i.e., doesn't take scope into
-;; account).
-;;
-;; : -> (Id-Hash (VAR . TYPE))
 (define-custom-hash-types id-hash
   #:key? identifier?
   bound-id=?)
-(define private:Γ (make-parameter (make-immutable-id-hash)))
 
 ;; Is VAR bounded in Γ?
 ;; : VAR -> Boolean
 (define (Γ-member? VAR)
-  (dict-has-key? (private:Γ) VAR))
+  (dict-has-key? (Γ) VAR))
 
 ;; Set TYPE of VAR in Γ
 ;; > (Γ-set #'(VAR . TYPE))
 ;; : #'(VAR . TYPE) -> Boolean
 (define (Γ-set VAR.TYPE [the-Γ #f])
-  (let* ([the-Γ (if the-Γ the-Γ (private:Γ))]
+  (let* ([the-Γ (if the-Γ the-Γ (Γ))]
          [VAR-&-TYPE (syntax-e VAR.TYPE)]
          [VAR (car VAR-&-TYPE)]
          [TYPE (cdr VAR-&-TYPE)])
     (dict-set the-Γ VAR TYPE)))
 
 (define (Γ-set* VAR.TYPEs)
-  (foldr Γ-set (private:Γ) (syntax->list VAR.TYPEs)))
+  (foldr Γ-set (Γ) (syntax->list VAR.TYPEs)))
 
 ;; Returns the TYPE of VAR in Γ
 ;; : VAR -> TYPE
 (define (Γ-ref VAR)
-  (dict-ref (private:Γ) VAR))
+  (dict-ref (Γ) VAR))
 
 ;; Make `the-Γ` a new value for Γ parameter by mapping it into a
 ;; (Hash (Var . TYPE)) in the context of STX.
 ;; : (U (Id-Hash (VAR . TYPE)) ((VAR . TYPE) ...) (-> STX) -> STX
 (define (private:with-Γ the-Γ thunk-E)
   (parameterize
-    ([private:Γ (cond
+    ([Γ (cond
           [(immutable-id-hash? the-Γ) the-Γ]
           [(and (syntax? the-Γ) (stx->list the-Γ))
            => (∘ make-immutable-id-hash (curry map syntax-e))]
           [else (raise-argument-error
                  'with-Γ "(or/c syntax? immutable-id-hash?)" the-Γ)])])
-    ;; (dbg (dict->list (private:Γ)))
+    ;; (dbg (dict->list (Γ)))
     (thunk-E)))
 
 (define-syntax-parser with-Γ
   ;; Automatically create the `thunk` around E expression
   [(_ THE-Γ E:expr ...) #'(private:with-Γ THE-Γ (thunk E ...))])
 
+;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+;;;; Access set of types CS, fields FS, and defs DS info
 
-;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-;; Access fields FS and defs DS info
+;; Tests type `t` exists in CS.
+(define (⊢τ t)
+  (if (findf (curry bound-id=? t) (CS)) #t
+      (raise-syntax-error #f "Unknown Type" t)))
 
-;; Lift FS, DS to works.
+;; Test two FS-key are equals.
+;; (fs-key=? #'(a . b) #'(a . b))  ; #t
+;; (fs-key=? #'(a . b) #'(c . d))  ; #f
+;; (fs-key=? #'(a . 1) #'(a . 1))  ; #f
+(define (fs-key=? key1-stx key2-stx)
+  (match-let ([(cons C-TYPE1 F-NAME1) (syntax-e key1-stx)]
+              [(cons C-TYPE2 F-NAME2) (syntax-e key2-stx)])
+    (and
+     (bound-id=? C-TYPE1 C-TYPE2)
+     (bound-id=? F-NAME1 F-NAME2))))
+
+;; (: FS-ref FS-key -> B-TYPE)
+(define (FS-ref FS-key) (def/dict-ref (FS) FS-key fs-key=?))
+
+;; (: FS-member FS-key -> Boolean)
+(define (FS-member? FS-key) (def/dict-has-key? (FS) FS-key fs-key=?))
+
+
+;; Test two DS-key are equals:
+;; - Defined in the same class
+;; - Same name
+;; - Same argument types (type comparison does not look at the owner
+;;   or context parameter).
 ;;
-;; In DS, use the `type=?` relation to compare ow-schemes: Compare two
-;; ow-scheme, but does not instantiate the owner and context
-;; parameters. So it only ensures that both basic types are bound and
-;; both contains the same number of context parameters.
-(define FS-member? (curry lift/ow-scheme->type def/FS-member?))
-(define FS-ref     (curry lift/ow-scheme->type def/FS-ref))
-(define DS-member? (curry lift/ow-scheme->type
-                          (curry def/DS-member? type=?)))
-(define DS-ref     (curry lift/ow-scheme->type
-                          (curry def/DS-ref type=?)))
+;; (: ds-key=? (DS-key DS-key -> Boolean))
+(define (ds-key=? key1-stx key2-stx)
+  (match-let ([(list C-TYPE1 D-NAME1 ARGs-OW-SCHEME1) (syntax-e key1-stx)]
+              [(list C-TYPE2 D-NAME2 ARGs-OW-SCHEME2) (syntax-e key2-stx)])
+    (and
+     (bound-id=? C-TYPE1 C-TYPE2)
+     (bound-id=? D-NAME1 D-NAME2)
+     (for/and ([ow1 (syntax->list ARGs-OW-SCHEME1)]
+               [ow2 (syntax->list ARGs-OW-SCHEME2)])
+       ;; Compare two ow-scheme, but does not instantiate the owner and
+       ;; context parameters. So it only ensures that both basic types are
+       ;; bound and both contains the same number of context parameters.
+       ;;
+       ;; > (type=? #'(a b ()) #'(a b ()))            ; #t
+       ;; > (type=? #'(a b [c d e]) #'(a b [c d e]))  ; #t
+       ;; > (type=? #'(a b [c d e]) #'(a b [e d c]))  ; #t
+       ;; > (type=? #'(a b [c d e]) #'(a z [c d e]))  ; #t
+       ;; > (type=? #'(a b ()) #'(c b ()))            ; #f
+       (type=? ow1 ow2)))))
+
+;; (: DS-ref DS-key -> B-TYPE)
+(define (DS-ref DS-key) (def/dict-ref (DS) DS-key ds-key=?))
+
+;; (: DS-member DS-key -> Boolean)
+(define (DS-member? DS-key) (def/dict-has-key? (DS) DS-key ds-key=?))
 
 
 ;; Exceptions
 
-;;;; Name clash
+;; Name clash
 (struct exn:name-clash exn:fail:syntax ()
   #:extra-constructor-name make-exn:name-clash
   #:transparent)
@@ -340,57 +407,73 @@
                                   (syntax-column previous-ID)))
 
   (raise (make-exn:name-clash
-          (string-append srcloc-msg ": " id ": " err-msg
-                         previous-ID-msg)
+          (string-append srcloc-msg ": " id ": " err-msg previous-ID-msg)
           (current-continuation-marks)
           (list (syntax-taint ID)))))
 
-;;;; Type mismatch
+
+;; Unknown type
+(struct exn:type-unknown exn:fail:syntax ()
+  #:extra-constructor-name make-exn:type-unknown
+  #:transparent)
+
+#;(define (raise-type-unknown B-TYPE)
+  (define srcloc-msg (srcloc->string (build-source-location B-TYPE)))
+  (define id (format "~s" (extract-exp-name B-TYPE)))
+  (define err-msg "unknown type")
+  (define elab-msg
+    (format (string-append "~n  The expression elaborate to the type ~s"
+                           "~n  But the expected type is ~s referring to declaration at ~a:~a"
+                           "~n  in: ~.s")
+            (syntax->datum GIVEN-B-TYPE)
+            (syntax->datum EXPECTED-B-TYPE)
+            (syntax-line EXPECTED-B-TYPE)
+            (syntax-column EXPECTED-B-TYPE)
+            (syntax->datum CTX)))
+
+  (raise (make-exn:type-unknown
+          (string-append srcloc-msg ": " id ": " err-msg elab-msg)
+          (current-continuation-marks)
+          (list (syntax-taint B-TYPE)))))
+
+;; Type mismatch
 (struct exn:type-mismatch exn:fail:syntax ()
   #:extra-constructor-name make-exn:type-mismatch
   #:transparent)
 
-(define (raise-type-mismatch ID IDs)
-  (define srcloc-msg (srcloc->string (build-source-location ID)))
-  (define id (format "~s" (syntax->datum ID)))
-  (define err-msg "multiple declaration")
-  (define previous-ID (findf (curry bound-identifier=? ID) IDs))
-  (define previous-ID-msg (format "~n  previously seen at line ~a:~a"
-                                  (syntax-line previous-ID)
-                                  (syntax-column previous-ID)))
+(define (raise-type-mismatch GIVEN-B-TYPE EXPECTED-B-TYPE CTX)
+  (define srcloc-msg (srcloc->string (build-source-location CTX)))
+  (define id (format "~s" (extract-exp-name CTX)))
+  (define err-msg "type mismatch")
+  (define elab-msg
+    (format (string-append "~n  The expression elaborate to the type ~s"
+                           "~n  But the expected type is ~s referring to declaration at ~a:~a"
+                           "~n  in: ~.s")
+            (syntax->datum GIVEN-B-TYPE)
+            (syntax->datum EXPECTED-B-TYPE)
+            (syntax-line EXPECTED-B-TYPE)
+            (syntax-column EXPECTED-B-TYPE)
+            (syntax->datum CTX)))
 
-  (raise (make-exn:name-clash
-          (string-append srcloc-msg ": " id ": " err-msg
-                         previous-ID-msg)
+  (raise (make-exn:type-mismatch
+          (string-append srcloc-msg ": " id ": " err-msg elab-msg)
           (current-continuation-marks)
-          (list (syntax-taint ID)))))
+          (list (syntax-taint CTX)))))
 
 
 ;; Utils
 
+;; (Syntaxof a) -> (Syntaxof (Pairof (Syntaxof a) B-TYPE))
 (define (get-τ stx)
   #`(#,stx #,(type-prop stx)))
 
-(define (τ=? ACTUAL-TYPE EXPECTED-TYPE #:srcloc [ctx (current-syntax-context)])
-  (syntax-parse #`(#,ACTUAL-TYPE #,EXPECTED-TYPE)
-    [(ow1:ow-scheme ow2:ow-scheme)
-     (cond
-       [(bound-id=? #'ow1.TYPE #'ow2.TYPE) #t]
-       [else
-        (define $err (string-append
-                      "type mismatch~n"
-                      "  The body elaborate to the type: ~s~n"
-                      "  But the expected type is: ~s")
-                      )
-        (define given (syntax->datum #'ow1.TYPE))
-        (define expected (syntax->datum #'ow2.TYPE))
-        (raise-syntax-error #f (format $err expected given) ctx)])]
-    [_ (error 'т=? "~a from ~a is not a proper pair of ownership types"
-              (syntax->datum this-syntax)
-              (syntax->datum ctx))]))
+;; (Syntaxof a) B-TYPE -> (Syntaxof a)
+(define add-τ type-prop)
 
-(define (add-τ stx TYPE)
-  (type-prop stx TYPE))
+;; (: τ=? ((U OW-SCHEME B-TYPE) (U OW-SCHEME B-TYPE) [srcloc stx] -> Boolean))
+(define (τ=? CURRENT-B-TYPE EXPECTED-B-TYPE #:srcloc [CTX (current-syntax-context)])
+  (unless (bound-id=? CURRENT-B-TYPE EXPECTED-B-TYPE)
+    (raise-type-mismatch CURRENT-B-TYPE EXPECTED-B-TYPE CTX)))
 
 ;; Ensures no name clash
 (define (no-name-clash? stxs)
@@ -401,8 +484,7 @@
       [(field name _ ...) #'name]
       [(def (name _ ...) _) #'name]))
 
-  (define names (map get-name (stx->list stxs)))
-  (define $err "multiple ~s declarations")
+  (define names (stx-map get-name stxs))
 
   (cond
     ;; A duplicate name exists
@@ -410,37 +492,6 @@
      => (λ (name) (raise-name-clash name names))]
     ;; Everything is fine
     [else #t]))
-
-;; Instantiate a ow-scheme into a type of [FKF98]
-(define ow-scheme->type (syntax-parser [ow:ow-scheme #'ow.TYPE]))
-
-;; Project the first ow-scheme to get the class type in FS, DS.
-(define (lift/ow-scheme->type f stx)
-  (syntax-parse (dbg stx)
-    ;; DS-key
-    [(ow:ow-scheme d-name params)
-     #:with t #'ow.TYPE
-     (f #'(t d-name params))]
-    ;; FS-key
-    [(ow:ow-scheme . f-name)
-     #:with t #'ow.TYPE
-     (f #'(t . f-name))]
-    ))
-
-;; ;; Returns (type-prop E) if (type-prop E) has type TYPE, raise a
-;; ;; syntax error otherwise
-;; (define (check-⊢e E TYPE)
-;;   (define expected-type (syntax->datum TYPE))
-;;   (define e-type (syntax->datum (type-prop E)))
-
-;;   (cond
-;;     [(eq? expected-type e-type) (type-prop E)]
-;;     [else
-;;      (define $err "type mismatch;~n  expected: ~s~n  given: ~s")
-;;      (raise-syntax-error #f (format $err expected-type e-type) E)]))
-
-;; ;; Extracts from an OW-SCHEME a SIMPLE-TYPE
-;; (define ow-type->simple-type (syntax-parser [(_ t _) #'t]))
 
 
 ;; Tests

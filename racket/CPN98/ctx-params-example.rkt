@@ -15,6 +15,7 @@
 (class Intermediate
   ;; Check wrong owner/type stx
   ;; (field [p1 : rep/(Pair rep world)])
+
   (field [p1 : (rep/Pair rep world)])
   (field [p2 : (Pair rep world)])
 
@@ -25,13 +26,13 @@
     p2)
 
   ;; Check duplicated field
-  (field [p1 : (rep/Pair rep world)])
+  ;; (field [p1 : (rep/Pair rep world)])
 
   ;; ;; Check duplicated def
-  ;; (def (b → [world / (Pair rep world)]) void)
+  ;; (def (b → [world/Pair rep world]) ???)
 
   ;; ;; Check unknow field
-  ;; (def (c → [rep   / (Pair rep world)])
+  ;; (def (c → [rep/Pair rep world])
   ;;   foo)
 
   (def (x → rep/X)
@@ -40,9 +41,11 @@
   (def (y → Y)
     (get-field (get-field this p2) snd))
 
+  ;; ;; Check fstt not a field of Pair
+  ;; (def (updateX-bad → rep/X)
+  ;;   (set-field! (get-field this p1) fstt (new rep/X)))
+
   (def (updateX → rep/X)
-    ;; Check:
-    ;; (set-field! (get-field this p1) fstt (new X)))
     (set-field! (get-field this p1) fst (new rep/X)))
 
 
@@ -56,10 +59,13 @@
                     → rep/Engine)
     e)
 
-  ;; Check: type mismatch get-field
-  ;; (def (get-engine-bad [e : (rep / Engine)]
-  ;;                      [b : (rep / (X a c))]
-  ;;                      → [rep / Engine])
+  ;; ;; Check: unknown Foo type
+  ;; (def (unknown-type → Foo) ???)
+
+  ;; ;; Check: type mismatch get-field
+  ;; (def (get-engine-bad [e : rep/Engine]
+  ;;                      [b : (rep/X a c)]
+  ;;                      → rep/Engine)
   ;;   (get-field this p1))
 
   (def (get-engine3 [e : rep/Engine]
