@@ -6,26 +6,6 @@
 ;;   '   `-' `-^ `-^ `-' `-^ `-^ `-' `-'
 ;; Ownership Types Checker.
 ;;
-
-(require (for-syntax racket/base)
-         racket/contract/base
-         racket/dict
-         racket/function
-         racket/list
-         racket/match
-         racket/syntax
-         syntax/parse
-         syntax/parse/define
-         syntax/srcloc
-         syntax/stx
-         "utils.rkt"
-         (rename-in "definitions.rkt"
-                    [dict-ref      def/dict-ref]
-                    [dict-has-key? def/dict-has-key?]
-                    [dict-map      def/dict-map]))
-
-(provide ?>)
-
 ;; Basic checking transformation (?>)
 ;; - Checks no duplicate class/field/def names.
 ;; - Type checks the program (for simple type -- "simple" as in simply
@@ -48,78 +28,104 @@
 ;; - meta:DS is the map of definitions with return ownership sheme as
 ;;   value
 
+(require (for-syntax racket/base)
+         racket/contract/base
+         racket/dict
+         racket/function
+         racket/list
+         racket/match
+         racket/syntax
+         syntax/parse
+         syntax/parse/define
+         syntax/srcloc
+         syntax/stx
+         "utils.rkt"
+         (rename-in "definitions.rkt"
+                    [dict-ref      def/dict-ref]
+                    [dict-has-key? def/dict-has-key?]
+                    [dict-map      def/dict-map]))
+
+(provide ?>)
+
 
 ;; Transformation (?>)
 
-(define-parser ?>
-  #:literal-sets [keyword-lits expr-lits]
+(define-parser (?> stx)
+  ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #:Env
+  (;; Map of locally bound variables.
+   ;; Γ : (HashTable Identifier B-TYPE)
+   [Γ (make-immutable-id-hash)]
 
-  ;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  ;;; Environment declaration and first init
+   ;; Store of the current class type
+   ;; τ : B-TYPE
+   [τ #'Unit]
 
-  ;; Map of locally bound variables.
-  ;;
-  ;; (: Γ (HashTable Identifier B-TYPE))
-  #:Γ (make-immutable-id-hash)
+   ;; Set of types
+   ;; CS : (Listof B-TYPE)
+   [CS (unbox meta:CS)]
 
-  ;; Store of the current class type
-  ;;
-  ;; (: τ B-TYPE)
-  #:τ 'Unit
-
-  ;; Set of types
-  ;;
-  ;; (: CS (Listof B-TYPE))
-  #:CS (unbox meta:CS)
-
-  ;; Map of fields
-  ;;
-  ;; With the syntax #'(Class-type . Field-name) as key and the
-  ;; Field type as value.
-  ;;
-  ;; (: FS (Dict (Syntaxof (Pairof (B-TYPE Identifier))) B-TYPE))
-  #:FS (def/dict-map
+   ;; Map of fields
+   ;;
+   ;; With the syntax #'(Class-type . Field-name) as key and the Field
+   ;; type as value.
+   ;;
+   ;; FS : (Dict (Syntaxof (Pairof (B-TYPE Identifier))) B-TYPE))
+   [FS (def/dict-map
          (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
-         (unbox meta:FS))
+         (unbox meta:FS))]
 
-  ;; Map of definitions
-  ;;
-  ;; With the syntax #'(Class-type Def-name (Def-arg-type ...)) as key
-  ;; and the Def return type as value.
-  ;;
-  ;; (: DS (Dict (Syntaxof (B-TYPE Identifier (Listof B-TYPE))) B-TYPE))
-  #:DS (def/dict-map
+   ;; Map of definitions
+   ;;
+   ;; With the syntax #'(Class-type Def-name (Def-arg-type ...)) as
+   ;; key and the Def return type as value.
+   ;;
+   ;; DS : (Dict (Syntaxof (B-TYPE Identifier (Listof B-TYPE))) B-TYPE))
+   [DS (def/dict-map
          (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
-         (unbox meta:DS))
+         (unbox meta:DS))])
 
-  ;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  ;;;; Clauses
+  ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ;; Parse
+  (⊢p stx))
 
-  ;; ⊢p P ⇒ ?P : t
-  ;;
-  ;; `P` elaborates to `?P` with type `t`
-  ;;
+
+;; Rules
+
+(define-syntax define-rules
+  (syntax-parser
+    [(_ ID:id RULE:expr ...)
+     #'(define ID
+         (λ (stx)
+           ;; (dbg stx #:ctx ID)
+           (syntax-parse stx
+             #:literal-sets [(keyword-lits #:at ID) (expr-lits #:at ID)]
+             RULE ...
+             )))]))
+
+;; ⊢p P ≫ ?P : t
+;;
+;; `P` elaborates to `?P` and has type `t`
+(define-rules ⊢p
   ;; [prog]
   [(prog ~! CLASS ... E)
-   ;; #:and (~do (dbg this-syntax))
    ;; Check no duplicated class names
    #:when (no-name-clash? #'(CLASS ...))
-   ;; Check P ⊢d CLASS ⇒ ?CLASS
-   #:with [?CLASS ...] (stx-map ?> #'(CLASS ...))
-   ;; Check P,[] ⊢e E ⇒ ?E : t
-   #:with [?E t] (get-τ (with-Γ #'() (?> #'E)))
+   ;; Check P ⊢d CLASS ≫ ?CLASS
+   #:with [?CLASS ...] (stx-map ⊢d #'(CLASS ...))
+   ;; Check P,[] ⊢e E ≫ ?E : t
+   #:with [?E t] (get-τ (with-Γ #'() (⊢e #'E)))
    ;; ----------------------------------------------------------------
-   ;; ⊢p (prog CLASS ... E) ⇒ (prog ?CLASS ... ?E) : t
-   (add-τ this-syntax #'t)]
+   ;; ⊢p (prog CLASS ... E) ≫ (prog ?CLASS ... ?E) : t
+   (add-τ this-syntax #'t)])
 
 
-  ;; P ⊢d CLASS ⇒ ?CLASS
-  ;;
-  ;; `CLASS` elaborates to `?CLASS` (under `P`)
-  ;;
+;; P ⊢d CLASS ≫ ?CLASS
+;;
+;; In context `P`, `CLASS` elaborates to `?CLASS`
+(define-rules ⊢d
   ;; [defn]
   [(class ~! NAME [CPARAM ...] FIELD/DEF ...)
-   ;; #:and (~do (dbg this-syntax))
    #:with [FIELD ...] (filter field? (stx->list #'(FIELD/DEF ...)))
    #:with [DEF ...] (filter def? (stx->list #'(FIELD/DEF ...)))
    ;; Check no duplicated field and def names
@@ -127,67 +133,66 @@
    #:when (no-name-clash? #'(DEF ...))
    ;; Check P ⊢τ t on fields
    #:with [(field ~! F-NAME F:ow-scheme) ...] #'(FIELD ...)
-   #:when (stx-for/and ([TYPE #'(F.TYPE ...)]) (⊢τ TYPE))
-   ;; Check P,NAME ⊢m DEF ⇒ ?DEF
-   #:with [?DEF ...] (with-τ #'NAME (stx-map ?> #'(DEF ...)))
+   #:when (stx-for/and ([T #'(F.TYPE ...)]) (⊢τ T))
+   ;; Check P,NAME ⊢m DEF ≫ ?DEF
+   #:with [?DEF ...] (with-τ #'NAME (stx-map ⊢m #'(DEF ...)))
    ;; ----------------------------------------------------------------
-   ;;p ⊢d (class NAME FIELD ... DEF ...) ⇒ (class NAME FIELD ... ?DEF ...)
-   this-syntax]
+   ;; P ⊢d (class NAME FIELD ... DEF ...) ≫ (class NAME FIELD ... ?DEF ...)
+   ;; #@(class NAME [CPARAM ...] FIELD ... ?DEF ...)]
+   this-syntax])
 
 
-  ;; P,τ ⊢m DEF ⇒ ?DEF
-  ;;
-  ;; `DEF` in `τ` elaborates to `?DEF`
-  ;;
+;; P,τ ⊢m DEF ≫ ?DEF
+;;
+;; In context `P,τ`, `DEF` elaborates to `?DEF`
+(define-rules ⊢m
   ;; [meth]
   [(def ~! (NAME (ARG-NAME ARG:ow-scheme) ... RET:ow-scheme) E)
-   ;; #:and (~do (dbg this-syntax))
    ;; Get current class type store in τ environment
    #:with τ0 (τ)
    ;; Check P ⊢τ t on args and return type
-   #:when (stx-for/and ([TYPE #'(ARG.TYPE ... RET.TYPE)]) (⊢τ TYPE))
-   ;; Check P,{this: τ0, ARG-NAME: ARG-TYPE, ...} ⊢e E ⇒ ?E : RET-TYPE
+   #:when (stx-for/and ([T #'(ARG.TYPE ... RET.TYPE)]) (⊢τ T))
+   ;; Check P,{this: τ0, ARG-NAME: ARG-TYPE, ...} ⊢e E ≫ ?E : RET-TYPE
    #:with [?E t-e] (get-τ
                     (with-Γ #'{ (this     . τ0)
                                 (???      . RET.TYPE)
                                 (ARG-NAME . ARG.TYPE) ... }
-                      (?> #'E)))
+                      (⊢e  #'E)))
    #:when (τ=? #'t-e #'RET.TYPE #:srcloc #'?E)
    ;; ----------------------------------------------------------------
-   ;; P,τ0 ⊢m (def (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) E) ⇒
+   ;; P,τ0 ⊢m (def (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) E) ≫
    ;;           (def (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) ?E)
-   this-syntax]
+   this-syntax])
 
 
-  ;; P,Γ ⊢e E ⇒ ?E : t
-  ;;
-  ;; `E` elaborates to `?E` with type `t`
-  ;;
+;; P,Γ ⊢e E ≫ ?E : t
+;;
+;; In context `P,Γ`, `E` elaborates to `?E` and has type `t`
+(define-rules ⊢e
   ;; [new]
   [(new ~! SCHEME:ow-scheme)
-   ;; #:and (~do (dbg this-syntax))
    ;; Check P ⊢τ VAR-OW-SCHEME
    #:when (⊢τ #'SCHEME.TYPE)
    ;; ----------------------------------------------------------------
-   ;; P,Γ ⊢e (new C) ⇒ (new C) : C
+   ;; P,Γ ⊢e (new C) ≫ (new C) : C
    (add-τ this-syntax #'SCHEME.TYPE)]
-
 
   ;; [var]
   ;; Check ID ∈ dom(Γ)
   ;;;; ID is locally bound (including `this` and `???`).
   [ID:id #:when (Γ-member? #'ID)
-   ;; #:and (~do (dbg this-syntax))
    ;; ----------------------------------------------------------------
-   ;; P,Γ ⊢e ID ⇒ ID : Γ(ID)
+   ;; P,Γ ⊢e ID ≫ ID : Γ(ID)
    (add-τ this-syntax (Γ-ref #'ID))]
-
+  ;;; Unbound identifier. This is not supposed to happened thanks to
+  ;;; desugaring, but who knows ...
+  [ID:id
+   (raise-syntax-error #f "unbound identifier" #'ID)]
 
   ;; [get]
   [(get-field ~! E FNAME)
-   ;; #:and (~do (dbg this-syntax))
-   ;; Check P,Γ ⊢e E ⇒ ?E : ?t
-   #:with [?E t] (get-τ (?> #'E))
+   ;; Check P,Γ ⊢e E ≫ ?E : ?t
+   #:with [?E t] (get-τ (⊢e #'E))
    ;; Check (t . FNAME) ∈ dom(FS)
    ;;;; The field FNAME is defined in the class t
    #:fail-unless (FS-member? #'(t . FNAME))
@@ -195,41 +200,37 @@
            (syntax->datum #'FNAME)
            (syntax->datum #'t))
    ;; ----------------------------------------------------------------
-   ;; P,Γ ⊢e (get-field E FNAME) ⇒
+   ;; P,Γ ⊢e (get-field E FNAME) ≫
    ;;          (get-field (?E : t) FNAME) : FS(t . FNAME)
    (add-τ this-syntax (FS-ref #'(t . FNAME)))]
 
-
   ;; [set]
   [(set-field! ~! E FNAME BODY)
-   ;; #:and (~do (dbg this-syntax))
-   ;; Check P,Γ ⊢e E ⇒ ?E : ?t
-   #:with [?E t] (get-τ (?> #'E))
+   ;; Check P,Γ ⊢e E ≫ ?E : ?t
+   #:with [?E t] (get-τ (⊢e #'E))
    ;; Check (t . FNAME) ∈ dom(FS)
    ;;;; The field FNAME is defined in the class t
    #:fail-unless (FS-member? #'(t . FNAME))
    (format "~a is not a field of ~a"
            (syntax->datum #'FNAME)
            (syntax->datum #'t))
-   ;; Check P,Γ ⊢e BODY ⇒ ?BODY : FS(t . FNAME)
+   ;; Check P,Γ ⊢e BODY ≫ ?BODY : FS(t . FNAME)
    ;;;; The BODY has to elaborate to something that fit into the
    ;;;; field.
-   #:with [?BODY t-body] (get-τ (?> #'BODY))
+   #:with [?BODY t-body] (get-τ (⊢e #'BODY))
    #:with t-field (FS-ref #'(t . FNAME))
    #:when (τ=? #'t-body #'t-field)
    ;; ----------------------------------------------------------------
-   ;; P,Γ ⊢e (set-field E FNAME BODY) ⇒
+   ;; P,Γ ⊢e (set-field E FNAME BODY) ≫
    ;;          (set-field (?E : t) FNAME ?BODY) : FS(t . FNAME)
    (add-τ this-syntax #'t-field)]
 
-
   ;; [call]
   [(send ~! E DNAME PARAM ...)
-   ;; #:and (~do (dbg this-syntax))
-   ;; Check P,Γ ⊢e E ⇒ ?E : t
-   #:with [?E t] (get-τ (?> #'E))
-   ;; Check P,Γ ⊢e PARAM ... ⇒ (?PARAM : t) ...
-   #:with [(?PARAM t-param) ...] (stx-map (∘ get-τ ?>) #'(PARAM ...))
+   ;; Check P,Γ ⊢e E ≫ ?E : t
+   #:with [?E t] (get-τ (⊢e #'E))
+   ;; Check P,Γ ⊢e PARAM ... ≫ (?PARAM : t) ...
+   #:with [(?PARAM t-param) ...] (stx-map (∘ get-τ ⊢e) #'(PARAM ...))
    ;; Check (t DNAME (t-param ...)) ∈ dom(DS)
    ;;;; The method DNAME with parameters (t-param ...) is defined in
    ;;;; the class t.
@@ -240,33 +241,32 @@
            (syntax->datum #'(t-param ...))
            (syntax->datum #'t))
    ;; ----------------------------------------------------------------
-   ;; P,Γ ⊢e (send E DNAME PARAM ...) ⇒
+   ;; P,Γ ⊢e (send E DNAME PARAM ...) ≫
    ;;          (send (?E : t) DNAME ?PARAM ...) : DS(t DNAME PARAM ...)
    (add-τ this-syntax (DS-ref #'DS-key))]
 
-
   ;; [let]
   [(let ~! (VAR-NAME VAR-SCHEME:ow-scheme E) BODY)
-   ;; #:and (~do (dbg this-syntax))
    #:when (⊢τ #'VAR-SCHEME.TYPE)
-   ;; Check  P,Γ ⊢e E => ?E : VAR-OW-SCHEME
+   ;; Check  P,Γ ⊢e E ≫ ?E : VAR-OW-SCHEME
    #:with [?E t] (get-τ (with-Γ (Γ-set #'(??? . VAR-SCHEME.TYPE))
-                          (?> #'E)))
+                          (⊢e #'E)))
    #:when (τ=? #'t #'VAR-SCHEME.TYPE #:srcloc #'?E)
-   ;; Check P,Γ{VAR-NAME: VAR-OW-SCHEME} ⊢e BODY => ?BODY : t
+   ;; Check P,Γ{VAR-NAME: VAR-OW-SCHEME} ⊢e BODY ≫ ?BODY : t
    #:with [_ t-body] (get-τ (with-Γ (Γ-set #'(VAR-NAME . VAR-SCHEME.TYPE))
-                        (?> #'BODY)))
+                              (⊢e #'BODY)))
    ;; ------------------------------------------------------------------
-   ;; P,Γ ⊢e *let (VAR-NAME VAR-OW-SCHEME E) BODY ⇒
+   ;; P,Γ ⊢e *let (VAR-NAME VAR-OW-SCHEME E) BODY ≫
    ;;           *let (VAR-NAME VAR-OW-SCHEME ?E) ?BODY : t
-   (add-τ this-syntax #'t-body)]
+   (add-τ this-syntax #'t-body)])
 
-
-  [ID:id ;; Not locally bound? ⇒ unbound identifier.
-   ;; #:and (~do (dbg this-syntax))
-   ;;;; This is not supposed to happened thanks to desugaring, but who
-   ;;;; knows ...
-   (raise-syntax-error #f "unbound identifier" #'ID)])
+;; P ⊢τ t
+;;
+;; In context `P`, `t` exists
+(define-rules ⊢τ
+  ;; [type]
+  [t #:when (CS-member? #'t) this-syntax]
+  [t (raise-syntax-error #f "Unknown Type" #'t)])
 
 
 ;; Environment
@@ -335,7 +335,7 @@
 ;;;; Access set of types CS, fields FS, and defs DS info
 
 ;; Tests type `t` exists in CS.
-(define (⊢τ t)
+(define (CS-member? t)
   (if (findf (curry bound-id=? t) (CS)) #t
       (raise-syntax-error #f "Unknown Type" t)))
 
@@ -493,186 +493,41 @@
     ;; Everything is fine
     [else #t]))
 
-
-;; Tests
-(module+ test
-  (require rackunit
-           rackunit/text-ui)
+;; (define (?> stx)
+;;   (parameterize
+;;       (;; - Map of locally bound variables.
+;;        ;;   Γ : (HashTable Identifier B-TYPE)
+;;        [Γ (make-immutable-id-hash)]
 
-  ;; Default EXPR/TYPE
-  (define τ✔-name #'τ✔)
-  (define τ✔ #`(#,τ✔-name type ()))
-  (define EXPR:τ✔ #`(new #,τ✔))
+;;        ;; - Store of the current class type
+;;        ;;   τ : B-TYPE
+;;        [τ 'Unit]
 
-  ;; Unknown EXPR/TYPE
-  (define τ✘-name #'τ✘)
-  (define τ✘ #`(#,τ✘-name type ()))
-  (define EXPR:τ✘ #`(new #,τ✘))
+;;        ;; - Set of types
+;;        ;;   CS : (Listof B-TYPE)
+;;        [CS (unbox meta:CS)]
 
-  (define test:Γ (make-immutable-id-hash
-                  (list (cons #'foo τ✔)
-                        (cons #'bar τ✔))))
+;;        ;; - Map of fields
+;;        ;;
+;;        ;;   With the syntax #'(Class-type . Field-name) as key and the
+;;        ;;   Field type as value.
+;;        ;;
+;;        ;;   FS : (Dict (Syntaxof (Pairof (B-TYPE Identifier))) B-TYPE))
+;;        [FS (def/dict-map
+;;              (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
+;;              (unbox meta:FS))]
 
-  (run-tests
-   (test-suite
-    "Tests for basic checks transformation (?>)"
+;;        ;; - Map of definitions
+;;        ;;
+;;        ;;   With the syntax #'(Class-type Def-name (Def-arg-type ...)) as
+;;        ;;   key and the Def return type as value.
+;;        ;;
+;;        ;;   DS : (Dict (Syntaxof (B-TYPE Identifier (Listof B-TYPE))) B-TYPE))
+;;        [DS (def/dict-map
+;;              (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
+;;              (unbox meta:DS))])
+;;     (⊢p stx)))
 
-    ;; ----------------------------------------------------------------
-    ;; Duplicated names
-    (test-case "Name clash"
-
-      (check-exn
-       exn:name-clash?
-       (thunk (?> #'(prog (class X []) (class X []) _)))
-       "class name is unique")
-
-      (check-exn
-       exn:name-clash?
-       (thunk (?> #'(class X [] (field x _) (field x _))))
-       "field name is unique in a class")
-
-      (check-not-exn
-       (thunk (?> #`(prog (class X [] (field x #,τ✔))
-                          (class Y [] (field x #,τ✔)))))
-       "field name is only unique within a class")
-
-      (check-exn
-       exn:name-clash?
-       (thunk (?> #'(class X [] (def (x _) _) (def (x _) _))))
-       "def name is unique in a class")
-
-      (check-not-exn
-       (thunk (?> #`(prog (class X [] (def (x #,τ✔) #,EXPR:τ✔))
-                          (class Y [] (def (x #,τ✔) #,EXPR:τ✔)))))
-       "def name is only unique within a class")
-      )
-
-    ;; ----------------------------------------------------------------
-    ;; Local bindings
-    (test-case "Local bindings"
-
-      ;; with syntax list
-      (with-Γ #'((foo . Integer) (bar . String))
-        ;; member
-        (check-true  (Γ-member? #'foo))
-        (check-false (Γ-member? #'baz))
-
-        ;; set
-        (check-true  (with-Γ (Γ-set #'(baz . _)) (Γ-member? #'baz)))
-        (check-false (with-Γ (Γ-set #'(baz . _)) (Γ-member? #'xyzzy)))
-
-        ;; ref
-        (check-stx=? (Γ-ref #'foo) #'Integer)
-        (check-stx=? (Γ-ref #'bar) #'String))
-
-      ;; With hash-table
-      (with-Γ (make-immutable-id-hash (list (cons #'foo #'Integer)
-                                            (cons #'bar #'String)))
-        ;; member
-        (check-true  (Γ-member? #'foo))
-        (check-false (Γ-member? #'baz))
-
-        ;; set
-        (check-true  (with-Γ (Γ-set #'(baz . _)) (Γ-member? #'baz)))
-        (check-false (with-Γ (Γ-set #'(baz . _)) (Γ-member? #'xyzzy)))
-
-        ;; ref
-        (check-stx=? (Γ-ref #'foo) #'Integer)
-        (check-stx=? (Γ-ref #'bar) #'String)))
-
-    ;; ----------------------------------------------------------------
-    ;; Unbound identifier
-    (test-case "Bound & unbound identifier"
-      (check-not-exn
-       (thunk (with-Γ #`((id . _)) (?> #'id)))
-       "id is bounded if it exists in Γ")
-      (check-exn
-       #rx"unbound identifier.+?in: id"
-       (thunk (?> #'id))
-       "id is unbound if it does not exist in Γ")
-
-      ;; def
-      (check-not-exn
-       (thunk (?> #`(def (x (id #,τ✔) #,τ✔) id)))
-       "id is bounded if it is a parameter of the def")
-      (check-not-exn
-       (thunk (?> #`(def (x (id #,τ✔) #,τ✔) this)))
-       "this is bounded in a def")
-      (check-exn
-       #rx"unbound identifier.+?in: id"
-       (thunk (?> #`(def (x #,τ✔) id)))
-       "id is unbound if it is not a parameter of the def")
-
-      ;; let
-      (check-not-exn
-       (thunk (?> #`(let (id #,τ✔ #,EXPR:τ✔) id)))
-       "let binder bound the id")
-      (check-exn
-       #rx"unbound identifier.+?in: id"
-       (thunk (?> #`(let (x #,τ✔ id) x)))
-       "id is unbound in the binder of a let if it does not exist in Γ")
-      (check-exn
-       #rx"unbound identifier.+?in: id"
-       (thunk (?> #`(let (x #,τ✔ #,EXPR:τ✔) id)))
-       "id is unbound in the body of a let if it does not exist in Γ")
-
-      ;; FIXME: Right now, unbound ids in class are forgotten. Rather, an
-      ;; exception should be raised.
-      ;; (check-exn
-      ;;           #rx"unbound identifier.+?in: id"
-      ;;           (thunk (?> #'(class X []  id))))
-      (check-exn #rx"unbound identifier.+?in: id"
-                (thunk (?> #`(get-field id _))))
-
-      (check-exn #rx"unbound identifier.+?in: id"
-                 (thunk (?> #`(set-field! id _ _)))
-                 "id is bound in the receiver object of a set-field!")
-
-      (check-exn #rx"unbound identifier.+?in: id"
-                 (thunk (?> #`(set-field! #,EXPR:τ✔ _ id)))
-                 "id is bound in the body of a set-field!")
-
-      (check-exn #rx"unbound identifier.+?in: id"
-                 (thunk (?> #`(send id _)))
-                 "id is bound in the receiver object of a send")
-
-      (check-exn #rx"unbound identifier.+?in: id"
-                 (thunk (?> #`(send #,EXPR:τ✔ _ id)))
-                 "id is bound in the argument of a send")
-      )
-
-
-    ;; ----------------------------------------------------------------
-    ;; Unknown Type
-    (test-case "Known & Unknown Types"
-      (check-not-exn
-       (thunk (?> #`(prog (class X  []) (new (ow-scheme X x ())))))
-       "Defining a class X implies P ⊢τ X")
-
-      ;; FIXME: don't relies on state
-      ;; (check-not-false
-      ;;  (check-⊢τ #'X)
-      ;;  "Defining a class X implies P ⊢τ X")
-      (check-exn
-       #rx"Unexpected Type.+?in: Y"
-       (thunk (?> #`(prog (class X  []) (new (ow-scheme Y x ())))))
-       "Unknonw type Y if class Y is not defined")
-      (check-exn #rx"Unexpected Type.+?in: τ✘"
-                 (thunk (?> #`(class X [] (field x #,τ✘)))))
-      (check-exn #rx"Unexpected Type.+?in: τ✘"
-                 (thunk (?> #`(def (x #,τ✘) _))))
-      (check-exn #rx"Unexpected Type.+?in: τ✘"
-                 (thunk (?> #`(def (x (_ #,τ✘) #,τ✔) _))))
-      (check-exn #rx"Unexpected Type.+?in: τ✘"
-                 (thunk (?> #`(let (x #,τ✘ _) _))))
-      (check-exn #rx"Unexpected Type.+?in: τ✘"
-                 (thunk (?> #`(new #,τ✘))))))
-   )
-
-  ;; No unbound identifier everywhere an `E` is expected. Desugaring
-  ;; ensures that all identifiers are binded with a let
-
-  )
 
 
 ;; Bibliography

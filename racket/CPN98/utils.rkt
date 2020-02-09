@@ -123,39 +123,75 @@
 ;; >
 ;; >   ;; Clauses ...
 ;; >   [(class NAME FIELD/DEF ...) #'(...)] ...)
-(define-syntax (define-parser parser-stx)
-  ;; Strip the `#:` from a (Syntaxof Keyword)
-  (define (strip#: KEYWORD)
-    (define keyword (keyword->string (syntax-e KEYWORD)))
-    (datum->syntax KEYWORD (string->symbol keyword)))
+;; (define-syntax (define-parser parser-stx)
+;;   ;; Strip the `#:` from a (Syntaxof Keyword)
+;;   (define (strip#: KEYWORD)
+;;     (define keyword (keyword->string (syntax-e KEYWORD)))
+;;     (datum->syntax KEYWORD (string->symbol keyword)))
 
-  ;; Make the parser
+;;   ;; Make the parser
+;;   (syntax-parse parser-stx
+;;     [(_ ID:id                          ;; Parser name (e.g., `?>`)
+;;         #:literal-sets ls              ;; Literals
+;;         (~seq K:keyword Env:expr) ...  ;; Environment variables
+;;         CLAUSE ...+)                   ;; Clauses of the transfo
+;;      #:with [def-K ...] (map strip#: (syntax->list #'(K ...)))
+;;      #:with PARSER-ID         (generate-temporary)
+;;      #'(begin
+;;          ;; Define environment variables as global parameter
+;;          (define def-K (make-parameter #f)) ...
+;;          (define topCall (make-parameter #t))
+
+;;          ;; Define parser as an internal def
+;;          (define PARSER-ID
+;;            (syntax-parser
+;;              #:literal-sets ls
+;;              CLAUSE ...))
+
+;;          ;; Define the parser as a global definition
+;;          (define (ID stx)
+
+;;            ;; Parameterize the parser call with `Env` values at the
+;;            ;; top Call (not recursive ones)
+;;            (if (topCall)
+;;                (parameterize ([def-K Env] ... [topCall #f]) (PARSER-ID stx))
+;;                (PARSER-ID stx))))]))
+
+(define-syntax (define-parser parser-stx)
   (syntax-parse parser-stx
-    [(_ ID:id                          ;; Parser name (e.g., `?>`)
-        #:literal-sets ls              ;; Literals
-        (~seq K:keyword Env:expr) ...  ;; Environment variables
-        CLAUSE ...+)                   ;; Clauses of the transfo
-     #:with [def-K ...] (map strip#: (syntax->list #'(K ...)))
-     #:with PARSER-ID         (generate-temporary)
+    [(_ ID:id                         ;; Parser name (e.g., `?>`)
+        #:Env ([NAME:id E:expr] ...)  ;; Environment variables
+        #:Rules (RHS ...+)            ;; Rules of the transformation
+        DEF ...)                      ;; Extra rules as `define`
      #'(begin
          ;; Define environment variables as global parameter
-         (define def-K (make-parameter #f)) ...
-         (define topCall (make-parameter #t))
+         (define NAME (make-parameter #f)) ...
 
-         ;; Define parser as an internal def
-         (define PARSER-ID
-           (syntax-parser
-             #:literal-sets ls
-             CLAUSE ...))
-
-         ;; Define the parser as a global definition
+         ;; Define the parser as a global definition. We parameter the
+         ;; first call of rules  with `Env` values
          (define (ID stx)
 
-           ;; Parameterize the parser call with `Env` values at the
-           ;; top Call (not recursive ones)
-           (if (topCall)
-               (parameterize ([def-K Env] ... [topCall #f]) (PARSER-ID stx))
-               (PARSER-ID stx))))]))
+           ;; Define rules as a local def (overriding name `ID`)
+           (define ID (syntax-parser RHS ...))
+
+           ;; Extra rules
+           DEF ...
+
+           ;; Parameter the first call of rules with `Env` values
+           (parameterize ([NAME E] ...) (ID stx))))]
+    [(_ (ID:id stx:expr)              ;; Parser name (e.g., `?>`) and its syntax object/id
+        #:Env ([NAME:id E:expr] ...)  ;; Environment variables ...
+        DEF)                          ;; parser definition
+     #'(begin
+         ;; Define environment variables as parameters
+         (define NAME (make-parameter #f)) ...
+
+         ;; Define the parser as a global definition. We parameterize
+         ;; the first call of `DEF` with `Env` values
+         (define (ID stx)
+           (parameterize ([NAME E] ...) DEF)))]
+    ))
+
 
 ;; Returns `#t` if the syntax object is a field.
 ;; field? : Syntax -> Boolean
@@ -231,18 +267,31 @@
 
 
 ;; (dbg (+ 1 2))
-;; > ; [dbg] utils.rkt:149:5: '(+ 1 2) = 3
+;; > ; [dbg] stdin::103: (+ 1 2) = 3
+;; > 3
+;;
+;; (dbg (+ 1 2) #:ctx add)
+;; > ; [dbg] stdin::107: add = 3
 ;; > 3
 (define-syntax (dbg stx)
-  (syntax-case stx ()
-    [(_ E)
-     #`(let
-           ([srcloc #,(srcloc->string (build-source-location #'E))]
-            [datum  #,(stx->string #'E)]
-            [res         E]
-            [$dbg-msg    "; [dbg] ~a: ~a = ~s"])
-         (log-fatal $dbg-msg srcloc datum res)
-         res)]))
+  (syntax-parse stx
+    [(_ E #:ctx ctx)
+     ;; Note on "?: literal data is not allowed;" error.
+     ;;
+     ;; A literal data in Racket is anything that isn't a symbol or a
+     ;; pair. And, a literal data, such as the following `srcloc`, is
+     ;; not legal in a fully-expanded program. It is only legal in a
+     ;; fully-expanded program when wrapped in `quote` or
+     ;; `quote-syntax`. I can fix this by explicitly wrap it in a
+     ;; quote.
+     ;;
+     ;; https://groups.google.com/d/msg/racket-users/HaSmcTN0SA4/IM6MR_TlAgAJ
+     #:with srcloc (srcloc->string (build-source-location #'ctx))
+     #'(let ([$dbg-msg "; [dbg] ~a: ~a = ~s~n"]
+             [res      E])
+         (log-fatal $dbg-msg 'srcloc 'ctx res)
+         res)]
+    [(_ E) #'(dbg E #:ctx E)]))
 
 
 (define-for-syntax (stx->string stx)

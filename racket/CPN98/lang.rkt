@@ -33,7 +33,7 @@
   ;; ~~~~~~~~~~~~~~~~
   ;; Tower of transformation
   (let*
-      (;; Vanilla prog
+      (;; Prog in surface syntax
        [prog #`(prog #,@(s-exps read-syntax))]
        ;; Desugaring
        [prog (∗> prog)]
@@ -41,8 +41,8 @@
        [_    (set-box!-values (meta:CS meta:FS meta:DS) (M> prog))]
        ;; Basic Checks
        [prog (?> prog)]
-       ;; Ownership
-       #;[prog (θ> prog)]
+       ;; ;; Ownership
+       ;; #;[prog (θ> prog)]
        ;; Final AST
        [prog (stx->string prog)])
     ;; Execution
