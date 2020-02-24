@@ -1,4 +1,4 @@
-#lang racket/base
+#lang reader "reader.rkt" racket/base
 
 ;; ,-,-,-.
 ;; `,| | |   ,-. . . ,-. ,-. . . ,-. ,-.
@@ -64,8 +64,7 @@
       [(prog ~! CLASS:expr ... E:expr)
        #:with [*CLASS ...] (stx-map parse-rule #'(CLASS ...))
        #:with *E           (parse-rule #'E)
-       ;; #@(prog *CLASS ... *E)]
-       (stx/this-loc (prog *CLASS ... *E))]
+       #@(prog *CLASS ... *E)]
 
       ;; A class is a NAME, an optional list of context parameters
       ;; CPARAM, and a list of fields and definitions.
@@ -74,10 +73,10 @@
       ;; ∗>  (class NAME (CPARAM ...) *FIELD ... *DEF ...)
       [(class NAME:id [CPARAM:id ...] ~! FIELD/DEF:expr ...)
        #:with [*FIELD/DEF ...] (stx-map parse-rule #'(FIELD/DEF ...))
-       (stx/this-loc (class NAME [CPARAM ...] *FIELD/DEF ...))]
+       #@(class NAME [CPARAM ...] *FIELD/DEF ...)]
       ;; Transforms a `class` without `CPARAM ...` into a `class` with.
       [(class ~! NAME FIELD/DEF ...)
-       (parse-rule (stx/this-loc (class NAME [] FIELD/DEF ...)))]
+       (parse-rule #@(class NAME [] FIELD/DEF ...))]
 
       ;; A field declares one argument ARG (i.e., no initialization).
       ;;
@@ -88,7 +87,7 @@
       [(field ~! ARG:arg)
        #:with NAME      #'ARG.NAME
        #:with OW-SCHEME (type∗>ow-scheme #'ARG.T)
-       (stx/this-loc (field NAME OW-SCHEME))]
+       #@(field NAME OW-SCHEME)]
 
       ;; A def (i.e., method) is a NAME, a list of arguments ARG, a
       ;; return type RET and the BODY of the def. The def binds ARG in
@@ -104,7 +103,7 @@
        #:with [A-OW-SCHEME ...] (stx-map type∗>ow-scheme #'(ARG.T ...))
        #:with RET-OW-SCHEME     (type∗>ow-scheme #'RET)
        #:with *BODY             (with-Γ #'(this A-NAME ...) (parse-rule #'BODY))
-       (stx/this-loc (def (NAME (~@ (A-NAME A-OW-SCHEME)) ... RET-OW-SCHEME) *BODY))]
+       #@(def (NAME (~@ (A-NAME A-OW-SCHEME)) ... RET-OW-SCHEME) *BODY)]
 
       ;; A let binds a variables VAR with a type T to an expression E in
       ;; a BODY. During the transformation of BODY, Γ is extended with
@@ -118,11 +117,11 @@
        #:with OW-SCHEME (type∗>ow-scheme #'T)
        #:with *E        (parse-rule #'E)
        #:with *BODY     (with-Γ (Γ-add #'VAR) (parse-rule #'BODY))
-       (stx/this-loc (let (VAR OW-SCHEME *E) *BODY))]
+       #@(let (VAR OW-SCHEME *E) *BODY)]
       ;; Transforms a `let` with multiple binding into multiple nested
       ;; `let`s with one unique binding (such as the previous let)
       [(let ~! (B1 BS ...) BODY:expr)
-       (parse-rule (stx/this-loc (let (B1) (let (BS ...) BODY))))]
+       (parse-rule #@(let (B1) (let (BS ...) BODY)))]
 
       ;; A new takes the class type C-TYPE of the class to instantiate
       ;; (i.e., no constructor).
@@ -131,7 +130,7 @@
       ;; ∗>  (new (TYPE OWNER CPARAMS))
       [(new ~! C-TYPE:type)
        #:with OW-SCHEME (type∗>ow-scheme #'C-TYPE)
-       (stx/this-loc (new OW-SCHEME))]
+       #@(new OW-SCHEME)]
 
       ;; A get-field takes an expression E that should reduce to an
       ;; object and the name of the field FNAME to get on that object.
@@ -140,7 +139,9 @@
       ;; ∗>  (get-field *E FNAME)
       [(get-field ~! E:expr FNAME:id)
        #:with *E (parse-rule #'E)
-       (stx/this-loc (get-field *E FNAME))]
+       ;; #:with res #@(get-field *E FNAME)
+       ;; #:and (~do (dbg res))
+       #@(get-field *E FNAME)]
 
       ;; A set-field! takes an expression E that should reduce to an
       ;; object, the name of the field FNAME to change the value of, and
@@ -151,7 +152,7 @@
       [(set-field! ~! E:expr FNAME:id BODY:expr)
        #:with *E    (parse-rule #'E)
        #:with *BODY (parse-rule #'BODY)
-       (stx/this-loc (set-field! *E FNAME *BODY))]
+       #@(set-field! *E FNAME *BODY)]
 
       ;; A send takes an expression E that should reduce to an object,
       ;; the name of the def DNAME to call on that object, and a list of
@@ -162,14 +163,14 @@
       [(send ~! E:expr DNAME:id E-ARG:expr ...)
        #:with *E           (parse-rule #'E)
        #:with [*E-ARG ...] (stx-map parse-rule #'(E-ARG ...))
-       (stx/this-loc (send *E DNAME *E-ARG ...))]
+       #@(send *E DNAME *E-ARG ...)]
 
       ;; An identifier is either:
       ;;
       ;;;; A local binding (from a def or let). It include the `this`
       ;;;; keyword in the case we are in the context of a def.
       [ID:id #:when (Γ-member? #'ID)
-             this-syntax]
+        this-syntax]
       ;;;; The debug placeholder ???
       [???
        this-syntax]
@@ -189,7 +190,7 @@
       ;;;; binding.
       ;;;; ID ∗> *(get-field this ID)
       [ID:id
-       (parse-rule (stx/this-loc (get-field this ID)))])))
+       (parse-rule #@(get-field this ID))])))
 
 
 ;; Rules

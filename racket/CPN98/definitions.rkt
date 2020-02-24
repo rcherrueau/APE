@@ -132,6 +132,11 @@
            (cons (f k) v)))
        the-dict))
 
+;; Returns the keys of `the-dict`
+(: dict-keys (All (k v) (Dict k v) -> (Listof k)))
+(define (dict-keys the-dict)
+  (map (λ ([kv : (Pairof k v)]) (car kv)) the-dict))
+
 ;; Make a dict
 (: make-dict (All (a b) ((Parameterof (Dict a b))
                         (a a -> Boolean) ->

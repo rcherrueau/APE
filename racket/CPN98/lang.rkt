@@ -12,7 +12,7 @@
          "definitions.rkt"
          "desugar.rkt"
          "meta.rkt"
-         "basic.rkt"
+         "basic-check.rkt"
          )
 
 (provide (rename-out

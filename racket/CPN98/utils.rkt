@@ -21,6 +21,9 @@
 (provide (all-defined-out))
 
 
+(define-logger lang)
+
+
 (define ∘ compose1)
 
 ;; (zip '(1 2 3) '(a b c))
@@ -265,6 +268,23 @@
 
 
 
+;; Add or preserve the 'surface property of the `origin' syntax object
+;; to `stx'.
+;;
+;; (syntax-property (stx/surface #'bar #'foo) 'surface)
+;; > #<syntax:stdin::233 foo>
+;; (syntax-property (stx/surface #'baz (stx/surface #'bar #'foo)) 'surface)
+;; > #<syntax:stdin::306 foo>
+(define-syntax-rule (stx/surface stx origin)
+  (let* (;; Set source location of `stx' by the one of `surface'
+         [stx/loc (syntax/loc origin stx)]
+         ;; Reuse 'surface property of `surface' or make `surface' the
+         ;; property
+         [surface-prop (or (syntax-property origin 'surface) origin)]
+         [new-stx (syntax-property stx/loc 'surface surface-prop #t)])
+    ;; (println surface-prop)
+    ;; (println (syntax-property-symbol-keys new-stx))
+    new-stx))
 
 ;; (dbg (+ 1 2))
 ;; > ; [dbg] stdin::103: (+ 1 2) = 3
@@ -289,7 +309,7 @@
      #:with srcloc (srcloc->string (build-source-location #'ctx))
      #'(let ([$dbg-msg "; [dbg] ~a: ~a = ~s~n"]
              [res      E])
-         (log-fatal $dbg-msg 'srcloc 'ctx res)
+         (log-lang-error $dbg-msg 'srcloc 'ctx res)
          res)]
     [(_ E) #'(dbg E #:ctx E)]))
 
