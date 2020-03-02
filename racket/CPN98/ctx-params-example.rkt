@@ -42,9 +42,9 @@
   (def (y → Y)
     (get-field (get-field this p2) snd))
 
-  ;; Check fstt not a field of Pair
-  (def (updateX-bad → rep/X)
-    (set-field! (get-field this p1) fstt (new rep/X)))
+  ;; ;; Check fstt not a field of Pair
+  ;; (def (updateX-bad → rep/X)
+  ;;   (set-field! (get-field this p1) fstt (new rep/X)))
 
   (def (updateX → rep/X)
     (set-field! (get-field this p1) fst (new rep/X)))
