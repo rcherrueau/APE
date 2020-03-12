@@ -15,4 +15,7 @@ compiled
 _the_asm_code.s
 _the_asm_code.o
 
+## compiled examples
+!examples/*.rkt
+
 # End of https://www.gitignore.io/api/racket
