@@ -1,4 +1,4 @@
-#lang reader "reader.rkt" racket/base
+#lang reader "reader.rkt" typed/racket/base/no-check
 
 ;; ,-,-,-.
 ;; `,| | |   ,-. . . ,-. ,-. . . ,-. ,-.
@@ -22,6 +22,7 @@
 
 (require (for-syntax racket/base)
          racket/contract/base
+         racket/contract/region
          racket/function
          racket/list
          racket/match
@@ -34,11 +35,14 @@
          "utils.rkt"
          "definitions.rkt")
 
+(module+ test (require rackunit))
+
+
 (provide ∗>)
 
 
 ;; Transformation (∗>)
-
+(: define-parser (Syntax -> Syntax))
 (define-parser (∗> stx)
 
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -69,6 +73,7 @@
 
 
 ;; A prog is a list of CLASS and one expression E
+(: ∗p> (Syntax -> Syntax))
 (define-rules ∗p>
   ;; Note: The `~!` eliminate backtracking. Hence, if the next
   ;; `fail-when` failed, it will not backtrack to try other cases.
@@ -80,9 +85,10 @@
 
 ;; A class is a NAME, an optional list of context parameters
 ;; CPARAM, and a list of fields and definitions.
+(: ∗c> (Syntax -> Syntax))
 (define-rules ∗c>
   [(class NAME:id [CPARAM:id ...] ~! FIELD/DEF:expr ...)
-   #:with [*FIELD/DEF ...] (stx-map ∗f>/d #'(FIELD/DEF ...))
+   #:with [*FIELD/DEF ...] (stx-map ∗f/d> #'(FIELD/DEF ...))
    #@(class NAME [CPARAM ...] *FIELD/DEF ...)]
   ;; Transforms a `class` without `CPARAM ...` into a `class` with.
   [(class ~! NAME FIELD/DEF ...)
@@ -90,7 +96,8 @@
 
 
 ;; Fields and Defs
-(define-rules ∗f>/d
+(: ∗f/d> (Syntax -> Syntax))
+(define-rules ∗f/d>
   ;; A field declares one argument ARG (i.e., no initialization).
   ;;
   ;; (field ARG)
@@ -98,9 +105,7 @@
   ;; with
   ;;     OW-SCHEME := (ow-scheme TYPE OWNER CPARAMS)
   [(field ~! ARG:arg)
-   #:with NAME      #'ARG.NAME
-   #:with OW-SCHEME (type∗>ow-scheme #'ARG.T)
-   #@(field NAME OW-SCHEME)]
+   #@(field ARG.NAME ARG.OW-SCHEME)]
 
   ;; A def (i.e., method) is a NAME, a list of arguments ARG, a
   ;; return type RET and the BODY of the def. The def binds ARG in
@@ -113,13 +118,14 @@
   ;;     A-OW-SCHEME := (A-TYPE A-OWNER A-CPARAMS)
   [(def ~! (NAME:id ARG:arg ... → RET:type) BODY:expr)
    #:with [A-NAME ...]      #'(ARG.NAME ...)
-   #:with [A-OW-SCHEME ...] (stx-map type∗>ow-scheme #'(ARG.T ...))
-   #:with RET-OW-SCHEME     (type∗>ow-scheme #'RET)
+   #:with [A-OW-SCHEME ...] #'(ARG.OW-SCHEME ...)
+   #:with RET-OW-SCHEME     #'RET.OW-SCHEME
    #:with *BODY             (with-Γ #'(this A-NAME ...) (∗e> #'BODY))
    #@(def (NAME (~@ (A-NAME A-OW-SCHEME)) ... RET-OW-SCHEME) *BODY)])
 
 
 ;; Expression
+(: ∗e> (Syntax -> Syntax))
 (define-rules ∗e>
   ;; A let binds a variables VAR with a type T to an expression E in
   ;; a BODY. During the transformation of BODY, Γ is extended with
@@ -130,10 +136,9 @@
   ;; with
   ;;     OW-SCHEME := (TYPE OWNER CPARAMS)
   [(let ([VAR:id : T:type E:expr]) ~! BODY:expr)
-   #:with OW-SCHEME (type∗>ow-scheme #'T)
    #:with *E        (∗e> #'E)
    #:with *BODY     (with-Γ (Γ-add #'VAR) (∗e> #'BODY))
-   #@(let (VAR OW-SCHEME *E) *BODY)]
+   #@(let (VAR T.OW-SCHEME *E) *BODY)]
   ;; Transforms a `let` with multiple binding into multiple nested
   ;; `let`s with one unique binding (such as the previous let)
   [(let ~! (B1 BS ...) BODY:expr)
@@ -145,8 +150,7 @@
   ;; (new C-TYPE)
   ;; ∗>  (new (TYPE OWNER CPARAMS))
   [(new ~! C-TYPE:type)
-   #:with OW-SCHEME (type∗>ow-scheme #'C-TYPE)
-   #@(new OW-SCHEME)]
+   #@(new C-TYPE.OW-SCHEME)]
 
   ;; A get-field takes an expression E that should reduce to an
   ;; object and the name of the field FNAME to get on that object.
@@ -210,12 +214,20 @@
 ;; Environment -- Manage local binding (Γ)
 
 ;; Is VAR bounded in Γ?
-;; : Identifier -> Boolean
+(: Γ-member? (Identifier -> Boolean))
 (define (Γ-member? VAR)
+  (when (not (list? (Γ)))
+    (error 'Γ-member?
+           (string-append
+            "Γ expected a (listof syntax?) but ~a was given."
+            "~n  Is expression wrapped in `with-Γ`?")
+           (Γ)))
+
   (if (findf (curry bound-id=? VAR) (Γ)) #t #f))
 
 ;; Add a VAR to Γ.
 ;; : Identifier -> List Identifier
+(: Γ-add (Identifier -> Void))
 (define (Γ-add VAR)
   (if (Γ-member? VAR)
       (Γ)
@@ -239,69 +251,193 @@
   [(_ THE-Γ E:expr ...) #'(private:with-Γ THE-Γ (thunk E ...))])
 
 (module+ test
-  (require rackunit)
-
   (define test:Γ (list #'foo #'bar))
 
   (define-test-suite Γ-tests
-    (test-case "Primitive operations (member?, add)"
-      (check-true  (with-Γ #'(foo bar) (Γ-member? #'foo)))
-      (check-false (with-Γ #'(foo bar) (Γ-member? #'bar)))
-      (check-true  (with-Γ test:Γ (Γ-member? #'foo)))
-      (check-false (with-Γ test:Γ (Γ-member? #'baz)))
-      (with-Γ #'(foo bar)
-        (check-true  (with-Γ (Γ-add #'baz) (Γ-member? #'baz)))
-        (check-false (with-Γ (Γ-add #'baz) (Γ-member? #'xyzzy)))))))
+    (check-true  (with-Γ #'(foo bar) (Γ-member? #'foo)))
+    (check-true  (with-Γ #'(foo bar) (Γ-member? #'bar)))
+    (check-true (with-Γ test:Γ (Γ-member? #'foo)))
+    (check-false (with-Γ test:Γ (Γ-member? #'baz)))
+    (check-exn exn:fail? (thunk (Γ-member? #'baz))
+               "expression unwrapped in `with-Γ` is not valid")
+
+    (with-Γ test:Γ
+      (with-Γ (Γ-add #'baz) (check-true  (Γ-member? #'baz)))
+      (check-false (Γ-member? #'baz)))))
 
 
 ;; Syntax for type and arg
 
 (define-literal-set type-lits
   ;; Don't consider :, →, and / as patterns
-  #:datum-literals (: →)
+  #:datum-literals (: → ->)
   ())
 
 (define-syntax-class type
-  ;; Should be of the form `owner/type`, (`owner/type (param ...)), `type`, (`type` (param ...))
   #:description (string-append
-                 "a ownership type: one of the form "
-                 "`owner/type`, "
-                 "`(owner/type param ...)`, "
-                 "`type`, or "
-                 "`(type param ...)` with owner implicitly "
-                 "bound to `world` in the last two forms.")
+                 "a ownership type is one of the form: "
+                 "~n- owner/type"
+                 "~n- (owner/type param ...)"
+                 "~n- type -- owner is implictly world"
+                 "~n- (type param ...) -- owner is implicitly world.")
   #:literal-sets [type-lits]
-  #:attributes [TYPE OWNER CPARAMS]
+  #:attributes [TYPE OWNER CPARAMS OW-SCHEME]
   ;; owner/type
   (pattern T:id #:when (is-stx-owner/type? #'T)
            #:with [OWNER . TYPE] (owner/type->OWNER.TYPE #'T)
-           #:with CPARAMS #'())
-  ;; (owner/type ctx params ...)
-  (pattern (T:id PARAMS:id ...+)
-           #:when (is-stx-owner/type? #'T)
-           #:with [OWNER . TYPE] (owner/type->OWNER.TYPE #'T)
-           #:with CPARAMS #'(PARAMS ...))
+           #:with CPARAMS #'()
+           #:with OW-SCHEME (syntax/loc #'T (TYPE OWNER CPARAMS)))
+  ;; (owner/(type ctx-params ...))
+  (pattern (O/:id (TYPE:id PARAMS:id ...+))
+           #:when (is-stx-owner/? #'O/)
+           #:with OWNER (owner/->OWNER #'O/)
+           #:with CPARAMS #'(PARAMS ...)
+           #:with OW-SCHEME (syntax/loc #'T (TYPE OWNER CPARAMS)))
   ;; type -- owner is implicitly world
   (pattern T:id
            #:with OWNER #'world
            #:with TYPE #'T
-           #:with CPARAMS #'())
+           #:with CPARAMS #'()
+           #:with OW-SCHEME (syntax/loc #'T (TYPE OWNER CPARAMS)))
   ;; (type ctx params ...) -- owner is implicitly world
   (pattern (T:id PARAMS:id ...+)
            #:with OWNER #'world
            #:with TYPE #'T
-           #:with CPARAMS #'(PARAMS ...))
-  )
+           #:with CPARAMS #'(PARAMS ...)
+           #:with OW-SCHEME (syntax/loc #'T (TYPE OWNER CPARAMS))))
 
-;; (is-stx-owner/type? #'owner/type)   ; #t
-;; (is-stx-owner/type? #'owner/t/ype)  ; #t
-;; (is-stx-owner/type? #'ownertype)    ; #f
+(define-syntax-class arg
+  #:description "an argument with its type"
+  #:literal-sets [type-lits]
+  (pattern (NAME:id : T:type)
+           #:attr OWNER     #'T.OWNER
+           #:attr TYPE      #'T.TYPE
+           #:attr CPARAMS   #'T.CPARAMS
+           #:attr OW-SCHEME #'T.OW-SCHEME)
+  (pattern (NAME:id : . T:type)
+           ;; TODO: A a `when` check to only catch
+           ;; T of the form `owner/ (...)`
+           #:attr OWNER     #'T.OWNER
+           #:attr TYPE      #'T.TYPE
+           #:attr CPARAMS   #'T.CPARAMS
+           #:attr OW-SCHEME #'T.OW-SCHEME))
+
+(module+ test
+  (define-test-suite owner/type-arg-stx-parse
+    (test-case "Parse #'owner/type"
+      (syntax-parse #'owner/type
+        [t:type
+         (check-stx=? #'t.TYPE      #'type)
+         (check-stx=? #'t.OWNER     #'owner)
+         (check-stx=? #'t.CPARAMS   #'())
+         (check-stx=? #'t.OW-SCHEME #'(type owner ()))]
+        [_ (fail "#'owner/type should be a type syntax-class")]))
+
+    (test-case "Parse #'owner/ty/pe"
+      (syntax-parse #'owner/ty/pe
+        [t:type
+         (check-stx=? #'t.TYPE      #'ty/pe)
+         (check-stx=? #'t.OWNER     #'owner)
+         (check-stx=? #'t.CPARAMS   #'())
+         (check-stx=? #'t.OW-SCHEME #'(ty/pe owner ()))]
+        [_ (fail "#'owner/ty/pe should be a type syntax-class")]))
+
+    (test-case "Parse #'(owner/type c1 c2)"
+      (syntax-parse #'(owner/(type c1 c2))
+        [t:type
+         (check-stx=? #'t.TYPE      #'type)
+         (check-stx=? #'t.OWNER     #'owner)
+         (check-stx=? #'t.CPARAMS   #'(c1 c2))
+         (check-stx=? #'t.OW-SCHEME #'(type owner (c1 c2)))]
+        [_ (fail "#'(owner/type c1 c2) should be a type syntax-class")]))
+
+    (test-case "Parse #'type"
+      (syntax-parse #'type
+        [t:type
+         (check-stx=? #'t.TYPE      #'type)
+         (check-stx=? #'t.OWNER     #'world)
+         (check-stx=? #'t.CPARAMS   #'())
+         (check-stx=? #'t.OW-SCHEME #'(type world ()))]
+        [_ (fail "#'type should be a type syntax-class")]))
+
+    (test-case "Parse #'(type c1 c2)"
+      (syntax-parse #'(type c1 c2)
+        [t:type
+         (check-stx=? #'t.TYPE      #'type)
+         (check-stx=? #'t.OWNER     #'world)
+         (check-stx=? #'t.CPARAMS   #'(c1 c2))
+         (check-stx=? #'t.OW-SCHEME #'(type world (c1 c2)))]
+        [_ (fail "#'(type c1 c2) should be a type syntax-class")]))
+
+    (test-case "Parse argument"
+      (syntax-parse #'(name : owner/type)
+        [a:arg
+         (check-stx=? #'a.NAME      #'name)
+         (check-stx=? #'a.TYPE      #'type)
+         (check-stx=? #'a.OWNER     #'owner)
+         (check-stx=? #'a.CPARAMS   #'())
+         (check-stx=? #'a.OW-SCHEME #'(type owner ()))]
+        [_ (fail "#'(name : owner/type)")])
+
+      (syntax-parse #'(name : owner/{type c1 c2})
+        [a:arg
+         (check-stx=? #'a.NAME      #'name)
+         (check-stx=? #'a.TYPE      #'type)
+         (check-stx=? #'a.OWNER     #'owner)
+         (check-stx=? #'a.CPARAMS   #'(c1 c2))
+         (check-stx=? #'a.OW-SCHEME #'(type owner (c1 c2)))]
+        [_ (fail "#'(name : owner/(type c1 c2))")])
+
+      (syntax-parse #'(name : type)
+        [a:arg
+         (check-stx=? #'a.NAME      #'name)
+         (check-stx=? #'a.TYPE      #'type)
+         (check-stx=? #'a.OWNER     #'world)
+         (check-stx=? #'a.CPARAMS   #'())
+         (check-stx=? #'a.OW-SCHEME #'(type world ()))]
+        [_ (fail "#'(name : type)")])
+
+      (syntax-parse #'(name : (type c1 c2))
+        [a:arg
+         (check-stx=? #'a.NAME      #'name)
+         (check-stx=? #'a.TYPE      #'type)
+         (check-stx=? #'a.OWNER     #'world)
+         (check-stx=? #'a.CPARAMS   #'(c1 c2))
+         (check-stx=? #'a.OW-SCHEME #'(type world (c1 c2)))]
+        [_ (fail "#'(name : type)")])
+      )
+
+    (test-case "Gracefully fails on parse"
+      (check-exn exn:fail:syntax?
+                 (thunk (syntax-parse #'{owner/type (c1 c2)})))
+      (check-exn exn:fail:syntax?
+                 (thunk (syntax-parse #'{type (c1 c2)})))
+      (check-exn exn:fail:syntax?
+                 (thunk (syntax-parse #'(name {owner/type})))))
+    ))
+
+
+
+;; Utils
+
+;; Return #t a syntax object is of the form #'owner/type, or #f
+;; otherwise.
+(: is-stx-owner/type? (Syntax -> Boolean))
 (define (is-stx-owner/type? stx)
   (and (identifier? stx)
        (string-contains? (symbol->string (syntax-e stx)) "/")))
 
-;; (owner/type->OWNER.TYPE #'owner/type)  ; #'(owner . type)
-;; (owner/type->OWNER.TYPE #'owner/ty/pe) ; #'(owner . ty/pe)
+;; Return #t a syntax object is of the form #'owner/, or #f
+;; otherwise.
+(: is-stx-owner/? (Syntax -> Boolean))
+(define (is-stx-owner/? stx)
+  (and (identifier? stx)
+       (string-suffix? (symbol->string (syntax-e stx)) "/")))
+
+;; Split a #'owner/type syntax object on the first `/` and returns a
+;; syntax pair #'(owner . type).
+(: owner/type->OWNER.TYPE
+   (Syntax -> (Syntaxof (Pairof Identifier Identifier))))
 (define (owner/type->OWNER.TYPE stx)
   (match-define (list owner-str type-str ...)
     (string-split (symbol->string (syntax-e stx)) "/"))
@@ -312,120 +448,32 @@
                           "~a" (string-join type-str "/"))])
     #`(#,OWNER . #,TYPE)))
 
-(define-syntax-class arg
-  #:description "an argument with its type"
-  #:literal-sets [type-lits]
-  (pattern (NAME:id : T:type)
-           #:attr OWNER #'T.OWNER
-           #:attr TYPE  #'T.TYPE
-           #:attr CPARAMS #'T.CPARAMS))
+;; Trim a #'owner/ syntax object on the last `/` and returns a
+;; syntax #'owner.
+(: owner/->OWNER (Identifier -> Identifier))
+(define (owner/->OWNER stx)
+  (define owner-str
+    (string-trim (symbol->string (syntax-e stx))
+                 "/"
+                 #:left? #f))
 
-
-;; Utils
+  (format-id stx #:source stx "~a" owner-str))
 
-;; From a `type` syntax class to a `ow-scheme` syntax class.
-;; (: type∗>ow-scheme (TYPE -> OW-SCHEME))
-(define type∗>ow-scheme (syntax-parser
-    [T:type
-     #:with OW-SCHEME #'(T.TYPE T.OWNER T.CPARAMS)
-     (syntax/loc #'T OW-SCHEME)]))
+(module+ test
+  (define-test-suite owner/type-stx-split
+    (check-true  (is-stx-owner/type? #'owner/type))
+    (check-true  (is-stx-owner/type? #'owner/t/type))
+    (check-false (is-stx-owner/type? #'ownertype))
 
-;; Make a syntax object with the loc of `this-syntax`.
-(define-syntax-rule (stx/this-loc pattern)
-  (syntax/loc this-syntax pattern))
+    (check-stx=? (owner/type->OWNER.TYPE #'owner/type)
+                 #'(owner . type))
+    (check-stx=? (owner/type->OWNER.TYPE #'owner/ty/pe)
+                 #'(owner . ty/pe))))
+
 
 ;; Tests
 (module+ test
   (require rackunit/text-ui)
   (run-tests Γ-tests)
-  #;(run-tests
-   (test-suite
-    "Tests for basic checks transformation (?>)"
-
-    ;;   (check-not-exn
-    ;;    (thunk (with-Γ #'(id) (?> #'id)))
-    ;;    "id is bounded if it exists in Γ")
-    ;;   (check-exn
-    ;;    #rx"unbound identifier.+?in: id"
-    ;;    (thunk (?> #'id))
-    ;;    "id is unbound if it does not exist in Γ")
-
-    ;;   ;; def
-    ;;   (check-not-exn
-    ;;    (thunk (?> #`(def (x (id #,τ✔) #,τ✔) id)))
-    ;;    "id is bounded if it is a parameter of the def")
-    ;;   (check-not-exn
-    ;;    (thunk (?> #`(def (x (id #,τ✔) #,τ✔) this)))
-    ;;    "this is bounded in a def")
-    ;;   (check-exn
-    ;;    #rx"unbound identifier.+?in: id"
-    ;;    (thunk (?> #`(def (x #,τ✔) id)))
-    ;;    "id is unbound if it is not a parameter of the def")
-
-    ;;   ;; let
-    ;;   (check-not-exn
-    ;;    (thunk (?> #`(let (id #,τ✔ #,EXPR:τ✔) id)))
-    ;;    "let binder bound the id")
-    ;;   (check-exn
-    ;;    #rx"unbound identifier.+?in: id"
-    ;;    (thunk (?> #`(let (x #,τ✔ id) x)))
-    ;;    "id is unbound in the binder of a let if it does not exist in Γ")
-    ;;   (check-exn
-    ;;    #rx"unbound identifier.+?in: id"
-    ;;    (thunk (?> #`(let (x #,τ✔ #,EXPR:τ✔) id)))
-    ;;    "id is unbound in the body of a let if it does not exist in Γ")
-
-    ;;   ;; FIXME: Right now, unbound ids in class are forgotten. Rather, an
-    ;;   ;; exception should be raised.
-    ;;   ;; (check-exn
-    ;;   ;;           #rx"unbound identifier.+?in: id"
-    ;;   ;;           (thunk (?> #'(class X []  id))))
-    ;;   (check-exn #rx"unbound identifier.+?in: id"
-    ;;             (thunk (?> #`(get-field id _))))
-
-    ;;   (check-exn #rx"unbound identifier.+?in: id"
-    ;;              (thunk (?> #`(set-field! id _ _)))
-    ;;              "id is bound in the receiver object of a set-field!")
-
-    ;;   (check-exn #rx"unbound identifier.+?in: id"
-    ;;              (thunk (?> #`(set-field! #,EXPR:τ✔ _ id)))
-    ;;              "id is bound in the body of a set-field!")
-
-    ;;   (check-exn #rx"unbound identifier.+?in: id"
-    ;;              (thunk (?> #`(send id _)))
-    ;;              "id is bound in the receiver object of a send")
-
-    ;;   (check-exn #rx"unbound identifier.+?in: id"
-    ;;              (thunk (?> #`(send #,EXPR:τ✔ _ id)))
-    ;;              "id is bound in the argument of a send"))
-
-
-    ;; ;; ----------------------------------------------------------------
-    ;; ;; Unknown Type
-    ;; (test-case "Known & Unknown Types"
-    ;;   (check-not-exn
-    ;;    (thunk (?> #`(prog (class X  []) (new (ow-scheme X x ())))))
-    ;;    "Defining a class X implies P ∗τ> X")
-
-    ;;   ;; FIXME: don't relies on state
-    ;;   ;; (check-not-false
-    ;;   ;;  (check-∗τ> #'X)
-    ;;   ;;  "Defining a class X implies P ∗τ> X")
-    ;;   (check-exn
-    ;;    #rx"Unexpected Type.+?in: Y"
-    ;;    (thunk (?> #`(prog (class X  []) (new (ow-scheme Y x ())))))
-    ;;    "Unknonw type Y if class Y is not defined")
-    ;;   (check-exn #rx"Unexpected Type.+?in: τ✘"
-    ;;              (thunk (?> #`(class X [] (field x #,τ✘)))))
-    ;;   (check-exn #rx"Unexpected Type.+?in: τ✘"
-    ;;              (thunk (?> #`(def (x #,τ✘) _))))
-    ;;   (check-exn #rx"Unexpected Type.+?in: τ✘"
-    ;;              (thunk (?> #`(def (x (_ #,τ✘) #,τ✔) _))))
-    ;;   (check-exn #rx"Unexpected Type.+?in: τ✘"
-    ;;              (thunk (?> #`(let (x #,τ✘ _) _))))
-    ;;   (check-exn #rx"Unexpected Type.+?in: τ✘"
-    ;;              (thunk (?> #`(new #,τ✘)))))
-    ;; )
-   )
-  )
-  )
+  (run-tests owner/type-stx-split)
+  (run-tests owner/type-arg-stx-parse))
