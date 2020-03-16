@@ -8,6 +8,8 @@ pkgs.mkShell {
   buildInputs = [
     pkgs.elmPackages.elm
     pkgs.nodejs-10_x
+    pkgs.electron
+    pkgs.p7zip
   ];
   shellHook = ''
     export ELM_HOME=$(pwd)

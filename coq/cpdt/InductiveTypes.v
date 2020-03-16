@@ -269,3 +269,101 @@ Qed.
 
 (* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
 (* Parameterized Types *)
+
+(* Polymorphic Inductive list à la Haskell/ML *)
+(*
+Inductive list (T: Set): Set :=
+| Nil: list T
+| Cons: T -> list T -> list T.
+
+Fixpoint length (T: Set) (xs: list T): nat :=
+  match xs with
+  | Nil => O
+  | Cons x xs' => S (length xs')
+  end.
+
+Fixpoint app (T: Set) (xs ys: list T): list T :=
+  match xs with
+  | Nil => ys
+  | Cons x xs' => Cons x (app xs' ys)
+  end.
+
+Check list_ind.
+
+Theorem length_app : forall (T: Set) (xs ys: list T),
+    length(app xs ys) = plus (length xs) (length ys).
+Proof.
+  induction xs; crush.
+Qed.
+
+This is a bit painful to add the parametric type `T` everywhere.
+Fortunately, Coq can do better.
+*)
+
+Section list.
+  (* Add `T` as extra function parameters for each defined identifier,
+  as needed *)
+  Variable T : Set.
+
+  Inductive list: Set :=
+  | Nil: list
+  | Cons: T -> list -> list.
+
+  Fixpoint length (xs: list): nat :=
+    match xs with
+    | Nil => O
+    | Cons x xs' => S (length xs')
+    end.
+
+  Fixpoint app (xs ys: list): list :=
+    match xs with
+    | Nil => ys
+    | Cons x xs' => Cons x (app xs' ys)
+    end.
+
+  Theorem length_app : forall (xs ys: list),
+      length (app xs ys) = plus (length xs) (length ys).
+  Proof.
+    induction xs; crush.
+  Qed.
+End list.
+
+Print list.
+(*
+  [[
+  Inductive list (T : Set) : Set :=
+    Nil : list T | Cons : T -> list T -> list T
+
+  For Cons: Argument T is implicit
+  ]]
+
+The parametric type `T` is automatically added to `Nil` and `Cons`
+constructors. `T` is also implicit in `Cons` thanks to the
+`Set Implicit Arguments` at the top of this file. But, we still have
+to explicitly set it for Nil, e.g.:
+
+  Definition nnil: list nat := Nil nat.
+
+instead of,
+
+  Definition nnil: list nat := Nil.
+
+Can we do better? Yes, with an `Arguments` command, we can ask
+that `T` be inferred when use `Nil`.
+*)
+Arguments Nil [T].
+
+Definition nnil: list nat := Nil.
+
+(* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
+(* Mutually Inductive Types *)
+
+(* Inductive types that refer to each other *)
+Inductive even_list: Set :=
+| ENil: even_list
+| ECons: nat -> odd_list -> even_list
+
+with odd_list: Set :=
+| OCons: nat -> even_list -> odd_list.
+
+Fixpoint elength (e)

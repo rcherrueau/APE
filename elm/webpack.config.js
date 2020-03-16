@@ -32,7 +32,7 @@ module.exports = [{
         // www/app.js)
         './OctoDaddy.js',
         // Loading of the Index (output in www/index.html)
-        './OctoDaddy.html', './favicon.ico'
+        './OctoDaddy.html', './favicon.ico',
     ],
     output: {
         path: path.resolve(__dirname, 'www'), // output directory of the build
@@ -73,10 +73,13 @@ module.exports = [{
             {
                 test: /\.js$/,
                 loader: 'babel-loader',
-                query: { presets: ['es2015'] }
+                // exclude: [
+                //     path.resolve(__dirname, 'electron.js'),
+                // ],
+                query: { presets: ['es2015'], }
             },
             // Elm part (Doesn't include elm-mdc/, this is managed by
-            // OctoDaddy package.json)
+            // OctoDaddy elm.json)
             {
                 test: /\.elm$/,
                 exclude: [/elm-stuff/, /node_modules/, /elm-mdc/],

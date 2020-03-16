@@ -19,3 +19,5 @@ http://localhost:8080/www/
 - MDC web doc https://material.io/develop/web/docs/getting-started/
   + Reach it from Develop > Web > DOCUMENTATION > Components
 - Elm doc https://package.elm-lang.org/
+- Electron quick start https://electronjs.org/docs/tutorial/first-app
+- Electron app packaging https://github.com/electron-userland/electron-builder

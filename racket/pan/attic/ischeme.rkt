@@ -16,11 +16,7 @@
 
 ;; Macro Expander
 
-(extends-lang "lam.rkt")
-
-;; List of Idealized Scheme Expressions
-(define-syntax-rule (ischeme-mb ISCHEME-EXP ...)
-  (#%module-begin ISCHEME-EXP ...))
+(extends-lang "lam+lit.rkt")
 
 ;; Reference
 (define-syntax-rule (ischeme-ref EXP)
@@ -38,29 +34,28 @@
 (define-syntax-rule (ischeme-ρ ([VAR VAL] ...) EXP)
   (letrec ([VAR VAL] ...) EXP))
 
-(provide (rename-out [ischeme-mb #%module-begin]
-                     [ischeme-ref ref]
+(provide (rename-out [ischeme-ref ref]
                      [ischeme-deref deref]
                      [ischeme-set! set!]
                      [ischeme-ρ ρ]
                      ))
 
-(module+ test
-  (require rackunit)
+;; (module+ test
+;;   (require rackunit)
 
-  ;; ----------------------------------- from lam.rkt
-  (define TRUE  (lam:λ t (lam:λ f t)))
-  (define FALSE (lam:λ t (lam:λ f f)))
-  (define IFTHENELSE
-    (lam:λ test
-           (lam:λ if-true
-                  (lam:λ if-false
-                         (lam:#%app (lam:#%app test if-true)
-                                    if-false)))))
+;;   ;; ----------------------------------- from lam.rkt
+;;   (define TRUE  (lam:λ t (lam:λ f t)))
+;;   (define FALSE (lam:λ t (lam:λ f f)))
+;;   (define IFTHENELSE
+;;     (lam:λ test
+;;            (lam:λ if-true
+;;                   (lam:λ if-false
+;;                          (lam:#%app (lam:#%app test if-true)
+;;                                     if-false)))))
 
-  (check-true (lam:#%app (lam:#%app (lam:#%app IFTHENELSE TRUE) #t) #f))
-  (check-false (lam:#%app (lam:#%app (lam:#%app IFTHENELSE FALSE) #t) #f))
+;;   (check-true (lam:#%app (lam:#%app (lam:#%app IFTHENELSE TRUE) #t) #f))
+;;   (check-false (lam:#%app (lam:#%app (lam:#%app IFTHENELSE FALSE) #t) #f))
 
-  ;; ----------------------------------- specific
-  (check-equal? (ischeme-ρ ([x 10]) x) 10)
-  )
+;;   ;; ----------------------------------- specific
+;;   (check-equal? (ischeme-ρ ([x 10]) x) 10)
+;;   )

@@ -18,7 +18,7 @@ pkgs.mkShell {
 
   shellHook = ''
     rustup install stable
-    rustup  default stable
+    rustup default stable
     rustup update
     rustup component add rls rust-analysis rust-src
   '';
