@@ -91,7 +91,7 @@
    #:with [*FIELD/DEF ...] (stx-map ∗f/d> #'(FIELD/DEF ...))
    #@(class NAME [CPARAM ...] *FIELD/DEF ...)]
   ;; Transforms a `class` without `CPARAM ...` into a `class` with.
-  [(class ~! NAME FIELD/DEF ...)
+  [(class NAME:id ~! FIELD/DEF:expr ...)
    (∗c> #@(class NAME [] FIELD/DEF ...))])
 
 
@@ -116,7 +116,7 @@
   ;; ∗>  (def (NAME (A-NAME A-OW-SCHEME) ... RET-OW-SCHEME) *BODY)
   ;; with
   ;;     A-OW-SCHEME := (A-TYPE A-OWNER A-CPARAMS)
-  [(def ~! (NAME:id ARG:arg ... → RET:type) BODY:expr)
+  [(def ~! (NAME:id ARG:arg ... . RET:rtype) BODY:expr)
    #:with [A-NAME ...]      #'(ARG.NAME ...)
    #:with [A-OW-SCHEME ...] #'(ARG.OW-SCHEME ...)
    #:with RET-OW-SCHEME     #'RET.OW-SCHEME
@@ -277,11 +277,11 @@
   #:description (string-append
                  "a ownership type is one of the form: "
                  "~n- owner/type"
-                 "~n- (owner/type param ...)"
+                 "~n- owner/(type param ...)"
                  "~n- type -- owner is implictly world"
                  "~n- (type param ...) -- owner is implicitly world.")
-  #:literal-sets [type-lits]
   #:attributes [TYPE OWNER CPARAMS OW-SCHEME]
+  #:commit
   ;; owner/type
   (pattern T:id #:when (is-stx-owner/type? #'T)
            #:with [OWNER . TYPE] (owner/type->OWNER.TYPE #'T)
@@ -308,18 +308,12 @@
 
 (define-syntax-class arg
   #:description "an argument with its type"
-  #:literal-sets [type-lits]
+  #:datum-literals [:]
+  #:commit
   (pattern (NAME:id : T:type)
-           #:attr OWNER     #'T.OWNER
-           #:attr TYPE      #'T.TYPE
-           #:attr CPARAMS   #'T.CPARAMS
            #:attr OW-SCHEME #'T.OW-SCHEME)
-  (pattern (NAME:id : . T:type)
-           ;; TODO: A a `when` check to only catch
-           ;; T of the form `owner/ (...)`
-           #:attr OWNER     #'T.OWNER
-           #:attr TYPE      #'T.TYPE
-           #:attr CPARAMS   #'T.CPARAMS
+  ;; The `.' removes the need of parentheses that surround the `T'.
+  (pattern (NAME:id : ~! . T:type)
            #:attr OW-SCHEME #'T.OW-SCHEME))
 
 (module+ test
@@ -420,7 +414,7 @@
 
 ;; Utils
 
-;; Return #t a syntax object is of the form #'owner/type, or #f
+;; Returns #t if a syntax object is of the form #'owner/type, or #f
 ;; otherwise.
 (: is-stx-owner/type? (Syntax -> Boolean))
 (define (is-stx-owner/type? stx)
@@ -468,7 +462,14 @@
     (check-stx=? (owner/type->OWNER.TYPE #'owner/type)
                  #'(owner . type))
     (check-stx=? (owner/type->OWNER.TYPE #'owner/ty/pe)
-                 #'(owner . ty/pe))))
+                 #'(owner . ty/pe)))
+
+  (define-test-suite owner/-stx-split
+    (check-true (is-stx-owner/? #'owner/))
+    (check-false (is-stx-owner/? #'own/er/))
+    (check-false (is-stx-owner/? #'owner))
+
+    (check-stx=? (owner/->OWNER #'owner/) #'owner)))
 
 
 ;; Tests
@@ -476,4 +477,9 @@
   (require rackunit/text-ui)
   (run-tests Γ-tests)
   (run-tests owner/type-stx-split)
-  (run-tests owner/type-arg-stx-parse))
+  (run-tests owner/-stx-split)
+  (run-tests type-parse)
+  (run-tests rtype-parse)
+  (run-tests arg-parse)
+  (run-tests arg+expr-parse)
+  )
