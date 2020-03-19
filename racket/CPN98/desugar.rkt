@@ -37,7 +37,6 @@
 
 (module+ test (require rackunit))
 
-
 (provide ∗>)
 
 
@@ -123,6 +122,14 @@
    #:with *BODY             (with-Γ #'(this A-NAME ...) (∗e> #'BODY))
    #@(def (NAME (~@ (A-NAME A-OW-SCHEME)) ... RET-OW-SCHEME) *BODY)])
 
+;; TODO: test me!
+;; (syntax-parse #'(-> owner/(type c1 c2))
+;;   [(a ... . r:rtype) (check-stx=? #'r.OW-SCHEME #'(type owner (c1 c2)))]
+;;   [_ (fail "#'(→ type)")])
+;;
+;; (syntax-parse #'(arg1 arg2 -> owner/(type c1 c2))
+;;   [(a ... . r:rtype) (check-stx=? #'r.OW-SCHEME #'(type owner (c1 c2)))]
+;;   [_ (fail "#'(→ type)")])
 
 ;; Expression
 (: ∗e> (Syntax -> Syntax))
@@ -135,10 +142,10 @@
   ;; ∗>  (let (VAR OW-SCHEME *E) (let... (...) *BODY)
   ;; with
   ;;     OW-SCHEME := (TYPE OWNER CPARAMS)
-  [(let ([VAR:id : T:type E:expr]) ~! BODY:expr)
-   #:with *E        (∗e> #'E)
-   #:with *BODY     (with-Γ (Γ-add #'VAR) (∗e> #'BODY))
-   #@(let (VAR T.OW-SCHEME *E) *BODY)]
+  [(let (ARG:arg+expr) ~! BODY:expr)
+   #:with *E        (∗e> #'ARG.EXPR)
+   #:with *BODY     (with-Γ (Γ-add #'ARG.VAR) (∗e> #'BODY))
+   #@(let (ARG.VAR ARG.OW-SCHEME *E) *BODY)]
   ;; Transforms a `let` with multiple binding into multiple nested
   ;; `let`s with one unique binding (such as the previous let)
   [(let ~! (B1 BS ...) BODY:expr)
@@ -268,6 +275,7 @@
 
 ;; Syntax for type and arg
 
+;; TODO: Remove this
 (define-literal-set type-lits
   ;; Don't consider :, →, and / as patterns
   #:datum-literals (: → ->)
@@ -306,6 +314,73 @@
            #:with CPARAMS #'(PARAMS ...)
            #:with OW-SCHEME (syntax/loc #'T (TYPE OWNER CPARAMS))))
 
+(module+ test
+  (define-test-suite type-parse
+    (test-parse #'owner/type t:type
+      (check-stx=? #'t.TYPE      #'type)
+      (check-stx=? #'t.OWNER     #'owner)
+      (check-stx=? #'t.CPARAMS   #'())
+      (check-stx=? #'t.OW-SCHEME #'(type owner ())))
+
+    (test-parse #'owner/ty/pe t:type
+      (check-stx=? #'t.TYPE      #'ty/pe)
+      (check-stx=? #'t.OWNER     #'owner)
+      (check-stx=? #'t.CPARAMS   #'())
+      (check-stx=? #'t.OW-SCHEME #'(ty/pe owner ())))
+
+    (test-parse #'(owner/(type c1 c2)) t:type
+      (check-stx=? #'t.TYPE      #'type)
+      (check-stx=? #'t.OWNER     #'owner)
+      (check-stx=? #'t.CPARAMS   #'(c1 c2))
+      (check-stx=? #'t.OW-SCHEME #'(type owner (c1 c2))))
+
+    (test-parse #'type t:type
+      (check-stx=? #'t.TYPE      #'type)
+      (check-stx=? #'t.OWNER     #'world)
+      (check-stx=? #'t.CPARAMS   #'())
+      (check-stx=? #'t.OW-SCHEME #'(type world ())))
+
+    (test-parse #'(type c1 c2) t:type
+      (check-stx=? #'t.TYPE      #'type)
+      (check-stx=? #'t.OWNER     #'world)
+      (check-stx=? #'t.CPARAMS   #'(c1 c2))
+      (check-stx=? #'t.OW-SCHEME #'(type world (c1 c2))))
+
+    (check-ill-parsed #'(owner/type (c1 c2)) _:type)
+    (check-ill-parsed #'(type (c1 c2)) _:type)
+    (check-ill-parsed #'(ow/ner/{type c1 c2}) _:type
+        #:msg "Putting a `/` in owner name is not a valid syntax")))
+
+
+(define-syntax-class rtype
+  #:description "a return type"
+  #:datum-literals [-> →]
+  #:commit
+  (pattern (-> T:type)   #:attr OW-SCHEME #'T.OW-SCHEME)
+  (pattern (→ T:type)    #:attr OW-SCHEME #'T.OW-SCHEME)
+  ;; The `.' removes the need of parentheses that surround the `T'.
+  (pattern (-> . T:type) #:attr OW-SCHEME #'T.OW-SCHEME)
+  (pattern (→ . T:type)  #:attr OW-SCHEME #'T.OW-SCHEME))
+
+(module+ test
+  (define-test-suite rtype-parse
+    (for ([-> (list #'→ #'->)])
+      (test-parse #`(#,-> owner/type) r:rtype
+        (check-stx=? #'r.OW-SCHEME #'(type owner ())))
+
+      (test-parse #`(#,-> owner/{type c1 c2}) r:rtype
+        (check-stx=? #'r.OW-SCHEME #'(type owner (c1 c2))))
+
+      (test-parse #`(#,-> (owner/{type c1 c2})) r:rtype
+        (check-stx=? #'r.OW-SCHEME #'(type owner (c1 c2))))
+
+      (test-parse #`(#,-> type) r:rtype
+        (check-stx=? #'r.OW-SCHEME #'(type world ())))
+
+      (test-parse #`(#,-> (type c1 c2)) r:rtype
+        (check-stx=? #'r.OW-SCHEME #'(type world (c1 c2)))))))
+
+
 (define-syntax-class arg
   #:description "an argument with its type"
   #:datum-literals [:]
@@ -317,99 +392,70 @@
            #:attr OW-SCHEME #'T.OW-SCHEME))
 
 (module+ test
-  (define-test-suite owner/type-arg-stx-parse
-    (test-case "Parse #'owner/type"
-      (syntax-parse #'owner/type
-        [t:type
-         (check-stx=? #'t.TYPE      #'type)
-         (check-stx=? #'t.OWNER     #'owner)
-         (check-stx=? #'t.CPARAMS   #'())
-         (check-stx=? #'t.OW-SCHEME #'(type owner ()))]
-        [_ (fail "#'owner/type should be a type syntax-class")]))
+  (define-test-suite arg-parse
+    (test-parse #'(name : owner/type) a:arg
+      (check-stx=? #'a.OW-SCHEME #'(type owner ())))
 
-    (test-case "Parse #'owner/ty/pe"
-      (syntax-parse #'owner/ty/pe
-        [t:type
-         (check-stx=? #'t.TYPE      #'ty/pe)
-         (check-stx=? #'t.OWNER     #'owner)
-         (check-stx=? #'t.CPARAMS   #'())
-         (check-stx=? #'t.OW-SCHEME #'(ty/pe owner ()))]
-        [_ (fail "#'owner/ty/pe should be a type syntax-class")]))
+    (test-parse #'(name : owner/{type c1 c2}) a:arg
+      (check-stx=? #'a.OW-SCHEME #'(type owner (c1 c2))))
 
-    (test-case "Parse #'(owner/type c1 c2)"
-      (syntax-parse #'(owner/(type c1 c2))
-        [t:type
-         (check-stx=? #'t.TYPE      #'type)
-         (check-stx=? #'t.OWNER     #'owner)
-         (check-stx=? #'t.CPARAMS   #'(c1 c2))
-         (check-stx=? #'t.OW-SCHEME #'(type owner (c1 c2)))]
-        [_ (fail "#'(owner/type c1 c2) should be a type syntax-class")]))
+    (test-parse #'(name : (owner/{type c1 c2})) a:arg
+      (check-stx=? #'a.OW-SCHEME #'(type owner (c1 c2))))
 
-    (test-case "Parse #'type"
-      (syntax-parse #'type
-        [t:type
-         (check-stx=? #'t.TYPE      #'type)
-         (check-stx=? #'t.OWNER     #'world)
-         (check-stx=? #'t.CPARAMS   #'())
-         (check-stx=? #'t.OW-SCHEME #'(type world ()))]
-        [_ (fail "#'type should be a type syntax-class")]))
+    (test-parse #'(name : type) a:arg
+      (check-stx=? #'a.OW-SCHEME #'(type world ())))
 
-    (test-case "Parse #'(type c1 c2)"
-      (syntax-parse #'(type c1 c2)
-        [t:type
-         (check-stx=? #'t.TYPE      #'type)
-         (check-stx=? #'t.OWNER     #'world)
-         (check-stx=? #'t.CPARAMS   #'(c1 c2))
-         (check-stx=? #'t.OW-SCHEME #'(type world (c1 c2)))]
-        [_ (fail "#'(type c1 c2) should be a type syntax-class")]))
+    (test-parse #'(name : (type c1 c2)) a:arg
+      (check-stx=? #'a.OW-SCHEME #'(type world (c1 c2))))
 
-    (test-case "Parse argument"
-      (syntax-parse #'(name : owner/type)
-        [a:arg
-         (check-stx=? #'a.NAME      #'name)
-         (check-stx=? #'a.TYPE      #'type)
-         (check-stx=? #'a.OWNER     #'owner)
-         (check-stx=? #'a.CPARAMS   #'())
-         (check-stx=? #'a.OW-SCHEME #'(type owner ()))]
-        [_ (fail "#'(name : owner/type)")])
+    (check-ill-parsed #'(name {owner/type}) _:arg)
+    (check-ill-parsed #'(name : own/er/{type (c1 c2)}) _:arg
+      #:msg "Putting a `/` in owner name is not a valid syntax")))
 
-      (syntax-parse #'(name : owner/{type c1 c2})
-        [a:arg
-         (check-stx=? #'a.NAME      #'name)
-         (check-stx=? #'a.TYPE      #'type)
-         (check-stx=? #'a.OWNER     #'owner)
-         (check-stx=? #'a.CPARAMS   #'(c1 c2))
-         (check-stx=? #'a.OW-SCHEME #'(type owner (c1 c2)))]
-        [_ (fail "#'(name : owner/(type c1 c2))")])
 
-      (syntax-parse #'(name : type)
-        [a:arg
-         (check-stx=? #'a.NAME      #'name)
-         (check-stx=? #'a.TYPE      #'type)
-         (check-stx=? #'a.OWNER     #'world)
-         (check-stx=? #'a.CPARAMS   #'())
-         (check-stx=? #'a.OW-SCHEME #'(type world ()))]
-        [_ (fail "#'(name : type)")])
+(define-syntax-class arg+expr
+  #:description "an argument with its type and a binding"
+  #:datum-literals [:]
+  #:attributes [VAR OW-SCHEME EXPR]
+  #:commit
+  (pattern (VAR:id : T:type E:expr)
+           #:attr EXPR #'E
+           #:attr OW-SCHEME #'T.OW-SCHEME)
+  (pattern (VAR:id : O/:id T:type E:expr)
+           #:when (and (is-stx-owner/? #'O/) (bound-id=? #'T.OWNER #'world))
+           #:cut
+           #:with OWNER (owner/->OWNER #'O/)
+           #:attr EXPR #'E
+           #:attr OW-SCHEME (syntax/loc #'T (T.TYPE OWNER T.CPARAMS))))
 
-      (syntax-parse #'(name : (type c1 c2))
-        [a:arg
-         (check-stx=? #'a.NAME      #'name)
-         (check-stx=? #'a.TYPE      #'type)
-         (check-stx=? #'a.OWNER     #'world)
-         (check-stx=? #'a.CPARAMS   #'(c1 c2))
-         (check-stx=? #'a.OW-SCHEME #'(type world (c1 c2)))]
-        [_ (fail "#'(name : type)")])
-      )
+(module+ test
+  (define-test-suite arg+expr-parse
+    (test-parse #'(name : owner/type (expr)) a:arg+expr
+       (check-stx=? #'a.VAR #'name)
+       (check-stx=? #'a.OW-SCHEME #'(type owner ()))
+       (check-stx=? #'a.EXPR #'(expr)))
 
-    (test-case "Gracefully fails on parse"
-      (check-exn exn:fail:syntax?
-                 (thunk (syntax-parse #'{owner/type (c1 c2)})))
-      (check-exn exn:fail:syntax?
-                 (thunk (syntax-parse #'{type (c1 c2)})))
-      (check-exn exn:fail:syntax?
-                 (thunk (syntax-parse #'(name {owner/type})))))
-    ))
+    (test-parse #'(name : owner/{type c1 c2} (expr)) a:arg+expr
+      (check-stx=? #'a.VAR #'name)
+      (check-stx=? #'a.OW-SCHEME #'(type owner (c1 c2)))
+      (check-stx=? #'a.EXPR #'(expr)))
 
+    (test-parse #'(name : (owner/{type c1 c2}) (expr)) a:arg+expr
+      (check-stx=? #'a.VAR #'name)
+      (check-stx=? #'a.OW-SCHEME #'(type owner (c1 c2)))
+      (check-stx=? #'a.EXPR #'(expr)))
+
+    (test-parse #'(name : type (expr)) a:arg+expr
+      (check-stx=? #'a.VAR #'name)
+      (check-stx=? #'a.OW-SCHEME #'(type world ()))
+      (check-stx=? #'a.EXPR #'(expr)))
+
+    (test-parse #'(name : (type c1 c2) (expr)) a:arg+expr
+      (check-stx=? #'a.VAR #'name)
+      (check-stx=? #'a.OW-SCHEME #'(type world (c1 c2)))
+      (check-stx=? #'a.EXPR #'(expr)))
+
+    (check-ill-parsed #'(name : owner/type expr1 expr2) a:arg+expr)))
 
 
 ;; Utils
@@ -420,13 +466,6 @@
 (define (is-stx-owner/type? stx)
   (and (identifier? stx)
        (string-contains? (symbol->string (syntax-e stx)) "/")))
-
-;; Return #t a syntax object is of the form #'owner/, or #f
-;; otherwise.
-(: is-stx-owner/? (Syntax -> Boolean))
-(define (is-stx-owner/? stx)
-  (and (identifier? stx)
-       (string-suffix? (symbol->string (syntax-e stx)) "/")))
 
 ;; Split a #'owner/type syntax object on the first `/` and returns a
 ;; syntax pair #'(owner . type).
@@ -442,7 +481,19 @@
                           "~a" (string-join type-str "/"))])
     #`(#,OWNER . #,TYPE)))
 
-;; Trim a #'owner/ syntax object on the last `/` and returns a
+;; Returns #t if a syntax object is of the form #'owner/, or #f
+;; otherwise.
+(: is-stx-owner/? (Syntax -> Boolean))
+(define (is-stx-owner/? stx)
+  (and (identifier? stx)
+       (let* ([id-str (symbol->string (syntax-e stx))]
+              [id-str-length (string-length id-str)]
+              [id-str-1 (substring id-str 0 (- id-str-length 2))])
+         ;; Test there is only a "/" at the end of the identifier
+         (and (string-suffix? id-str "/")
+              (not (string-contains? id-str-1 "/"))))))
+
+;; Trims a #'owner/ syntax object on the last `/` and returns a
 ;; syntax #'owner.
 (: owner/->OWNER (Identifier -> Identifier))
 (define (owner/->OWNER stx)

@@ -20,6 +20,12 @@
 
 (provide (all-defined-out))
 
+(define-for-syntax (stx->string stx)
+  (call-with-output-string
+   (λ (out-str)
+     (pretty-print (syntax->datum stx)
+                   out-str
+                   #:newline? #f))))
 
 (define-logger lang)
 
@@ -259,6 +265,83 @@
 (define-simple-check (check-stx=? stx1 stx2)
   (equal? (syntax->datum stx1) (syntax->datum stx2)))
 
+;; Tests that a `stx' follows `pattern` and verifies `check`s.
+;; `message` is optional
+;;
+;; > (test-parse #'stx pat:id (check-stx=? #'stx #'pat))   ; succeed
+;;
+;; > (test-parse #'stx pat:id (check-stx=? #'pat #'foo))   ; check failed
+;; --------------------
+;; Parse (syntax stx) as pat:id
+;; ; FAILURE
+;; ; /home/rfish/prog/APE/racket/CPN98/utils.rkt:292:25
+;; name:       check-stx=?
+;; location:   utils.rkt:292:25
+;; params:
+;; '(#<syntax:/home/rfish/prog/APE/racket/CPN98/utils.rkt:292:14 stx>
+;;   #<syntax:/home/rfish/prog/APE/racket/CPN98/utils.rkt:292:46 foo>)
+;; --------------------
+;;
+;; > (test-parse #'stx pat:str (check-stx=? #'stx #'pat))  ; parse failed
+;; --------------------
+;; Parse (syntax stx) as pat:str
+;; ; FAILURE
+;; ; /home/rfish/prog/APE/racket/CPN98/utils.rkt:300:12
+;; name:       test-parse
+;; location:   utils.rkt:300:12
+;; params:     '(#'stx pat:str)
+;; message:    "Failed to parse syntax as pat:str"
+;; --------------------
+(define-syntax test-parse
+  (syntax-parser
+    [(name:id stx:expr pattern:expr check:expr ...+
+              (~optional (~seq #:msg message) #:defaults ([message #'#f])))
+     #`(test-case (format "Parse ~a as ~a" 'stx 'pattern)
+         (syntax-parse stx
+           [pattern check ...]
+           [_
+            (with-check-info*
+              (list (make-check-name 'name)
+                    (make-check-location '#,(build-source-location-list #'stx))
+                    (make-check-params (list 'stx 'pattern))
+                    (make-check-message
+                     (or message
+                         (format "Failed to parse syntax as ~a" 'pattern))))
+               fail-check)]))]))
+
+;; Checks that `stx` raise a `exn-pred?` when parsed as `pattern`.
+;;
+;; > (check-ill-parsed #'foo _:str)  ; succeed
+;; > (check-ill-parsed #'foo _:id)   ; failed
+;; --------------------
+;; Parse (syntax foo) as _:id
+;; ; FAILURE
+;; ; /home/rfish/prog/APE/racket/CPN98/utils.rkt:325:17
+;; name:       check-ill-parsed
+;; location:   utils.rkt:325:17
+;; params:     '(#'foo _:id exn:fail:syntax?)
+;; message:    "No exception raised"
+;; --------------------
+;;
+;; Other usages:
+;; (check-ill-parsed #'foo _:id #:pred exn:fail?)  ; failed
+;; (check-ill-parsed #'foo _:id #:msg "lala")      ; failed
+(define-syntax check-ill-parsed
+  (syntax-parser
+    [(name:id stx:expr pattern:expr
+        (~optional (~seq #:pred exn-pred?) #:defaults ([exn-pred? #'exn:fail:syntax?]))
+        (~optional (~seq #:msg message) #:defaults ([message #'#f])))
+     #`(test-case (format "Parse ~a as ~a" 'stx 'pattern)
+         (with-check-info*
+           (list (make-check-name 'name)
+                 (make-check-location '#,(build-source-location-list #'stx))
+                 (make-check-params (list 'stx 'pattern 'exn-pred?))
+                 (make-check-message (or message (format "No ~a raised" 'exn-pred?))))
+           (thunk
+            (check-exn exn-pred?
+                       (thunk (syntax-parse stx [pattern #t]))
+                       message))))]))
+
 ;; Equivalent to (for/and ([i (syntax->list STXL)]) BODY ...).
 (define-syntax (stx-for/and stx)
   (syntax-case stx ()
@@ -312,11 +395,3 @@
          (log-lang-error $dbg-msg 'srcloc 'ctx res)
          res)]
     [(_ E) #'(dbg E #:ctx E)]))
-
-
-(define-for-syntax (stx->string stx)
-  (call-with-output-string
-   (λ (out-str)
-     (pretty-print (syntax->datum stx)
-                   out-str
-                   #:newline? #f))))
