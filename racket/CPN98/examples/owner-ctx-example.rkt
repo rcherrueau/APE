@@ -1,4 +1,4 @@
-#lang reader "surface-lang.rkt"
+#lang reader "../lang.rkt"
 ;; #lang s-exp "lang.rkt"
 
 (class Link [n]

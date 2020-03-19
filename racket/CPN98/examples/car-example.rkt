@@ -1,4 +1,4 @@
-#lang s-exp "surface-lang.rkt"
+#lang s-exp "../lang.rkt"
 
 (class Engine
   (def (start → Unit) void)

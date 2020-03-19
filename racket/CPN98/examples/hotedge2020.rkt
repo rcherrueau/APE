@@ -1,4 +1,4 @@
-#lang reader "lang.rkt"
+#lang reader "../lang.rkt"
 
 ;; Type def
 (class FlatNet) (class VM)

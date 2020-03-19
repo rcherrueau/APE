@@ -1,4 +1,4 @@
-#lang reader "lang.rkt"
+#lang reader "../lang.rkt"
 
 ;; Type def
 (class X) (class Y) (class Unit) (class Engine)
