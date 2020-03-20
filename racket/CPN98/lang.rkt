@@ -11,8 +11,8 @@
          "utils.rkt"
          "definitions.rkt"
          "desugar.rkt"
-         "meta.rkt"
-         "basic-check.rkt"
+         ;; "meta.rkt"
+         ;; "basic-check.rkt"
          )
 
 (provide (rename-out
@@ -37,10 +37,10 @@
        [prog #`(prog #,@(s-exps read-syntax))]
        ;; Desugaring
        [prog (∗> prog)]
-       ;; Meta-information
-       [_    (set-box!-values (meta:CS meta:FS meta:DS) (M> prog))]
-       ;; Basic Checks
-       [prog (?> prog)]
+       ;; ;; Meta-information
+       ;; [_    (set-box!-values (meta:CS meta:FS meta:DS) (M> prog))]
+       ;; ;; Basic Checks
+       ;; [prog (?> prog)]
        ;; ;; Ownership
        ;; #;[prog (θ> prog)]
        ;; Final AST

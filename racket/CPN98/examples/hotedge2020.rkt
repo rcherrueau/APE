@@ -11,7 +11,7 @@
   (def (bootVM [net : os/FlatNet] → VM) ???))
 
 ;; openstack server create --network flat my-vm
-(let ([network : [world/Network Site1] (new (Network Site1))]
-      [compute : [world/Compute Site2] (new (Compute Site2))])
+(let ([network : world/[Network Site1] (new (Network Site1))]
+      [compute : world/[Compute Site2] (new (Compute Site2))])
   (send compute bootVM
         (get-field network flatNet)))

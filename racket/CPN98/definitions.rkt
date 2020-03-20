@@ -23,7 +23,7 @@
 ;;   ;; Any). This helps type-checking the `unlines` function.
 ;;   [syntax-parser (Any -> Any)])
 (require/typed "utils.rkt"
-  [check-stx=? (->* (Syntax Syntax) (String) Any)]
+  ;; [check-stx=? (->* (Syntax Syntax) (String) Any)]
   [zip (All (a b) ((Listof a) (Listof b) -> (Listof (Pairof a b))))]
   [unzip (All (a b) ((Listof (Pairof a b)) -> (Values (Listof a) (Listof b))))])
 

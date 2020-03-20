@@ -262,37 +262,86 @@
                        (list-ref x 5)))
    (continuation-mark-set->list cms errortrace-key)))
 
-(define-simple-check (check-stx=? stx1 stx2)
-  (equal? (syntax->datum stx1) (syntax->datum stx2)))
+;; (check-stx=? #'foo #'foo)                               ; succeed
+;; (check-stx=? #'foo #'bar)                               ; failed
+;; (check-stx=? (syntax-parse #'foo [_:id #'bar])  #'bar)  ; suceed
+;; (check-stx=? (syntax-parse #'foo [_:id #'bar])  #'baz)  ; faild #'bar != #'baz
+(define-syntax check-stx=?
+  (syntax-parser
+    [(name:id stx1:expr stx2:expr
+              (~optional (~seq #:msg message)))
+     #`(test-case (format "Parse ~a" 'stx1)
+         (with-check-info*
+           (list (make-check-name 'name)
+                 (make-check-location '#,(build-source-location-list #'stx1))
+                 (make-check-actual stx1)
+                 (make-check-expected stx2)
+                 ;; Note: The `~?` inserts the `(make-check-message
+                 ;; message)` if `#:msg` is defined.  Or does nothing
+                 ;; otherwise (i.e., `(~@)`).  See,
+                 ;; https://docs.racket-lang.org/syntax/Optional_Keyword_Arguments.html#%28part._.Optional_.Arguments_with___%29
+                 (~? (make-check-message message) (~@)))
+           (thunk (check-equal? (syntax->datum stx1)
+                                (syntax->datum stx2)))))]))
+
+;; Checks that `stx` raise a `exn-pred?` when parsed as `pattern`.
+;;
+;; > (check-ill-parsed (syntax-parse #'foo [_:str #t]))  ; succeed
+;; > (check-ill-parsed (syntax-parse #'foo [_:id #t]))   ; failed
+;; --------------------
+;; Parse (syntax foo) as _:id
+;; ; FAILURE
+;; ; /home/rfish/prog/APE/racket/CPN98/utils.rkt:325:17
+;; name:       check-ill-parsed
+;; location:   utils.rkt:325:17
+;; params:     '(#'foo _:id exn:fail:syntax?)
+;; message:    "No exception raised"
+;; --------------------
+;;
+;; Other usages:
+;; (check-ill-parsed (syntax-parse #'foo [_:id #t]) #:pred exn:fail?)  ; failed
+;; (check-ill-parsed (syntax-parse #'foo [_:id #t]) #:msg "lala")      ; failed
+(define-syntax check-ill-parsed
+  (syntax-parser
+    [(name:id stx:expr
+        (~optional (~seq #:pred exn-pred?) #:defaults ([exn-pred? #'exn:fail:syntax?]))
+        (~optional (~seq #:msg message) #:defaults ([message #'#f])))
+     #`(test-case (format "Parse ~a as ~a" 'stx 'stx-parser)
+         (with-check-info*
+           (list (make-check-name 'name)
+                 (make-check-location '#,(build-source-location-list #'stx))
+                 (make-check-params (list 'stx 'stx-parser 'exn-pred?))
+                 (make-check-message (or message (format "No ~a raised" 'exn-pred?))))
+           (thunk
+            (check-exn exn-pred? (thunk stx) message))))]))
 
 ;; Tests that a `stx' follows `pattern` and verifies `check`s.
 ;; `message` is optional
 ;;
-;; > (test-parse #'stx pat:id (check-stx=? #'stx #'pat))   ; succeed
+;; > (test-pattern #'stx pat:id (check-stx=? #'stx #'pat))   ; succeed
 ;;
-;; > (test-parse #'stx pat:id (check-stx=? #'pat #'foo))   ; check failed
+;; > (test-pattern #'stx pat:id (check-stx=? #'pat #'foo))   ; check failed
 ;; --------------------
 ;; Parse (syntax stx) as pat:id
 ;; ; FAILURE
 ;; ; /home/rfish/prog/APE/racket/CPN98/utils.rkt:292:25
 ;; name:       check-stx=?
 ;; location:   utils.rkt:292:25
-;; params:
-;; '(#<syntax:/home/rfish/prog/APE/racket/CPN98/utils.rkt:292:14 stx>
-;;   #<syntax:/home/rfish/prog/APE/racket/CPN98/utils.rkt:292:46 foo>)
+;; actual:     #<syntax:stdin::282 stx>
+;; expected:   #<syntax:stdin::314 foo>
 ;; --------------------
 ;;
-;; > (test-parse #'stx pat:str (check-stx=? #'stx #'pat))  ; parse failed
+;; > (test-pattern #'stx pat:str (check-stx=? #'stx #'pat))  ; parse failed
 ;; --------------------
 ;; Parse (syntax stx) as pat:str
 ;; ; FAILURE
 ;; ; /home/rfish/prog/APE/racket/CPN98/utils.rkt:300:12
-;; name:       test-parse
+;; name:       test-pattern
 ;; location:   utils.rkt:300:12
 ;; params:     '(#'stx pat:str)
 ;; message:    "Failed to parse syntax as pat:str"
 ;; --------------------
-(define-syntax test-parse
+(define-syntax test-pattern
   (syntax-parser
     [(name:id stx:expr pattern:expr check:expr ...+
               (~optional (~seq #:msg message) #:defaults ([message #'#f])))
@@ -309,44 +358,11 @@
                          (format "Failed to parse syntax as ~a" 'pattern))))
                fail-check)]))]))
 
-;; Checks that `stx` raise a `exn-pred?` when parsed as `pattern`.
-;;
-;; > (check-ill-parsed #'foo _:str)  ; succeed
-;; > (check-ill-parsed #'foo _:id)   ; failed
-;; --------------------
-;; Parse (syntax foo) as _:id
-;; ; FAILURE
-;; ; /home/rfish/prog/APE/racket/CPN98/utils.rkt:325:17
-;; name:       check-ill-parsed
-;; location:   utils.rkt:325:17
-;; params:     '(#'foo _:id exn:fail:syntax?)
-;; message:    "No exception raised"
-;; --------------------
-;;
-;; Other usages:
-;; (check-ill-parsed #'foo _:id #:pred exn:fail?)  ; failed
-;; (check-ill-parsed #'foo _:id #:msg "lala")      ; failed
-(define-syntax check-ill-parsed
-  (syntax-parser
-    [(name:id stx:expr pattern:expr
-        (~optional (~seq #:pred exn-pred?) #:defaults ([exn-pred? #'exn:fail:syntax?]))
-        (~optional (~seq #:msg message) #:defaults ([message #'#f])))
-     #`(test-case (format "Parse ~a as ~a" 'stx 'pattern)
-         (with-check-info*
-           (list (make-check-name 'name)
-                 (make-check-location '#,(build-source-location-list #'stx))
-                 (make-check-params (list 'stx 'pattern 'exn-pred?))
-                 (make-check-message (or message (format "No ~a raised" 'exn-pred?))))
-           (thunk
-            (check-exn exn-pred?
-                       (thunk (syntax-parse stx [pattern #t]))
-                       message))))]))
-
 ;; Equivalent to (for/and ([i (syntax->list STXL)]) BODY ...).
 (define-syntax (stx-for/and stx)
   (syntax-case stx ()
     [(_ ([FOR-CLAUSE-ID FOR-CLAUSE-STXL] ...) BODY ...)
-     #'(for/and ([FOR-CLAUSE-ID (syntax->list FOR-CLAUSE-STXL)] ...)
+     #'(for/and ([FOR-CLAUSE-ID (in-syntax FOR-CLAUSE-STXL)] ...)
          BODY ...)]))
 
 
