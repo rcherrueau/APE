@@ -93,17 +93,6 @@
 
 ;; Rules
 
-(define-syntax define-rules
-  (syntax-parser
-    [(_ ID:id RULE:expr ...)
-     #'(define ID
-         (λ (stx)
-           ;; (dbg stx #:ctx ID)
-           (syntax-parse stx
-             #:literal-sets [(keyword-lits #:at ID) (expr-lits #:at ID)]
-             RULE ...
-             )))]))
-
 ;; ⊢p P ≫ ?P : t
 ;;
 ;; `P` elaborates to `?P` and has type `t`

@@ -13,9 +13,6 @@
 
 
 (class Intermediate
-  ;; Check wrong owner/type stx
-  ;; (field [p1 : rep/(Pair rep world)])
-
   (field [p1 : rep/(Pair rep world)])
   (field [p2 : (Pair rep world)])
   (field [p3 : Unit])

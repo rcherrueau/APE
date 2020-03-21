@@ -31,7 +31,7 @@
   [index-of (All (a) ((Listof a) a (a a -> Boolean) -> (U Nonnegative-Integer #f)))])
 
 (provide (except-out (all-defined-out)
-                     keyword-lits expr-lits
+                     ;; keyword-lits expr-lits
                      private:dict-index-of
                      dict-set
                      ;; FIXME: make them private and define a proper
@@ -48,7 +48,7 @@
 ;; which exports the macro without any contracts generated. See,
 ;; https://docs.racket-lang.org/ts-guide/typed-untyped-interaction.html#%28part._.Using_.Typed_.Code_in_.Untyped_.Code%29
 ;; https://groups.google.com/d/msg/racket-users/eowl6RpdDwY/1wrCluDcAwAJ
-(unsafe-provide keyword-lits expr-lits
+(unsafe-provide ;; keyword-lits expr-lits
                 meta:FS)
 
 
@@ -158,21 +158,6 @@
 
 
 ;; Language definitions
-
-(define-literal-set keyword-lits
-  #:for-label
-  ;; Note: The syntax/parse package require all literals to have a
-  ;; binding. To match identifier by their symbolic names, I have to
-  ;; use `#:datum-literals` instead.
-  #:datum-literals (prog class field def)
-  ;; I have no literals that should be interpreted.
-  ())
-
-(define-literal-set expr-lits
-  #:for-label
-  #:datum-literals (let new send get-field set-field! this ???)
-  ())
-
 
 (define-type B-TYPE Identifier)                        ;; Basic Type
 (define-type OWNER Identifier)                         ;; Owner
