@@ -1,4 +1,4 @@
-#lang racket/base
+#lang typed/racket/base/no-check
 
 ;; ,-,-,-.
 ;; `,| | |   ,-. . . ,-. ,-. . . ,-. ,-.
@@ -45,6 +45,8 @@
                     [dict-has-key? def/dict-has-key?]
                     [dict-map      def/dict-map]
                     [dict-keys     def/dict-keys]))
+
+(module+ test (require rackunit))
 
 (provide ?>)
 
@@ -251,6 +253,93 @@
 ;; Environment
 
 ;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+;;;; Manage local binding Γ
+
+(define-custom-hash-types id-hash
+  #:key? identifier?
+  bound-id=?)
+
+(define-type Γτ (Immutable-HashTable Identifier B-TYPE))
+(: Γ (Parameterof Γτ))
+;; (define-predicate Γ? Γ-type)
+
+;; Is VAR bound in Γ?
+(: Γ-member? (Identifier -> Boolean))
+(define (Γ-member? VAR)
+  ;; TODO: remove me after types to contracts
+  ;; on (: Γ (Parameterof Γτ))
+  (when (not (immutable-id-hash? (Γ)))
+    (error 'Γ-member?
+           (string-append
+            "Γ expected an immutable-id-hash? but ~a was given."
+            "~n  Is expression wrapped in `with-Γ`?")
+           (Γ)))
+
+  (dict-has-key? (Γ) VAR))
+
+;; Set TYPE of VAR in Γ
+(: Γ-set (->* (Syntaxof (Pairof Identifier B-TYPE)) (U Γ #f) Γτ))
+(define (Γ-set VAR.TYPE [the-Γ #f])
+  (match-define (cons VAR TYPE) (syntax-e VAR.TYPE))
+  (dict-set (or the-Γ (Γ)) VAR TYPE))
+
+;; Returns the TYPE of VAR in Γ
+;; : VAR -> TYPE
+(: Γ-ref (Identifier -> B-TYPE))
+(define (Γ-ref VAR)
+  (dict-ref (Γ) VAR))
+
+;; Make `the-Γ` a new value for Γ parameter by mapping it into a
+;; (Hash (Var . TYPE)) in the context of STX.
+(: private:with-Γ
+   (All (a)
+        ((U Γτ (Syntaxof (Listof (Syntaxof (Pairof Identifier B-TYPE)))))
+         (-> (Syntaxof a))
+         -> (Syntaxof a))))
+(define (private:with-Γ the-Γ thunk-E)
+  (parameterize
+    ([Γ (cond
+          [(immutable-id-hash? the-Γ) the-Γ]
+          [(Γ-stx? the-Γ)
+           (make-immutable-id-hash (map syntax-e (syntax->list the-Γ)))]
+          [else (raise-argument-error
+                 'with-Γ "(or/c Γ-stx? immutable-id-hash?)" the-Γ)])])
+    ;; (dbg (dict->list (Γ)))
+    (thunk-E)))
+
+(define-syntax-parser with-Γ
+  ;; Automatically create the `thunk` around E expression
+  [(_ THE-Γ E:expr ...) #'(private:with-Γ THE-Γ (thunk E ...))])
+
+(module+ test
+  (define test:Γ (make-immutable-id-hash
+                  (list (cons #'foo #'bar)
+                        (cons #'fizz #'buzz))))
+
+  (define-test-suite Γ-tests
+    (with-Γ #'{(foo . bar) (fizz . buzz)}
+      (check-true  (Γ-member? #'foo))
+      (check-stx=? (Γ-ref #'foo) #'bar)
+      (check-true  (Γ-member? #'fizz))
+      (check-stx=? (Γ-ref #'fizz) #'buzz)
+      (check-false (Γ-member? #'baz))
+      (with-Γ (Γ-set #'(toto . tata)) (check-true (Γ-member? #'toto)))
+      (check-false (Γ-member? #'toto)))
+
+    (with-Γ test:Γ
+      (check-true  (Γ-member? #'foo))
+      (check-stx=? (Γ-ref #'foo) #'bar)
+      (check-true  (Γ-member? #'fizz))
+      (check-stx=? (Γ-ref #'fizz) #'buzz)
+      (with-Γ (Γ-set #'(toto . tata)) (check-true (Γ-member? #'toto)))
+      (check-false (Γ-member? #'toto)))
+
+    (check-exn exn:fail? (thunk (Γ-member? #'baz))
+               "expression unwrapped in `with-Γ` is not valid")
+    (check-exn exn:fail? (thunk (with-Γ #'{(foo bar)} #t))
+               "with-Γ expects a `Γ-stx?` syntax")))
+
+;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ;;;; Manage the current class type τ
 
 ;; Make `the-τ` a new value for (τ) parameter in the context of STX.
@@ -261,54 +350,6 @@
 (define-syntax-parser with-τ
   ;; Automatically create the `thunk` around E expression
   [(_ THE-τ E:expr ...) #'(private:with-τ THE-τ (thunk E ...))])
-
-;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-;;;; Manage local binding Γ
-
-(define-custom-hash-types id-hash
-  #:key? identifier?
-  bound-id=?)
-
-;; Is VAR bounded in Γ?
-;; : VAR -> Boolean
-(define (Γ-member? VAR)
-  (dict-has-key? (Γ) VAR))
-
-;; Set TYPE of VAR in Γ
-;; > (Γ-set #'(VAR . TYPE))
-;; : #'(VAR . TYPE) -> Boolean
-(define (Γ-set VAR.TYPE [the-Γ #f])
-  (let* ([the-Γ (if the-Γ the-Γ (Γ))]
-         [VAR-&-TYPE (syntax-e VAR.TYPE)]
-         [VAR (car VAR-&-TYPE)]
-         [TYPE (cdr VAR-&-TYPE)])
-    (dict-set the-Γ VAR TYPE)))
-
-(define (Γ-set* VAR.TYPEs)
-  (foldr Γ-set (Γ) (syntax->list VAR.TYPEs)))
-
-;; Returns the TYPE of VAR in Γ
-;; : VAR -> TYPE
-(define (Γ-ref VAR)
-  (dict-ref (Γ) VAR))
-
-;; Make `the-Γ` a new value for Γ parameter by mapping it into a
-;; (Hash (Var . TYPE)) in the context of STX.
-;; : (U (Id-Hash (VAR . TYPE)) ((VAR . TYPE) ...) (-> STX) -> STX
-(define (private:with-Γ the-Γ thunk-E)
-  (parameterize
-    ([Γ (cond
-          [(immutable-id-hash? the-Γ) the-Γ]
-          [(and (syntax? the-Γ) (stx->list the-Γ))
-           => (∘ make-immutable-id-hash (curry map syntax-e))]
-          [else (raise-argument-error
-                 'with-Γ "(or/c syntax? immutable-id-hash?)" the-Γ)])])
-    ;; (dbg (dict->list (Γ)))
-    (thunk-E)))
-
-(define-syntax-parser with-Γ
-  ;; Automatically create the `thunk` around E expression
-  [(_ THE-Γ E:expr ...) #'(private:with-Γ THE-Γ (thunk E ...))])
 
 ;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ;;;; Access set of types CS
@@ -608,3 +649,19 @@
 ;;   doi =          {10.1145/268946.268961},
 ;;   url =          {https://doi.org/10.1145/268946.268961},
 ;; }
+
+
+;; Tests
+(module+ test
+  (require rackunit/text-ui)
+  (provide basic-check-tests)
+
+  (define basic-check-tests
+    (test-suite
+     "Tests for basic checks"
+     ;; Check env
+     Γ-tests
+     ))
+
+  (run-tests basic-check-tests)
+  )

@@ -51,6 +51,9 @@
 (unsafe-provide ;; keyword-lits expr-lits
                 meta:FS)
 
+;; TODO: Use https://docs.racket-lang.org/ts-reference/Utilities.html#%28part._.Untyped_.Utilities%29
+;; for a better def of typed dict
+
 
 ;; Utils
 
@@ -419,3 +422,7 @@
 ;; (: DS-ref ((OW-SCHEME OW-SCHEME -> Boolean) DS-key -> OW-SCHEME))
 ;; (define (DS-ref ow-scheme=? ds-key)
 ;;   (dict-ref (meta:DS) ds-key (curry ds-key=? ow-scheme=?)))
+
+
+(define-predicate Γ-stx?
+  (Syntaxof (Listof (Syntaxof (Pairof Identifier B-TYPE)))))
