@@ -29,7 +29,6 @@
 ;;   value
 
 (require (for-syntax racket/base)
-         racket/contract/base
          racket/dict
          racket/function
          racket/list
@@ -44,7 +43,8 @@
                     [dict-ref      def/dict-ref]
                     [dict-has-key? def/dict-has-key?]
                     [dict-map      def/dict-map]
-                    [dict-keys     def/dict-keys]))
+                    [dict-keys     def/dict-keys])
+         (prefix-in env: (submod "env.rkt" basic-check)))
 
 (module+ test (require rackunit))
 
@@ -57,36 +57,63 @@
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #:Env
   (;; Map of locally bound variables.
-   ;; Γ : (HashTable Identifier B-TYPE)
-   [Γ (make-immutable-id-hash)]
+   ;; TODO:
+   ;; [Γ : Id~>B-TYPE
+   ;;    #:mk   env:make-Γ   ;; Maybe something à la datatype
+   ;;    #:init '()
+   ;;    #:partial-app ([env:Γ-member? Γ-member?]
+   ;;                   [env:Γ-add     Γ-add]
+   ;;                   [env:Γ-ref     Γ-ref])]
+   [Γ : (HashTable Identifier B-TYPE)
+      env:make-Γ '()
+      #:partial-app ([env:Γ-member? Γ-member?]
+                     [env:Γ-add     Γ-add]
+                     [env:Γ-ref     Γ-ref])]
 
    ;; Store of the current class type
-   ;; τ : B-TYPE
-   [τ #'Unit]
+   [τ : B-TYPE
+      #'Top]
 
-   ;; Set of types
-   ;; CS : (Listof B-TYPE)
-   [CS (unbox meta:CS)]
+   ;; Set of existing types
+   [CS : (Setof B-TYPE)
+       env:make-CS (unbox meta:CS)
+       #:partial-app ([env:CS-member? CS-member?])]
 
    ;; Map of fields
    ;;
    ;; With the syntax #'(Class-type . Field-name) as key and the Field
    ;; type as value.
-   ;;
-   ;; FS : (Dict (Syntaxof (Pairof (B-TYPE Identifier))) B-TYPE))
-   [FS (def/dict-map
-         (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
-         (unbox meta:FS))]
+   [FS : (HashTable
+          (Syntaxof (Pairof B-TYPE Identifier)) ;; #'(Class-type . Field-name)
+          B-TYPE)                               ;; #'Field-type
+       env:make-FS
+       (meta-map  ;; Instantiate ows in values
+        (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
+        (unbox meta:FS))
+       #:partial-app ([env:FS-member? FS-member?]
+                      [env:FS-ref FS-ref])]
 
    ;; Map of definitions
    ;;
    ;; With the syntax #'(Class-type Def-name (Def-arg-type ...)) as
    ;; key and the Def return type as value.
-   ;;
-   ;; DS : (Dict (Syntaxof (B-TYPE Identifier (Listof B-TYPE))) B-TYPE))
-   [DS (def/dict-map
-         (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
-         (unbox meta:DS))])
+   [DS : (HashTable
+          (Syntaxof (List Identifier                    ; Class type
+                          Identifier                    ; Def name
+                          (Syntaxof (Listof B-TYPE))))  ; Type of def args
+          B-TYPE)                                       ; Def return type
+       env:make-DS
+       (meta-map-kv
+        ;; Instantiate ows in keys
+        (syntax-parser [(c-type:id def:id (scheme:ow-scheme ...))
+                        #:with b-types #'(scheme.TYPE ...)
+                        #'(c-type def b-types)])
+        ;; Instantiate ows in values
+        (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
+        (unbox meta:DS))
+       #:partial-app ([env:DS-member? DS-member?]
+                      [env:DS-ref DS-ref]
+                      [env:DS-domain DS-domain])])
 
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ;; Parse
@@ -187,7 +214,7 @@
    #:with [?E t] (get-τ (⊢e #'E))
    ;; Check (t . FNAME) ∈ dom(FS)
    ;;;; The field FNAME is defined in the class t
-   #:when (FS-member? #'(t . FNAME))
+   #:when (or (FS-member? #'(t . FNAME)) (raise-unknown-field #'FNAME #'t))
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e (get-field E FNAME) ≫
    ;;          (get-field (?E : t) FNAME) : FS(t . FNAME)
@@ -199,7 +226,7 @@
    #:with [?E t] (get-τ (⊢e #'E))
    ;; Check (t . FNAME) ∈ dom(FS)
    ;;;; The field FNAME is defined in the class t
-   #:when (FS-member? #'(t . FNAME))
+   #:when (or (FS-member? #'(t . FNAME)) (raise-unknown-field #'FNAME #'t))
    ;; Check P,Γ ⊢e BODY ≫ ?BODY : FS(t . FNAME)
    ;;;; The BODY has to elaborate to something that fit into the
    ;;;; field.
@@ -221,7 +248,7 @@
    ;;;; The method DNAME with parameters (t-param ...) is defined in
    ;;;; the class t.
    #:with DS-key #'(t DNAME (t-param ...))
-   #:when (DS-member? #'DS-key)
+   #:when (or (DS-member? #'DS-key) (raise-def-error #'DS-key))
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e (send E DNAME PARAM ...) ≫
    ;;          (send (?E : t) DNAME ?PARAM ...) : DS(t DNAME PARAM ...)
@@ -231,11 +258,11 @@
   [(let ~! (VAR-NAME VAR-SCHEME:ow-scheme E) BODY)
    #:when (⊢τ #'VAR-SCHEME.TYPE)
    ;; Check  P,Γ ⊢e E ≫ ?E : VAR-OW-SCHEME
-   #:with [?E t] (get-τ (with-Γ (Γ-set #'(??? . VAR-SCHEME.TYPE))
+   #:with [?E t] (get-τ (with-Γ (Γ-add #'(??? . VAR-SCHEME.TYPE))
                           (⊢e #'E)))
    #:when (τ=? #'t #'VAR-SCHEME.TYPE #:srcloc #'?E)
    ;; Check P,Γ{VAR-NAME: VAR-OW-SCHEME} ⊢e BODY ≫ ?BODY : t
-   #:with [_ t-body] (get-τ (with-Γ (Γ-set #'(VAR-NAME . VAR-SCHEME.TYPE))
+   #:with [_ t-body] (get-τ (with-Γ (Γ-add #'(VAR-NAME . VAR-SCHEME.TYPE))
                               (⊢e #'BODY)))
    ;; ------------------------------------------------------------------
    ;; P,Γ ⊢e *let (VAR-NAME VAR-OW-SCHEME E) BODY ≫
@@ -247,213 +274,123 @@
 ;; In context `P`, `t` exists
 (define-rules ⊢τ
   ;; [type]
-  [t #:when (CS-member? #'t) this-syntax])
+  [t #:when (or (CS-member? #'t) (raise-type-unknown #'t))
+     this-syntax])
 
 
 ;; Environment
 
 ;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-;;;; Manage local binding Γ
-
-(define-custom-hash-types id-hash
-  #:key? identifier?
-  bound-id=?)
-
-(define-type Γτ (Immutable-HashTable Identifier B-TYPE))
-(: Γ (Parameterof Γτ))
-;; (define-predicate Γ? Γ-type)
-
-;; Is VAR bound in Γ?
-(: Γ-member? (Identifier -> Boolean))
-(define (Γ-member? VAR)
-  ;; TODO: remove me after types to contracts
-  ;; on (: Γ (Parameterof Γτ))
-  (when (not (immutable-id-hash? (Γ)))
-    (error 'Γ-member?
-           (string-append
-            "Γ expected an immutable-id-hash? but ~a was given."
-            "~n  Is expression wrapped in `with-Γ`?")
-           (Γ)))
-
-  (dict-has-key? (Γ) VAR))
-
-;; Set TYPE of VAR in Γ
-(: Γ-set (->* (Syntaxof (Pairof Identifier B-TYPE)) (U Γ #f) Γτ))
-(define (Γ-set VAR.TYPE [the-Γ #f])
-  (match-define (cons VAR TYPE) (syntax-e VAR.TYPE))
-  (dict-set (or the-Γ (Γ)) VAR TYPE))
-
-;; Returns the TYPE of VAR in Γ
-;; : VAR -> TYPE
-(: Γ-ref (Identifier -> B-TYPE))
-(define (Γ-ref VAR)
-  (dict-ref (Γ) VAR))
-
-;; Make `the-Γ` a new value for Γ parameter by mapping it into a
-;; (Hash (Var . TYPE)) in the context of STX.
-(: private:with-Γ
-   (All (a)
-        ((U Γτ (Syntaxof (Listof (Syntaxof (Pairof Identifier B-TYPE)))))
-         (-> (Syntaxof a))
-         -> (Syntaxof a))))
-(define (private:with-Γ the-Γ thunk-E)
-  (parameterize
-    ([Γ (cond
-          [(immutable-id-hash? the-Γ) the-Γ]
-          [(Γ-stx? the-Γ)
-           (make-immutable-id-hash (map syntax-e (syntax->list the-Γ)))]
-          [else (raise-argument-error
-                 'with-Γ "(or/c Γ-stx? immutable-id-hash?)" the-Γ)])])
-    ;; (dbg (dict->list (Γ)))
-    (thunk-E)))
-
-(define-syntax-parser with-Γ
-  ;; Automatically create the `thunk` around E expression
-  [(_ THE-Γ E:expr ...) #'(private:with-Γ THE-Γ (thunk E ...))])
-
-(module+ test
-  (define test:Γ (make-immutable-id-hash
-                  (list (cons #'foo #'bar)
-                        (cons #'fizz #'buzz))))
-
-  (define-test-suite Γ-tests
-    (with-Γ #'{(foo . bar) (fizz . buzz)}
-      (check-true  (Γ-member? #'foo))
-      (check-stx=? (Γ-ref #'foo) #'bar)
-      (check-true  (Γ-member? #'fizz))
-      (check-stx=? (Γ-ref #'fizz) #'buzz)
-      (check-false (Γ-member? #'baz))
-      (with-Γ (Γ-set #'(toto . tata)) (check-true (Γ-member? #'toto)))
-      (check-false (Γ-member? #'toto)))
-
-    (with-Γ test:Γ
-      (check-true  (Γ-member? #'foo))
-      (check-stx=? (Γ-ref #'foo) #'bar)
-      (check-true  (Γ-member? #'fizz))
-      (check-stx=? (Γ-ref #'fizz) #'buzz)
-      (with-Γ (Γ-set #'(toto . tata)) (check-true (Γ-member? #'toto)))
-      (check-false (Γ-member? #'toto)))
-
-    (check-exn exn:fail? (thunk (Γ-member? #'baz))
-               "expression unwrapped in `with-Γ` is not valid")
-    (check-exn exn:fail? (thunk (with-Γ #'{(foo bar)} #t))
-               "with-Γ expects a `Γ-stx?` syntax")))
-
-;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-;;;; Manage the current class type τ
-
-;; Make `the-τ` a new value for (τ) parameter in the context of STX.
-;; : TYPE (-> STX) -> STX
-(define (private:with-τ the-τ thunk-E)
-  (parameterize ([τ the-τ]) (thunk-E)))
-
-(define-syntax-parser with-τ
-  ;; Automatically create the `thunk` around E expression
-  [(_ THE-τ E:expr ...) #'(private:with-τ THE-τ (thunk E ...))])
-
-;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ;;;; Access set of types CS
-
-;;; Defined in the same class
-(define c-type=? bound-id=?)
-
-;; Tests type `t` exists in CS.
-(define (CS-member? t)
-  (cond
-    ;; t in CS => everything OK
-    [(findf (curry c-type=? t) (CS)) #t]
-    ;; t not in CS => unknown type
-    [else (raise-type-unknown t)]))
+;;;; TODO: remove me
+;; (define c-type=? bound-id=?)
 
 ;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ;;;; Access set of fields FS, and defs DS info
 
+;; (key=? #'(a . b) #'(a . b))  ; #t
+;; (key=? #'(a . b) #'(c . d))  ; #f
+;; (key=? #'(a . 1) #'(a . 1))  ; #f
+;; (define (fs-key=? key1-stx key2-stx)
+;;   (match-let ([(cons C-TYPE1 F-NAME1) (syntax-e key1-stx)]
+;;               [(cons C-TYPE2 F-NAME2) (syntax-e key2-stx)])
+;;     (and (bound-id=? C-TYPE1 C-TYPE2)
+;;          (bound-id=? F-NAME1 F-NAME2))))
+
 ;; Test two FS-key are equals iff:
 ;;; Defined in the same class (c-type=?)
 ;;; Same name
-(define f-name=? bound-id=?)
-;;
-;; (fs-key=? #'(a . b) #'(a . b))  ; #t
-;; (fs-key=? #'(a . b) #'(c . d))  ; #f
-;; (fs-key=? #'(a . 1) #'(a . 1))  ; #f
-(define (fs-key=? key1-stx key2-stx)
-  (match-let ([(cons C-TYPE1 F-NAME1) (syntax-e key1-stx)]
-              [(cons C-TYPE2 F-NAME2) (syntax-e key2-stx)])
-    (and (c-type=? C-TYPE1 C-TYPE2)
-         (f-name=? F-NAME1 F-NAME2))))
-
-;; (: FS-ref (Syntaxof (Listof B-TYPE Identifier)) -> B-TYPE)
-(define (FS-ref FS-key) (def/dict-ref (FS) FS-key fs-key=?))
-
-;; (: FS-member (Syntaxof (Listof B-TYPE Identifier)) -> Boolean)
-(define (FS-member? FS-key)
-  (or
-   ;; FS-key is a member => Everything OK
-   (def/dict-has-key? (FS) FS-key fs-key=?)
-   ;; FS-key is not a member
-   (match-let* ([(cons GIVEN-C-TYPE GIVEN-F-NAME) (syntax-e FS-key)])
-     (raise-unknown-field GIVEN-F-NAME GIVEN-C-TYPE (current-syntax-context)))))
+;;; TODO: remove me
+;; (define f-name=? bound-id=?)
 
 ;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ;;;; Access set of defs DS
 
-;; Test two DS-key are equals.  Two DS-key are equals iff:
-;;; Defined in the same class (c-type=?)
-;;; Same name
-(define d-name=? bound-id=?)
-;;; Same number of arguments
-(define (num-args=? args1 args2) (eq? (length args1) (length args2)))
-;;; Same argument types (type comparison does not look at the owner or
-;;; context parameter)
-(define b-type=? bound-id=?)
-;;
-;; (: ds-key=? (DS-key DS-key -> Boolean))
-(define (ds-key=? key1-stx key2-stx)
-  (match-let* ([(list C-TYPE1 D-NAME1 ARGs-OW-SCHEME1) (syntax-e key1-stx)]
-               [(list C-TYPE2 D-NAME2 ARGs-B-TYPE) (syntax-e key2-stx)]
-               [ows (syntax->list ARGs-OW-SCHEME1)]
-               [b-types (syntax->list ARGs-B-TYPE)])
-    (and
-     (c-type=? C-TYPE1 C-TYPE2)
-     (d-name=? D-NAME1 D-NAME2)
-     (num-args=? ows b-types)
-     (for/and ([ow ows] [b-type b-types])
-       (b-type=? (car (syntax-e ow)) b-type)))))
+;; ;; Test two DS-key are equals.  Two DS-key are equals iff:
+;; ;;; Defined in the same class (c-type=?)
+;; ;;; Same name
+;; (define d-name=? bound-id=?)
+;; ;;; Same number of arguments
+;; (define (num-args=? args1 args2) (eq? (length args1) (length args2)))
+;; ;;; Same argument types (type comparison does not look at the owner or
+;; ;;; context parameter)
+;; (define b-type=? bound-id=?)
+;; ;;
+;; ;; (: ds-key=? (DS-key DS-key -> Boolean))
+;; (define (ds-key=? key1-stx key2-stx)
+;;   (match-let* ([(list C-TYPE1 D-NAME1 ARGs-OW-SCHEME1) (syntax-e key1-stx)]
+;;                [(list C-TYPE2 D-NAME2 ARGs-B-TYPE) (syntax-e key2-stx)]
+;;                [ows (syntax->list ARGs-OW-SCHEME1)]
+;;                [b-types (syntax->list ARGs-B-TYPE)])
+;;     (and
+;;      (c-type=? C-TYPE1 C-TYPE2)
+;;      (d-name=? D-NAME1 D-NAME2)
+;;      (num-args=? ows b-types)
+;;      (for/and ([ow ows] [b-type b-types])
+;;        (b-type=? (car (syntax-e ow)) b-type)))))
 
-;; (: DS-ref DS-key -> B-TYPE)
-(define (DS-ref DS-key) (def/dict-ref (DS) DS-key ds-key=?))
+;; DS-key is not a member => Three possible causes:
+;;;; I met no c-name=? and d-name=? => unknown definition
+;;;; I met c-name=? and d-name=? but not num-args? => arity error
+;;;; I met c-name=?, d-name=? and num-args? => type mismatch
+(define (raise-def-error LOOKED-DS-key)
+  ;; Get info of the looked def
+  (match-define (list LOOKED-DEF-C-TYPE LOOKED-DEF-NAME _LOOKED-DEF-ARGs)
+    (syntax-e LOOKED-DS-key))
+  (define LOOKED-DEF-ARGs (syntax->list _LOOKED-DEF-ARGs))
+  (define looked-def-arity (length LOOKED-DEF-ARGs))
 
-;; (: DS-member DS-key -> Boolean)
-(define (DS-member? DS-key)
-  (or
-   ;; DS-key is a member => Everything OK
-   (def/dict-has-key? (DS) DS-key ds-key=?)
-   ;; DS-key is not a member => Three possible causes:
-   ;;; I met no c-name=? and d-name=? => unknown definition
-   ;;; I met c-name=? and d-name=? but not num-args? => arity error
-   ;;; I met c-name=?, d-name=? and num-args? => type mismatch
-   (match-let* ([(list GIVEN-C-TYPE GIVEN-D-NAME GIVEN-ARGS) (syntax-e DS-key)])
-     ;; I loop over DS-keys and try to met my criterion
-     (for ([ds-key (def/dict-keys (DS))])
-       (match-define (list DS-C-TYPE DS-D-NAME DS-ARGS) (syntax-e ds-key))
-       ;; There is an entry in DS-key with same class and def name
-       (when (and (c-type=? GIVEN-C-TYPE DS-C-TYPE)
-                  (d-name=? GIVEN-D-NAME DS-D-NAME))
-         (define GIVEN-ARGs (syntax->list GIVEN-ARGS))
-         (define DS-ARGs (syntax->list DS-ARGS))
-         (if (num-args=? GIVEN-ARGs DS-ARGs)
-             ;; I met my three criterion => type-mismatch
-             (match-let ([(cons given-b-type expected-b-type)
-                          (findf (λ (b-type.b-type)
-                                   (let ([b-type1 (car b-type.b-type)]
-                                         [b-type2 (cdr b-type.b-type)])
-                                     (not (b-type=? b-type1 b-type2))))
-                                 (zip GIVEN-ARGs (map (∘ car syntax-e) DS-ARGs)))])
-               (raise-type-mismatch given-b-type expected-b-type (current-syntax-context)))
-             ;; I met only c-name=? and d-name? => arity error
-             (raise-arity-error DS-D-NAME (length DS-ARGs) GIVEN-ARGs (current-syntax-context)))))
-     ;; I met zero criterion => unknown definition
-     (raise-unknown-def GIVEN-D-NAME GIVEN-C-TYPE (current-syntax-context)))))
+  ;; Get the domain of `DS` and transform info for latter analysis
+  ;; (: def-dom (Listof (List B-TYPE Identifier (Listof B-TYPE))))
+  (define def-dom
+    (map (∘ (λ (key)
+              (match-define (list c-type def-name args) key)
+              (list c-type def-name (syntax->list args)))
+            syntax-e)
+         (DS-domain)))
+
+  ;; Define predicates to met in order to analyze the error type
+  (define (met-cname=/dname=? ds-key)
+    (match-define (list C-TYPE D-NAME _) ds-key)
+    (and (bound-id=? LOOKED-DEF-C-TYPE C-TYPE)
+         (bound-id=? LOOKED-DEF-NAME D-NAME)))
+
+  (define (met-def-arity=? ds-key)
+    (match-define (list _ _ ARGs-B-TYPE) ds-key)
+    (eq? looked-def-arity (length ARGs-B-TYPE)))
+
+  ;; Lets find entries in dom(DS) with same class and def name
+  (define met-cname=/dname=-defs (filter met-cname=/dname=? def-dom))
+
+  ;; I met zero criterion => unknown definition
+  (when (empty? met-cname=/dname=-defs)
+    (raise-unknown-def LOOKED-DEF-NAME LOOKED-DEF-C-TYPE))
+
+  ;; Lets refine entries in dom(DS) with same arity
+  (define met-cname=/dname=/arity=-defs
+    (filter met-def-arity=? met-cname=/dname=-defs))
+
+  ;; I met the cname=/dname=? criteria but not arity=? => arity error
+  (when (empty? met-cname=/dname=/arity=-defs)
+    (define expected-def (car met-cname=/dname=-defs))
+    (match-define (list _ _ EXPECTED-DEF-ARGs) expected-def)
+    (define expected-def-arity (length EXPECTED-DEF-ARGs))
+    (raise-arity-error LOOKED-DEF-NAME expected-def-arity LOOKED-DEF-ARGs))
+
+  ;; Here, I met my three criterion => type mismatch
+  (define expected-def (car met-cname=/dname=/arity=-defs))
+  (match-define (list _ _ EXPECTED-DEF-ARGs) expected-def)
+  (for ([looked-b-type LOOKED-DEF-ARGs]
+        [expected-b-type EXPECTED-DEF-ARGs]
+        [arg-pos (in-range (length LOOKED-DEF-ARGs))])
+    (when (not (bound-id=? looked-b-type expected-b-type))
+      ;; I found the type which is incorrect, and it is located a
+      ;; position `arg-pos`.
+      (define send-stx (current-syntax-context))
+      (define ill-typed-arg (list-ref (syntax-e send-stx) (+ arg-pos 3)))
+      (raise-type-mismatch looked-b-type expected-b-type
+                           #:name ill-typed-arg)
+      )))
 
 
 ;; Exceptions
@@ -498,12 +435,17 @@
   #:extra-constructor-name make-exn:type-mismatch
   #:transparent)
 
-;; (: raise-type-mismatch B-TYPE B-TYPE STX -> exn:type-mismatch)
-(define (raise-type-mismatch GIVEN-B-TYPE EXPECTED-B-TYPE CTX)
+;; (: raise-type-mismatch  B-TYPE B-TYPE STX #:name (U Syntax Symbol #f) -> exn:type-mismatch)
+(define (raise-type-mismatch GIVEN-B-TYPE EXPECTED-B-TYPE [context #f]
+                             #:name [n #f])
+  (define CTX (or context (current-syntax-context)))
   (log-lang-debug "Original error in ~.s" CTX)
   (define CTX-SURFACE (syntax-property CTX 'surface))
   (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
-  (define id (format "~s" (extract-exp-name CTX-SURFACE)))
+  (define name (cond
+                 [(syntax? n) (extract-exp-name (syntax-property n 'surface))]
+                 [else n]))
+  (define id (format "~s" (or name (extract-exp-name CTX-SURFACE))))
   (define err-msg "type mismatch")
   (define elab-msg
     (format (string-append "~n  The expression elaborate to the type ~s"
@@ -528,7 +470,8 @@
   #:transparent)
 
 ;; (: raise-arity-error (Identifier Integer (Listof B-TYPE) STX -> exn:arity-error))
-(define (raise-arity-error def-name expected-args-size given-args CTX)
+(define (raise-arity-error def-name expected-args-size given-args [context #f])
+  (define CTX (or context (current-syntax-context)))
   (log-lang-debug "Original error in ~.s" CTX)
   (define CTX-SURFACE (syntax-property CTX 'surface))
   (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
@@ -558,7 +501,8 @@
   #:transparent)
 
 ;; (: raise-unknown-def (Identifier B-TYPE STX -> exn:unknown-def))
-(define (raise-unknown-def def-name c-type CTX)
+(define (raise-unknown-def def-name c-type [context #f])
+  (define CTX (or context (current-syntax-context)))
   (log-lang-debug "Original error in ~.s" CTX)
   (define CTX-SURFACE (syntax-property CTX 'surface))
   (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
@@ -582,7 +526,8 @@
   #:transparent)
 
 ;; (: raise-unknown-field (Identifier B-TYPE STX -> exn:unknown-field))
-(define (raise-unknown-field field-name c-type CTX)
+(define (raise-unknown-field field-name c-type [CONTEXT #f])
+  (define CTX (or CONTEXT (current-syntax-context)))
   (log-lang-debug "Original error in ~.s" CTX)
   (define CTX-SURFACE (syntax-property CTX 'surface))
   (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
@@ -653,14 +598,18 @@
 
 ;; Tests
 (module+ test
-  (require rackunit/text-ui)
+  (require rackunit/text-ui
+           (prefix-in env: (submod "env.rkt" basic-check test)))
   (provide basic-check-tests)
 
   (define basic-check-tests
     (test-suite
      "Tests for basic checks"
      ;; Check env
-     Γ-tests
+     env:CS-tests
+     env:Γ-tests
+     env:FS-tests
+     env:DS-tests
      ))
 
   (run-tests basic-check-tests)

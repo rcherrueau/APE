@@ -6,6 +6,7 @@
                      racket/pretty
                      racket/port
                      racket/string
+                     racket/sequence
                      racket/syntax
                      syntax/srcloc)
          racket/dict
@@ -15,15 +16,18 @@
          racket/match
          racket/port
          racket/pretty
+         racket/sequence
          racket/string
          rackunit
          syntax/parse
          syntax/parse/define
          syntax/macro-testing
+         syntax/srcloc
          errortrace/errortrace-key
          )
 
-(provide (all-defined-out))
+(provide (except-out (all-defined-out)
+                     private:check-stx=?-w/-msg))
 
 (define-for-syntax (stx->string stx)
   (call-with-output-string
@@ -187,27 +191,26 @@
                        (list-ref x 5)))
    (continuation-mark-set->list cms errortrace-key)))
 
+(define-check (private:check-stx=?-w/-msg stx1 stx2 msg)
+  (with-check-info*
+    (list (make-check-name 'check-stx=?)
+          (make-check-location (build-source-location-list stx1))
+          (make-check-actual stx1)
+          (make-check-expected stx2)
+          (make-check-message
+           (or msg
+               (format "#'~.a does not structurally equal to #'~.a"
+                       (syntax->datum stx1)
+                       (syntax->datum stx2)))))
+    (thunk (check-equal? (syntax->datum stx1)
+                         (syntax->datum stx2)))))
+
 ;; (check-stx=? #'foo #'foo)                               ; succeed
 ;; (check-stx=? #'foo #'bar)                               ; failed
 ;; (check-stx=? (syntax-parse #'foo [_:id #'bar])  #'bar)  ; suceed
 ;; (check-stx=? (syntax-parse #'foo [_:id #'bar])  #'baz)  ; faild #'bar != #'baz
-(define-syntax check-stx=?
-  (syntax-parser
-    [(name:id stx1:expr stx2:expr
-              (~optional (~seq #:msg message)))
-     #`(test-case (format "Check ~a structurally equals ~a" 'stx1 'stx2)
-         (with-check-info*
-           (list (make-check-name 'name)
-                 (make-check-location '#,(build-source-location-list #'stx1))
-                 (make-check-actual stx1)
-                 (make-check-expected stx2)
-                 ;; Note: The `~?` inserts the `(make-check-message
-                 ;; message)` if `#:msg` is defined.  Or does nothing
-                 ;; otherwise (i.e., `(~@)`).  See,
-                 ;; https://docs.racket-lang.org/syntax/Optional_Keyword_Arguments.html#%28part._.Optional_.Arguments_with___%29
-                 (~? (make-check-message message) (~@)))
-           (thunk (check-equal? (syntax->datum stx1)
-                                (syntax->datum stx2)))))]))
+(define (check-stx=? stx1 stx2 #:msg [msg #f])
+  (private:check-stx=?-w/-msg stx1 stx2 msg))
 
 ;; Checks that `stx` raise a `exn-pred?` when parsed as `pattern`.
 ;;
@@ -276,6 +279,10 @@
                           (with-check-info*
                             (list (make-check-name 'name)
                                   (make-check-location '#,(build-source-location-list #'stx))
+                                  ;; Note: The `~?` inserts the `(make-check-message
+                                  ;; message)` if `#:msg` is defined.  Or does nothing
+                                  ;; otherwise (i.e., `(~@)`).  See,
+                                  ;; https://docs.racket-lang.org/syntax/Optional_Keyword_Arguments.html#%28part._.Optional_.Arguments_with___%29
                                   (~? (make-check-message message) (~@)))
                             (thunk (check-not-exn (thunk (raise e))))))])
           (syntax-parse stx
@@ -287,6 +294,15 @@
     [(_ ([FOR-CLAUSE-ID FOR-CLAUSE-STXL] ...) BODY ...)
      #'(for/and ([FOR-CLAUSE-ID (in-syntax FOR-CLAUSE-STXL)] ...)
          BODY ...)]))
+
+(define (stx-flatten stxls)
+  #;(for ([stxl (in-list stxls)]
+        [i (in-naturals)])
+    (unless (stx-list? stxl)
+      (apply raise-type-error 'stx-flatten "stx-list" i stxls)))
+  (define flatten-stx (flatten (map syntax->list stxls)))
+  #`#,flatten-stx
+  )
 
 
 

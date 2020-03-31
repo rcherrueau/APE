@@ -21,15 +21,17 @@
 ;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
 
 (require (for-syntax racket/base)
-         racket/contract/base
          racket/function
          racket/list
+         racket/match
          racket/syntax
+         racket/string
          syntax/parse
          syntax/parse/define
          syntax/stx
          "utils.rkt"
-         "definitions.rkt")
+         "definitions.rkt"
+         (prefix-in env: (submod "env.rkt" desugar)))
 
 (module+ test (require rackunit))
 
@@ -37,14 +39,15 @@
 
 
 ;; Transformation (∗>)
-;; (: define-parser (Syntax -> Syntax))
 (define-parser (∗> stx)
-
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #:Env
-  ;; - Set of local bindings
-  ;;   Γ : (Listof Identifier)
-  ([Γ '()])
+  (;; Set of local bindings
+   [Γ : (Setof Identifier)
+      env:make-Γ '()
+      #:partial-app ([env:Γ-member? Γ-member?]
+                     [env:Γ-add     Γ-add])
+      ])
 
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ;; Parser
@@ -299,63 +302,6 @@
       (check-ill-parsed (∗e> #'(send foo def ()))))))
 
 
-;; Environment -- Manage local binding (Γ)
-
-;; Is VAR bounded in Γ?
-(: Γ-member? (Identifier -> Boolean))
-(define (Γ-member? VAR)
-  (when (not (list? (Γ)))
-    (error 'Γ-member?
-           (string-append
-            "Γ expected a (listof syntax?) but ~a was given."
-            "~n  Is expression wrapped in `with-Γ`?")
-           (Γ)))
-
-  (if (findf (curry bound-id=? VAR) (Γ)) #t #f))
-
-;; Add a VAR to Γ.
-(: Γ-add (Identifier -> Void))
-(define (Γ-add VAR)
-  (if (Γ-member? VAR)
-      (Γ)
-      (cons VAR (Γ))))
-
-;; Make `the-Γ` a new value for Γ in the context of
-;; STX.
-(: private:with-Γ
-   (All (a) ((U (Listof Identifier) (Syntaxof (Listof Identifier)))
-             (-> (Syntaxof a))
-             -> (Syntaxof a))))
-(define (private:with-Γ the-Γ thunk-E)
-  (define listof-id? (listof identifier?))
-  (parameterize
-    ([Γ (cond
-          [(listof-id? the-Γ) the-Γ]
-          [(and (syntax? the-Γ) (syntax->list the-Γ)) => identity]
-          [else (raise-argument-error
-                 'with-Γ "(or/c syntax? (listof syntax?))" the-Γ)])])
-    (thunk-E)))
-
-(define-syntax-parser with-Γ
-  ;; Automatically create the `thunk` around E expressions
-  [(_ THE-Γ E:expr ...) #'(private:with-Γ THE-Γ (thunk E ...))])
-
-(module+ test
-  (define test:Γ (list #'foo #'bar))
-
-  (define-test-suite Γ-tests
-    (check-true  (with-Γ #'(foo bar) (Γ-member? #'foo)))
-    (check-true  (with-Γ #'(foo bar) (Γ-member? #'bar)))
-    (check-true  (with-Γ test:Γ (Γ-member? #'foo)))
-    (check-false (with-Γ test:Γ (Γ-member? #'baz)))
-    (check-exn exn:fail? (thunk (Γ-member? #'baz))
-               "expression unwrapped in `with-Γ` is not valid")
-
-    (with-Γ test:Γ
-      (with-Γ (Γ-add #'baz) (check-true  (Γ-member? #'baz)))
-      (check-false (Γ-member? #'baz)))))
-
-
 ;; Syntax for type and arg
 
 (define-splicing-syntax-class type
@@ -552,14 +498,15 @@
 
 ;; Tests
 (module+ test
-  (require rackunit/text-ui)
+  (require rackunit/text-ui
+           (prefix-in env: (submod "env.rkt" desugar test)))
   (provide desugar-tests)
 
   (define desugar-tests
     (test-suite
      "Tests for desugaring"
      ;; Check env
-     Γ-tests
+     env:Γ-tests
      ;; Check syntax class
      owner/type-stx-split
      type-parse

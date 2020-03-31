@@ -40,10 +40,10 @@
     (sequence (stx-map get-names/fields/defs class-stxs)))
 
   ;; Transforms ctype-fields to an FS
-  (values
-   ctype
-   (foldr (λ (v l) (append (mk-fs (car v) (cdr v)) l) ) '() ctype-fields)
-   (foldr (λ (v l) (append (mk-ds (car v) (cdr v)) l) ) '() ctype-defs))
+  (define fs (foldr (λ (v l) (append (mk-fs (car v) (cdr v)) l) ) '() ctype-fields))
+  (define ds (foldr (λ (v l) (append (mk-ds (car v) (cdr v)) l) ) '() ctype-defs))
+
+  (values ctype fs ds)
   )
 
 

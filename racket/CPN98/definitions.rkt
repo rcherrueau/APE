@@ -17,6 +17,7 @@
          "utils.rkt"
          )
 
+(module+ test (require typed/rackunit))
 
 ;; (require/typed syntax/parse
 ;;   ;; Coerce `flatten` to only return Listof String (instead of Listof
@@ -25,7 +26,8 @@
 (require/typed "utils.rkt"
   ;; [check-stx=? (->* (Syntax Syntax) (String) Any)]
   [zip (All (a b) ((Listof a) (Listof b) -> (Listof (Pairof a b))))]
-  [unzip (All (a b) ((Listof (Pairof a b)) -> (Values (Listof a) (Listof b))))])
+  [unzip (All (a b) ((Listof (Pairof a b)) -> (Values (Listof a) (Listof b))))]
+  [bound-id=? (Identifier Identifier -> Boolean)])
 
 (require/typed racket/list
   [index-of (All (a) ((Listof a) a (a a -> Boolean) -> (U Nonnegative-Integer #f)))])
@@ -39,7 +41,8 @@
                      ;; type safety with contracts.
                      meta:FS
                      )
-         (all-from-out "_definitions.rkt"))
+         (all-from-out "_definitions.rkt")
+         )
 
 ;; Provide without the generation of contracts
 ;;
@@ -57,9 +60,9 @@
 
 ;; Utils
 
-(: bound-id=? (Identifier Identifier -> Boolean))
-(define (bound-id=? id1 id2)
-  (eq? (syntax-e id1) (syntax-e id2)))
+;; (: bound-id=? (Identifier Identifier -> Boolean))
+;; (define (bound-id=? id1 id2)
+;;   (eq? (syntax-e id1) (syntax-e id2)))
 
 ;; A dict with custom function for comparing keys.
 (define-type (Dict k v) (Listof (Pairof k v)))
@@ -126,6 +129,15 @@
            (cons k (f v))))
        the-dict))
 
+;; Maps values of `the-dict` with `f`
+(: meta-map (All (k v w) ((v -> w) (Dict k v) -> (Dict k w))))
+(define (meta-map f the-dict)
+  (map (λ ([kv : (Pairof k v)])
+         (let ([k (car kv)]
+               [v (cdr kv)])
+           (cons k (f v))))
+       the-dict))
+
 ;; Maps keys of `the-dict` with `f`
 (: dict-kmap (All (k l v) ((k -> l) (Dict k v) -> (Dict l v))))
 (define (dict-kmap f the-dict)
@@ -133,6 +145,23 @@
          (let ([k (car kv)]
                [v (cdr kv)])
            (cons (f k) v)))
+       the-dict))
+
+;; Maps keys of `the-dict` with `f`
+(: meta-kmap (All (k l v) ((k -> l) (Dict k v) -> (Dict l v))))
+(define (meta-kmap f the-dict)
+  (map (λ ([kv : (Pairof k v)])
+         (let ([k (car kv)]
+               [v (cdr kv)])
+           (cons (f k) v)))
+       the-dict))
+
+(: meta-map-kv (All (k l v w) ((k -> l) (v -> w) (Dict k v) -> (Dict l w))))
+(define (meta-map-kv f g the-dict)
+  (map (λ ([kv : (Pairof k v)])
+         (let ([k (car kv)]
+               [v (cdr kv)])
+           (cons (f k) (g v))))
        the-dict))
 
 ;; Returns the keys of `the-dict`
@@ -185,6 +214,13 @@
 (define (ow-scheme->b-type ows) (car (syntax-e ows)))
 (define (ow-scheme->owner ows) (cadr (syntax-e ows)))
 (define (ow-scheme->c-params ows) (caddr (syntax-e ows)))
+
+;; Cast a B-TYPE into a degenerated OW-SCHEME
+(: b-type->ow-scheme (B-TYPE -> OW-SCHEME))
+(define (b-type->ow-scheme B-TYPE)
+  (define b-type (syntax-e B-TYPE))
+  (cast (datum->syntax B-TYPE `(,b-type ⊥ ()) B-TYPE)
+        OW-SCHEME))
 
 ;; Compare two ow-scheme, but does not instantiate the owner and
 ;; context parameters. So it only ensures that both basic types are
@@ -301,8 +337,6 @@
 ;;     [(_ THE-CS E ...) #'(private:with-CS THE-CS (thunk E ...))]))
 
 (module+ test
-  (require typed/rackunit)
-
   ;; (with-CS #'(foo bar)
   ;;   (check-true  (CS-member? #'foo))
   ;;   (check-false (CS-member? #'baz)))
@@ -337,7 +371,6 @@
 
 
 (module+ test
-  (require typed/rackunit)
 
   ;; Test two FS-key are equals
   ;; (fs-key=? #'(a . b) #'(a . b))  ; #t
@@ -391,6 +424,7 @@
                            Identifier                     ; Def name
                            (Syntaxof (Listof OW-SCHEME))  ; Type of def args
                            )))
+
 (define-type DS (Dict DS-key OW-SCHEME))
 (: meta:DS (Boxof DS))
 (define meta:DS (box '()))
@@ -411,6 +445,22 @@
                [ow2 (syntax->list ARGs-OW-SCHEME2)])
        (ow-scheme=? ow1 ow2)))))
 
+;; Same as `DS-key` except that is as a (Listof B-TYPE) instead of a
+;; (Listof OW-SCHEME) as type of args
+(define-type DS-key* (Syntaxof
+                      (List Identifier                  ; Class type
+                            Identifier                  ; Def name
+                            (Syntaxof (Listof B-TYPE))  ; Type of def args
+                            )))
+
+(: dsk*->dsk (DS-key* -> DS-key))
+(define (dsk*->dsk k*)
+  (match-define (list class def b-types) (syntax-e k*))
+  (define ows (map b-type->ow-scheme (syntax->list b-types)))
+  (cast (datum->syntax k* (list class def ows) k*)
+        DS-key)
+  )
+
 ;; (: DS-member? ((OW-SCHEME OW-SCHEME -> Boolean) DS-key  -> Boolean))
 ;; (define (DS-member? ow-scheme=? ds-key)
 ;;   (dict-has-key? (meta:DS) ds-key (curry ds-key=? ow-scheme=?)))
@@ -426,3 +476,85 @@
 
 (define-predicate Γ-stx?
   (Syntaxof (Listof (Syntaxof (Pairof Identifier B-TYPE)))))
+
+
+
+;; ;; Does not work
+;; ;; See https://stackoverflow.com/a/60849727/2072144
+;; (module desugar-def racket/base
+;;   (require racket/set (only-in "utils.rkt" bound-id=?))
+
+;;   (provide (rename-out [immutable-ids? ids?]
+;;                        [make-immutable-ids make-ids]
+;;                        [set-member? ids-member?]
+;;                        [set-add ids-add]))
+
+;;   (define-custom-set-types ids
+;;     ;; This is not necessary because contract will check this
+;;     ;; #:elem? identifier?
+;;     bound-id=?)
+;;   )
+
+;; (require/typed/provide 'desugar-def
+;;   [#:opaque Identifiers ids?]
+;;   [make-ids ((Listof Identifier) -> Identifiers)]
+;;   [ids-member? (Identifiers Identifier -> Boolean)]
+;;   [ids-add (Identifiers Identifier -> Identifiers)])
+
+;; ;; ;; (immutable-id-set? (make-immutable-id-set (list #'a #'b #'c)))
+;; ;; ;; (immutable-id-set? #'(a b c)) ;; fails
+;; ;; (set? #'(a b c))
+;; ;; ;; (immutable-id-set? (list #'a #'b #'c))
+
+;; (module UNTYPED racket/base
+;;   (require  (only-in racket/set gen:set)
+;;             racket/function)
+;;   (provide (struct-out set))
+
+;;   ;; : elems (Listof a)
+;;   ;; : eql? (a a -> Boolean)
+;;   (struct set [elems eql?]
+;;     #:transparent
+;;     #:constructor-name make-set
+;;     #:methods gen:set
+;;     [(define (set-member? st e)
+;;        (let ([elems (set-elems st)]
+;;              [eql?  (set-eql? st)])
+;;          (findf (curry eql? e) elems)))
+;;      (define (set-add st e)
+;;        (let ([elems (set-elems st)]
+;;              [eql?  (set-eql? st)])
+;;          (if (set-member? st e) st
+;;              (make-set (cons e elems) eql?))))]))
+
+;; (require/typed 'UNTYPED
+;;   [#:struct [a] set
+;;    (#;[elems : (Listof a)]
+;;     [eql?  : (Any Any -> Boolean)])
+;;    #:constructor-name make-set
+;;    ;; #:transparent
+;;    ])
+
+;; (module untyped racket/base
+;;   (require racket/dict
+;;            "utils.rkt")
+;;   (provide (rename-out
+;;             [make-immutable-id~>btype make-id~>btype])
+;;            id~>btype?)
+
+;;     ;; (HashTable Identifier B-TYPE)
+;;     (define-custom-hash-types id~>btype
+;;       #:key? identifier?
+;;       (λ (x y) (eq? (syntax-e x) (syntax-e y))))
+;;   )
+
+;; (require 'untyped)
+;; (provide (all-from-out 'untyped))
+
+;; (unsafe-require/typed/provide 'untyped
+;;  [#:opaque Id~>B-TYPE id~>btype?]
+;;  [make-id~>btype ((Listof (Pairof Identifier B-TYPE)) -> Id~>B-TYPE)])
+
+;; (id~>btype? #f)
+;; (id~>btype? #'f)
+;; (make-id~>btype (list (cons #'foo 'a)))

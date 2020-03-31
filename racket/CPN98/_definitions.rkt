@@ -9,7 +9,13 @@
 ;;
 ;; TODO: move all parts of this file into definitions.rkt
 
-(require (for-syntax racket/base)
+(require (for-syntax racket/base
+                     racket/function
+                     racket/list
+                     racket/syntax
+                     syntax/stx
+                     syntax/parse/define
+                     "utils.rkt")
          syntax/parse
          syntax/parse/define
          "utils.rkt")
@@ -90,40 +96,57 @@
 ;;            (if (topCall)
 ;;                (parameterize ([def-K Env] ... [topCall #f]) (PARSER-ID stx))
 ;;                (PARSER-ID stx))))]))
+(begin-for-syntax
+  (define-syntax-class env
+    #:description "an environment variable and its type"
+    #:datum-literals [:]
+    #:attributes [NAME TYPE MAKER VAL DEFS WITH]
+    #:commit
+    (pattern (NAME:id : TYPE:expr (~optional MK:expr) VAL:expr)
+             #:attr DEFS #'()
+             #:attr MAKER #'(~? MK (λ (x) x))
+             #:attr WITH (format-id #'NAME "with-~a" (syntax-e #'NAME))
+             )
+    (pattern (NAME:id : TYPE:expr (~optional MK:expr) VAL:expr
+                      #:partial-app [(DEF:id DEF-LIFTED-NAME:id) ...])
+             #:attr DEFS #'((DEF DEF-LIFTED-NAME) ...)
+             #:attr MAKER #'(~? MK const)  ;; Use the const function if no MAKER
+             #:attr WITH (format-id #'NAME "with-~a" (syntax-e #'NAME))
+             )))
 
 (define-syntax (define-parser parser-stx)
+  (define (env->name/def/lift stx)
+    (syntax-parse stx
+      [e:env
+       #:with [(e-def e-lift) ...] #'e.DEFS
+       #'((e.NAME e-def e-lift) ...)]))
+
   (syntax-parse parser-stx
-    [(_ ID:id                         ;; Parser name (e.g., `?>`)
-        #:Env ([NAME:id E:expr] ...)  ;; Environment variables
-        #:Rules (RHS ...+)            ;; Rules of the transformation
-        DEF ...)                      ;; Extra rules as `define`
-     #'(begin
-         ;; Define environment variables as global parameter
-         (define NAME (make-parameter #f)) ...
-
-         ;; Define the parser as a global definition. We parameter the
-         ;; first call of rules  with `Env` values
-         (define (ID stx)
-
-           ;; Define rules as a local def (overriding name `ID`)
-           (define ID (syntax-parser RHS ...))
-
-           ;; Extra rules
-           DEF ...
-
-           ;; Parameter the first call of rules with `Env` values
-           (parameterize ([NAME E] ...) (ID stx))))]
-    [(_ (ID:id stx:expr)              ;; Parser name (e.g., `?>`) and its syntax object/id
-        #:Env ([NAME:id E:expr] ...)  ;; Environment variables ...
-        DEF)                          ;; parser definition
+    [(_ (ID:id stx:expr)      ;; Parser name (e.g., `?>`) and its syntax object/id
+        #:Env (E:env ...)     ;; Environment variables ...
+        DEF)                  ;; parser definition
+     #:with ((E-NAME E-DEF E-LIFT) ...) (stx-flatten (stx-map env->name/def/lift #'(E ...)))
      #'(begin
          ;; Define environment variables as parameters
-         (define NAME (make-parameter #f)) ...
+         (: E.NAME (Parameterof E.TYPE)) ...
+         (define E.NAME (make-parameter (E.MAKER E.VAL))) ...
+
+         ;; The with-param macro
+         (... ;; Note: A stat-template is like a template, except that
+              ;; ..., ~?, and ~@ are interpreted as constants instead
+              ;; of template forms. See
+              ;; https://docs.racket-lang.org/reference/stx-patterns.html#%28form._%28%28lib._racket%2Fprivate%2Fstxcase-scheme..rkt%29._syntax%29%29
+          (define-simple-macro (E.WITH THE-PARAM EXPR:expr ...)
+            (parameterize ([E.NAME (E.MAKER THE-PARAM)]) EXPR ...)))
+         ...
+
+         ;; lifted DEF with E-NAME parameter
+         (define (E-LIFT . args) (apply E-DEF (E-NAME) args)) ...
 
          ;; Define the parser as a global definition. We parameterize
          ;; the first call of `DEF` with `Env` values
          (define (ID stx)
-           (parameterize ([NAME E] ...) DEF)))]
+           (parameterize ([E.NAME (E.MAKER E.VAL)] ...) DEF)))]
     ))
 
 (define-syntax define-rules
@@ -138,6 +161,8 @@
            ))]))
 
 
+;; TODO: for dict see https://lists.racket-lang.org/users/archive/2014-September/064340.html
+
 ;; (provide (struct-out immutable-custom-map))
 ;; (provide (struct-out IdIdMap) make-ididmap ididmap-ref ididmap-set ididmap-has-key?)
 
