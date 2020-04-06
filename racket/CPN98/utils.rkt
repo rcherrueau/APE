@@ -1,6 +1,8 @@
-#lang typed/racket/base/no-check
+;; #lang typed/racket/base/no-check
+#lang racket/base
 
 (require (for-syntax racket/base
+                     racket/exn
                      racket/pretty
                      racket/port
                      racket/string
@@ -11,10 +13,13 @@
          racket/function
          racket/list
          racket/match
+         racket/port
+         racket/pretty
          racket/string
          rackunit
          syntax/parse
          syntax/parse/define
+         syntax/macro-testing
          errortrace/errortrace-key
          )
 
@@ -34,21 +39,23 @@
 
 ;; (zip '(1 2 3) '(a b c))
 ;; > '((1 . a) (2 . b) (3 . c))
-(: zip (All (a b) ((Listof a) (Listof b) -> (Listof (Pairof a b)))))
+;; (: zip (All (a b) ((Listof a) (Listof b) -> (Listof (Pairof a b)))))
 (define (zip l1 l2) (map cons l1 l2))
 
 ;; (unzip '((1 . a) (2 . b) (3 . c)))
 ;; > '(1 2 3)
 ;; > '(a b c)
-(: unzip (All (a b) ((Listof (Pairof a b)) -> (Values (Listof a) (Listof b)))))
+;; (: unzip (All (a b) ((Listof (Pairof a b)) -> (Values (Listof a) (Listof b)))))
 (define (unzip l)
-  (struct (X Y) 2-tuple ([fst : X] [snd : Y])
+  ;; (struct (X Y) 2-tuple ([fst : X] [snd : Y])
+  (struct 2-tuple (fst snd)
     #:constructor-name mk-2-tuple)
 
-  (: unzip-l (2-tuple (Listof a) (Listof b)))
+  ;; (: unzip-l (2-tuple (Listof a) (Listof b)))
   (define unzip-l
-    (foldr (λ ([v : (Pairof a b)]
-             [as-bs : (2-tuple (Listof a) (Listof b))])
+    (foldr (λ (#;[v : (Pairof a b)]
+               #;[as-bs : (2-tuple (Listof a) (Listof b))]
+               v as-bs)
            (let ([as (2-tuple-fst as-bs)]
                  [bs (2-tuple-snd as-bs)])
              (mk-2-tuple (cons (car v) as)
@@ -60,7 +67,7 @@
 
 ;; (string-contains-once? "lala+lala"  #\+)  ; #t
 ;; (string-contains-once? "lala+lala+" #\+)  ; #f
-(: string-contains-once? (String Char -> Boolean))
+;; (: string-contains-once? (String Char -> Boolean))
 (define (string-contains-once? str contained)
   (eq? (length (indexes-of (string->list str) contained)) 1))
 
@@ -79,7 +86,7 @@
 ;; (extract-exp-name #'(foo [bar baz]))   ; 'foo
 ;;
 ;; From https://github.com/racket/racket/blob/738d2b7a81aad981a03884d27a7d0429940eccaf/racket/src/expander/syntax/error.rkt#L105-L115
-(: extract-exp-name ((All a) (Syntaxof a) -> (U Identifier #f)))
+;; (: extract-exp-name ((All a) (Syntaxof a) -> (U Identifier #f)))
 (define (extract-exp-name stx)
   (cond
     [(syntax? stx)
@@ -262,18 +269,17 @@
 (define-syntax test-pattern
   (syntax-parser
     [(name:id stx:expr pattern:expr check:expr ...+
-              (~optional (~seq #:msg message) #:defaults ([message #'#f])))
+              (~optional (~seq #:msg message)))
      ;; #`(test-case (format "Parse ~a as ~a" 'stx 'pattern)
-     #`(syntax-parse stx
-           [pattern check ...]
-           [_
-            (with-check-info*
-              (list (make-check-name 'name)
-                    (make-check-location '#,(build-source-location-list #'stx))
-                    (make-check-message
-                     (or message
-                         (format "Failed to parse syntax as ~a" 'pattern))))
-               fail-check)])]))
+     #`(with-handlers ([exn:fail:syntax?
+                        (λ (e)
+                          (with-check-info*
+                            (list (make-check-name 'name)
+                                  (make-check-location '#,(build-source-location-list #'stx))
+                                  (~? (make-check-message message) (~@)))
+                            (thunk (check-not-exn (thunk (raise e))))))])
+          (syntax-parse stx
+            [pattern check ...]))]))
 
 ;; Equivalent to (for/and ([i (syntax->list STXL)]) BODY ...).
 (define-syntax (stx-for/and stx)
@@ -328,3 +334,8 @@
          (log-lang-error $dbg-msg 'srcloc 'ctx res)
          res)]
     [(_ E) #'(dbg E #:ctx E)]))
+
+
+;; (: bound-id=? (Identifier Identifier -> Boolean))
+(define (bound-id=? id1 id2)
+  (eq? (syntax-e id1) (syntax-e id2)))
