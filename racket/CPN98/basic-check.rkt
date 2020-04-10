@@ -161,6 +161,13 @@
    this-syntax])
 
 
+;; (check-true (no-name-clash? #'((class foo (field foo)) (class bar (field bar)))))
+
+;; (check-true (no-name-clash? #'((class foo (field foo)) (class bar (field foo))))
+;;             "Two field could have the same name in different class")
+;; (check-true (no-name-clash? #'((class foo (field foo) (def foo (foo))))))
+;; ;; (check-true (no-name-clash? #'((class foo (field foo) (field foo)))))
+
 ;; P,τ ⊢m DEF ≫ ?DEF
 ;;
 ;; In context `P,τ`, `DEF` elaborates to `?DEF`
@@ -177,7 +184,8 @@
                                 (???      . RET.TYPE)
                                 (ARG-NAME . ARG.TYPE) ... }
                       (⊢e  #'E)))
-   #:when (τ=? #'t-e #'RET.TYPE #:srcloc #'?E)
+   #:when (or (τ=? #'t-e #'RET.TYPE)
+              (raise-type-mismatch #'t-e #'RET.TYPE #'?E))
    ;; ----------------------------------------------------------------
    ;; P,τ0 ⊢m (def (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) E) ≫
    ;;           (def (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) ?E)
@@ -232,7 +240,8 @@
    ;;;; field.
    #:with [?BODY t-body] (get-τ (⊢e #'BODY))
    #:with t-field (FS-ref #'(t . FNAME))
-   #:when (τ=? #'t-body #'t-field)
+   #:when (or (τ=? #'t-body #'t-field)
+              (raise-type-mismatch #'t-body #'t-field))
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e (set-field E FNAME BODY) ≫
    ;;          (set-field (?E : t) FNAME ?BODY) : FS(t . FNAME)
@@ -260,7 +269,8 @@
    ;; Check  P,Γ ⊢e E ≫ ?E : VAR-OW-SCHEME
    #:with [?E t] (get-τ (with-Γ (Γ-add #'(??? . VAR-SCHEME.TYPE))
                           (⊢e #'E)))
-   #:when (τ=? #'t #'VAR-SCHEME.TYPE #:srcloc #'?E)
+   #:when (or (τ=? #'t #'VAR-SCHEME.TYPE)
+              (raise-type-mismatch #'t #'VAR-SCHEME.TYPE #'?E))
    ;; Check P,Γ{VAR-NAME: VAR-OW-SCHEME} ⊢e BODY ≫ ?BODY : t
    #:with [_ t-body] (get-τ (with-Γ (Γ-add #'(VAR-NAME . VAR-SCHEME.TYPE))
                               (⊢e #'BODY)))
@@ -280,56 +290,7 @@
 
 ;; Environment
 
-;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-;;;; Access set of types CS
-;;;; TODO: remove me
-;; (define c-type=? bound-id=?)
-
-;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-;;;; Access set of fields FS, and defs DS info
-
-;; (key=? #'(a . b) #'(a . b))  ; #t
-;; (key=? #'(a . b) #'(c . d))  ; #f
-;; (key=? #'(a . 1) #'(a . 1))  ; #f
-;; (define (fs-key=? key1-stx key2-stx)
-;;   (match-let ([(cons C-TYPE1 F-NAME1) (syntax-e key1-stx)]
-;;               [(cons C-TYPE2 F-NAME2) (syntax-e key2-stx)])
-;;     (and (bound-id=? C-TYPE1 C-TYPE2)
-;;          (bound-id=? F-NAME1 F-NAME2))))
-
-;; Test two FS-key are equals iff:
-;;; Defined in the same class (c-type=?)
-;;; Same name
-;;; TODO: remove me
-;; (define f-name=? bound-id=?)
-
-;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-;;;; Access set of defs DS
-
-;; ;; Test two DS-key are equals.  Two DS-key are equals iff:
-;; ;;; Defined in the same class (c-type=?)
-;; ;;; Same name
-;; (define d-name=? bound-id=?)
-;; ;;; Same number of arguments
-;; (define (num-args=? args1 args2) (eq? (length args1) (length args2)))
-;; ;;; Same argument types (type comparison does not look at the owner or
-;; ;;; context parameter)
-;; (define b-type=? bound-id=?)
-;; ;;
-;; ;; (: ds-key=? (DS-key DS-key -> Boolean))
-;; (define (ds-key=? key1-stx key2-stx)
-;;   (match-let* ([(list C-TYPE1 D-NAME1 ARGs-OW-SCHEME1) (syntax-e key1-stx)]
-;;                [(list C-TYPE2 D-NAME2 ARGs-B-TYPE) (syntax-e key2-stx)]
-;;                [ows (syntax->list ARGs-OW-SCHEME1)]
-;;                [b-types (syntax->list ARGs-B-TYPE)])
-;;     (and
-;;      (c-type=? C-TYPE1 C-TYPE2)
-;;      (d-name=? D-NAME1 D-NAME2)
-;;      (num-args=? ows b-types)
-;;      (for/and ([ow ows] [b-type b-types])
-;;        (b-type=? (car (syntax-e ow)) b-type)))))
-
-;; DS-key is not a member => Three possible causes:
+;; DS-key is not a member implies three possible causes:
 ;;;; I met no c-name=? and d-name=? => unknown definition
 ;;;; I met c-name=? and d-name=? but not num-args? => arity error
 ;;;; I met c-name=?, d-name=? and num-args? => type mismatch
@@ -435,7 +396,7 @@
   #:extra-constructor-name make-exn:type-mismatch
   #:transparent)
 
-;; (: raise-type-mismatch  B-TYPE B-TYPE STX #:name (U Syntax Symbol #f) -> exn:type-mismatch)
+;; (: raise-type-mismatch  B-TYPE B-TYPE Syntax #:name (U Syntax Symbol #f) -> exn:type-mismatch)
 (define (raise-type-mismatch GIVEN-B-TYPE EXPECTED-B-TYPE [context #f]
                              #:name [n #f])
   (define CTX (or context (current-syntax-context)))
@@ -525,7 +486,7 @@
   #:extra-constructor-name make-exn:unknown-field
   #:transparent)
 
-;; (: raise-unknown-field (Identifier B-TYPE STX -> exn:unknown-field))
+;; (: raise-unknown-field (Identifier B-TYPE Syntax -> exn:unknown-field))
 (define (raise-unknown-field field-name c-type [CONTEXT #f])
   (define CTX (or CONTEXT (current-syntax-context)))
   (log-lang-debug "Original error in ~.s" CTX)
@@ -550,25 +511,26 @@
 
 ;; (Syntaxof a) -> (Syntaxof (Pairof (Syntaxof a) B-TYPE))
 (define (get-τ stx)
-  #`(#,stx #,(type-prop stx)))
+  (with-syntax ([e-stx stx] [τ-stx (type-prop stx)])
+    #'(e-stx τ-stx)))
 
 ;; (Syntaxof a) B-TYPE -> (Syntaxof a)
 (define add-τ type-prop)
 
-;; (: τ=? ((U OW-SCHEME B-TYPE) (U OW-SCHEME B-TYPE) [srcloc stx] -> Boolean))
-(define (τ=? CURRENT-B-TYPE EXPECTED-B-TYPE #:srcloc [CTX (current-syntax-context)])
-  (unless (bound-id=? CURRENT-B-TYPE EXPECTED-B-TYPE)
-    (raise-type-mismatch CURRENT-B-TYPE EXPECTED-B-TYPE CTX)))
+;; (: τ=? (B-TYPE B-TYPE -> Boolean))
+(define τ=? bound-id=?)
 
 ;; Ensures no name clash
 (define (no-name-clash? stxs)
+  ;; Extract names from a `class`, `field` or `def`
   (define get-name
     (syntax-parser
-      #:literal-sets [keyword-lits]
-      [(class name _ ...) #'name]
-      [(field name _ ...) #'name]
-      [(def (name _ ...) _) #'name]))
+      #:datum-literals [class field def]
+      [(class name:id _ ...) #'name]
+      [(field name:id _ ...) #'name]
+      [(def (name:id _ ...) _) #'name]))
 
+  ;; Extract names from `stxs`
   (define names (stx-map get-name stxs))
 
   (cond
@@ -577,6 +539,58 @@
      => (λ (name) (raise-name-clash name names))]
     ;; Everything is fine
     [else #t]))
+
+(module+ test
+  (define-test-suite utils
+    ;; Check
+    (check-stx=? (get-τ (add-τ #'foo #'bar)) #'(foo bar))
+    (check-stx=? (get-τ (add-τ (add-τ #'foo #'bar) #'baz)) #'(foo baz))
+    (check-stx=? (get-τ #'foo) #'(foo #f))  ;; TODO: raise an exception?
+
+    ;; Check name clash
+    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((clazz foo))))
+               "`clazz` is not a `class`")
+    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((class (foo)))))
+               "`(foo)` is not a valid name")
+    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((filed foo))))
+               "`filed` is not a `field`")
+    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((field (foo)))))
+               "`(foo)` is not a valid name")
+    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((dEf (foo) ???))))
+               "`dEf` is not a `def`")
+    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((def ((foo)) ???))))
+               "`(foo)` is not a valid name")
+
+    (check-true (no-name-clash? #'((class foo) (class bar))))
+    (check-true (no-name-clash? #'((field foo) (field bar))))
+    (check-true (no-name-clash? #'((def (foo) ???) (def (bar) ???))))
+
+    (check-exn exn:name-clash? (thunk (no-name-clash? #'((class foo) (class foo)))))
+    (check-exn exn:name-clash? (thunk (no-name-clash? #'((field foo) (field foo)))))
+    (check-exn exn:name-clash? (thunk (no-name-clash? #'((def (foo) ???) (def (foo) ???)))))
+    )
+  )
+
+;; Tests
+(module+ test
+  (require rackunit/text-ui
+           (prefix-in env: (submod "env.rkt" basic-check test)))
+  (provide basic-check-tests)
+
+  (define basic-check-tests
+    (test-suite
+     "Tests for basic checks"
+     ;; Check env
+     env:CS-tests
+     env:Γ-tests
+     env:FS-tests
+     env:DS-tests
+     ;; Check utils
+     utils
+     ))
+
+  (run-tests basic-check-tests)
+  )
 
 
 ;; Bibliography
@@ -594,23 +608,3 @@
 ;;   doi =          {10.1145/268946.268961},
 ;;   url =          {https://doi.org/10.1145/268946.268961},
 ;; }
-
-
-;; Tests
-(module+ test
-  (require rackunit/text-ui
-           (prefix-in env: (submod "env.rkt" basic-check test)))
-  (provide basic-check-tests)
-
-  (define basic-check-tests
-    (test-suite
-     "Tests for basic checks"
-     ;; Check env
-     env:CS-tests
-     env:Γ-tests
-     env:FS-tests
-     env:DS-tests
-     ))
-
-  (run-tests basic-check-tests)
-  )
