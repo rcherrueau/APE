@@ -39,7 +39,7 @@
                      ;; FIXME: make them private and define a proper
                      ;; interface to define them in order to ensure
                      ;; type safety with contracts.
-                     meta:FS
+                     ;; meta:FS
                      )
          (all-from-out "_definitions.rkt")
          )
@@ -52,7 +52,7 @@
 ;; https://docs.racket-lang.org/ts-guide/typed-untyped-interaction.html#%28part._.Using_.Typed_.Code_in_.Untyped_.Code%29
 ;; https://groups.google.com/d/msg/racket-users/eowl6RpdDwY/1wrCluDcAwAJ
 (unsafe-provide ;; keyword-lits expr-lits
-                meta:FS)
+                #;meta:FS)
 
 ;; TODO: Use https://docs.racket-lang.org/ts-reference/Utilities.html#%28part._.Untyped_.Utilities%29
 ;; for a better def of typed dict
@@ -316,8 +316,8 @@
 ;;~~~~~~~~~~~~~~~~~
 ;; CS: Set of Types
 
-(: meta:CS (Boxof (Listof Identifier)))
-(define meta:CS (box '()))
+;; (: meta:CS (Boxof (Listof Identifier)))
+;; (define meta:CS (box '()))
 
 ;; ;; Make `the-CS` the value of `CS` in `A`.
 ;; (: private:with-CS
@@ -353,8 +353,8 @@
 ;; OW-SCHEME as value.
 (define-type FS-key (Syntaxof (Pairof B-TYPE Identifier)))
 (define-type FS (Dict FS-key OW-SCHEME))
-(: meta:FS (Boxof FS))
-(define meta:FS (box '()))
+;; (: meta:FS (Boxof FS))
+;; (define meta:FS (box '()))
 
 ;; (: make-FS
 ;;    ((FS-key FS-key -> Boolean) ->
@@ -426,8 +426,8 @@
                            )))
 
 (define-type DS (Dict DS-key OW-SCHEME))
-(: meta:DS (Boxof DS))
-(define meta:DS (box '()))
+;; (: meta:DS (Boxof DS))
+;; (define meta:DS (box '()))
 
 ;; (define (ow-scheme=?))
 ;; (ds-key=? #'(a b ()) #'(a b ()))                  ; #t

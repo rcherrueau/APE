@@ -37,8 +37,8 @@
        [prog #`(prog #,@(s-exps read-syntax))]
        ;; Desugaring
        [prog (∗> prog)]
-       ;; Meta-information
-       [_    (set-box!-values (meta:CS meta:FS meta:DS) (M> prog))]
+       ;; Meta-information (Effectful computation)
+       [_    (M> prog)]
        ;; Basic Checks
        [prog (?> prog)]
        ;; Ownership

@@ -39,6 +39,7 @@
          syntax/srcloc
          syntax/stx
          "utils.rkt"
+         "meta.rkt"
          (rename-in "definitions.rkt"
                     [dict-ref      def/dict-ref]
                     [dict-has-key? def/dict-has-key?]
@@ -76,7 +77,7 @@
 
    ;; Set of existing types
    [CS : (Setof B-TYPE)
-       env:make-CS (unbox meta:CS)
+       env:make-CS meta:CS
        #:partial-app ([env:CS-member? CS-member?])]
 
    ;; Map of fields
@@ -89,7 +90,7 @@
        env:make-FS
        (meta-map  ;; Instantiate ows in values
         (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
-        (unbox meta:FS))
+        meta:FS)
        #:partial-app ([env:FS-member? FS-member?]
                       [env:FS-ref FS-ref])]
 
@@ -110,7 +111,7 @@
                         #'(c-type def b-types)])
         ;; Instantiate ows in values
         (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
-        (unbox meta:DS))
+        meta:DS)
        #:partial-app ([env:DS-member? DS-member?]
                       [env:DS-ref DS-ref]
                       [env:DS-domain DS-domain])])

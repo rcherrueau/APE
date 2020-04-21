@@ -1,4 +1,4 @@
-#lang racket/base
+#lang typed/racket/base/no-check
 
 ;; ,-,-,-.
 ;; `,| | |   ,-. . . ,-. ,-. . . ,-. ,-.
@@ -23,43 +23,67 @@
          "utils.rkt"
          "definitions.rkt")
 
-(provide M>)
+(provide meta:CS meta:FS meta:DS
+         M>)
 
 
+;; Meta values
+
+(: meta:CS (Listof Identifier))
+(define meta:CS '())
+
+(: meta:FS (Dict FS-key OW-SCHEME))
+(define meta:FS '())
+
+(: meta:DS (Dict DS-key OW-SCHEME))
+(define meta:DS '())
+
+
+;; Function to find and set meta values
+
 (define (M> stx)
-  ;; Get all class
-  (define class-stxs
-    (syntax-parse stx
-      #:literal-sets [keyword-lits]
-      [(prog ~! CLASS ... E) #'(CLASS ...)]))
+  (set!-values
+   (meta:CS meta:FS meta:DS)
 
-  ;; Get all class' names, fields and defs
-  (match-define (list ctype         ;; (listof name-stx)
-                      ctype-fields  ;; (listof (pairof name-stx fields-stx))
-                      ctype-defs)   ;; (listof (pairof name-stx defs-stx))
-    (sequence (stx-map get-names/fields/defs class-stxs)))
+   (for/foldr ([cs '()][fs '()][ds '()])
+              ([class-stx (in-syntax (get-classes-stx stx))])
+     (define-values (ctype fields-stx defs-stx)
+       (get-ctype/fields/defs-stx class-stx))
 
-  ;; Transforms ctype-fields to an FS
-  (define fs (foldr (λ (v l) (append (mk-fs (car v) (cdr v)) l) ) '() ctype-fields))
-  (define ds (foldr (λ (v l) (append (mk-ds (car v) (cdr v)) l) ) '() ctype-defs))
-
-  (values ctype fs ds)
-  )
+     (values
+      ;; cs
+      (cons ctype cs)
+      ;; fs
+      (append (mk-fs ctype fields-stx) fs)
+      ;; ds
+      (append (mk-ds ctype defs-stx) ds)))))
 
 
-;; Get the fields indexed by the class name.
-(define get-names/fields/defs
+;; Utils
+
+;; Get all classes stx
+(: get-classes-stx (Syntax -> (Syntaxof (Listof 'class-stx))))
+(define get-classes-stx
+  (syntax-parser
+    #:literal-sets [keyword-lits]
+    [(prog ~! CLASS ... E) #'(CLASS ...)]))
+
+;; Extracts the type, fields and defs syntax objects of a class
+(: get-ctype/fields/defs-stx
+   ('class-stx -> (List Identifier                        ;; class type
+                        (Syntaxof (Listof 'field-stx))    ;; Fields stx
+                        (Syntaxof (Listof 'def-stx)))))   ;; Defs stx
+(define get-ctype/fields/defs-stx
   (syntax-parser
     #:literal-sets [keyword-lits]
     [(class ~! NAME [CPARAM ...] FIELD/DEF ...)
      #:with [FIELD ...] (filter field? (stx->list #'(FIELD/DEF ...)))
      #:with [DEF ...] (filter def? (stx->list #'(FIELD/DEF ...)))
-     (list #'NAME
-           (cons #'NAME #'(FIELD ...))
-           (cons #'NAME #'(DEF ...)))]))
+     (values #'NAME #'(FIELD ...) #'(DEF ...))]))
 
-;; (pairof name-stx (listof field-stx))
-;; -> (listof (pairof (syntaxof (pairof name field-name)) field-type-stx))
+(: mk-fs
+   ((Pairof Identifier (Syntaxof (Listof 'field-stx)))
+    -> (Listof (Pairof FS-key OW-SCHEME))))
 (define (mk-fs C-TYPE FIELD...)
   (define mk-fs-item (syntax-parser
       #:literal-sets [keyword-lits]
@@ -69,13 +93,9 @@
 
   (stx-map mk-fs-item FIELD...))
 
-
-;; output:
-;; (Syntaxof
-;;  (List Identifier                     ; Class type
-;;        Identifier                     ; Def name
-;;        (Syntaxof (Listof OW-SCHEME))  ; Type of def args
-;;        ))
+(: mk-ds
+   ((Pairof Identifier (Syntaxof (Listof 'def-stx)))
+    -> (Listof (Pairof DS-key OW-SCHEME))))
 (define (mk-ds C-TYPE DEF...)
   (define mk-ds-item (syntax-parser
       #:literal-sets [keyword-lits]
@@ -84,10 +104,3 @@
        (cons #'(C-TYPE NAME (A-OWS ...)) #'R-OWS)]))
 
   (stx-map mk-ds-item DEF...))
-
-(define get-name
-  (syntax-parser
-    #:literal-sets [keyword-lits]
-    [(class name _ ...) #'name]
-    [(field name _ ...) #'name]
-    [(def (name _ ...) _) #'name]))
