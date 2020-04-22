@@ -36,7 +36,7 @@
                    out-str
                    #:newline? #f))))
 
-(define-logger lang)
+(define-logger sclang)
 
 
 (define ∘ compose1)
@@ -347,7 +347,7 @@
      #:with srcloc (srcloc->string (build-source-location #'ctx))
      #'(let ([$dbg-msg "; [dbg] ~a: ~a = ~s~n"]
              [res      E])
-         (log-lang-error $dbg-msg 'srcloc 'ctx res)
+         (log-sclang-debug $dbg-msg 'srcloc 'ctx res)
          res)]
     [(_ E) #'(dbg E #:ctx E)]))
 

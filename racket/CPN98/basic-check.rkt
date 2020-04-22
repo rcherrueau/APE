@@ -401,7 +401,7 @@
 (define (raise-type-mismatch GIVEN-B-TYPE EXPECTED-B-TYPE [context #f]
                              #:name [n #f])
   (define CTX (or context (current-syntax-context)))
-  (log-lang-debug "Original error in ~.s" CTX)
+  (log-sclang-debug "Original error in ~.s" CTX)
   (define CTX-SURFACE (syntax-property CTX 'surface))
   (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
   (define name (cond
@@ -419,7 +419,7 @@
             (syntax-column EXPECTED-B-TYPE)
             (syntax->datum CTX-SURFACE)))
 
-  (log-lang-debug "Original error in ~.s" CTX)
+  (log-sclang-debug "Original error in ~.s" CTX)
 
   (raise (make-exn:type-mismatch
           (string-append srcloc-msg ": " id ": " err-msg elab-msg)
@@ -434,7 +434,7 @@
 ;; (: raise-arity-error (Identifier Integer (Listof B-TYPE) STX -> exn:arity-error))
 (define (raise-arity-error def-name expected-args-size given-args [context #f])
   (define CTX (or context (current-syntax-context)))
-  (log-lang-debug "Original error in ~.s" CTX)
+  (log-sclang-debug "Original error in ~.s" CTX)
   (define CTX-SURFACE (syntax-property CTX 'surface))
   (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
   (define id (format "~s" (extract-exp-name def-name)))
@@ -465,7 +465,7 @@
 ;; (: raise-unknown-def (Identifier B-TYPE STX -> exn:unknown-def))
 (define (raise-unknown-def def-name c-type [context #f])
   (define CTX (or context (current-syntax-context)))
-  (log-lang-debug "Original error in ~.s" CTX)
+  (log-sclang-debug "Original error in ~.s" CTX)
   (define CTX-SURFACE (syntax-property CTX 'surface))
   (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
   (define id (format "~s" (extract-exp-name def-name)))
@@ -490,7 +490,7 @@
 ;; (: raise-unknown-field (Identifier B-TYPE Syntax -> exn:unknown-field))
 (define (raise-unknown-field field-name c-type [CONTEXT #f])
   (define CTX (or CONTEXT (current-syntax-context)))
-  (log-lang-debug "Original error in ~.s" CTX)
+  (log-sclang-debug "Original error in ~.s" CTX)
   (define CTX-SURFACE (syntax-property CTX 'surface))
   (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
   (define id (format "~s" (extract-exp-name field-name)))
