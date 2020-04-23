@@ -37,6 +37,10 @@
   #:datum-literals (let new send get-field set-field! this ???)
   ())
 
+(define-literal-set type-lits
+  #:for-label
+  #:datum-literals (-> → :)
+  ())
 
 ;; TODO: "scheme" meaning? look at "Hindley-Milner Elaboration in
 ;; Application" paper, for a definition of scheme.
@@ -129,7 +133,7 @@
      #'(begin
          ;; Define environment variables as parameters
          (: E.NAME (Parameterof E.TYPE)) ...
-         (define E.NAME (make-parameter (E.MAKER E.VAL))) ...
+         (define E.NAME (make-parameter #f)) ...
 
          ;; The with-param macro
          (... ;; Note: A stat-template is like a template, except that
@@ -156,7 +160,8 @@
          ;; (dbg stx #:ctx ID)
          (syntax-parse stx
            #:literal-sets [(keyword-lits #:at ID)
-                           (expr-lits #:at ID)]
+                           (expr-lits #:at ID)
+                           (type-lits #:at ID)]
            RULE ...
            ))]))
 

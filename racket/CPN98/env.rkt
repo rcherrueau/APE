@@ -7,23 +7,24 @@
 ;;
 ;; Environments def for parsers of the lang.
 ;;
-;; In transformation (e.g., desugar.rkt) I have to go with untyped
-;; racket because it relies to much on `syntax-parse` and consœurs
-;; which lack of good definitions in typed/racket.  But in general I
-;; prefer typed code.  Typed code prevents to systematically tangle
-;; annoying input-validation code in your function.
+;; In phases (e.g., desugar.rkt) I have to go with untyped racket
+;; because it relies to much on `syntax-parse` and consœurs which lack
+;; of good definitions in typed/racket.  But in general I prefer typed
+;; code.  Typed code prevents to systematically tangle annoying
+;; input-validation code in your function.
 ;;
-;; In transformation, managing env should be done in typed/racket
-;; because it only involve operation on list or hash
-;; map. Unfortunately, I find it really hard to mix typed code with
-;; untyped one... The `with-type` construction is not a good solution.
-;; It doesn't benefit from type definitions outside of it (that I use
-;; a lot with `typed/no-check` to document my code).  So I have to
-;; write type annotation twice (outside `with-type` for documentation
-;; and inside `with-type` for type checking).
+;; In phases, managing env should have be done in typed/racket because
+;; it only involves operations on list or hash map. Unfortunately, I
+;; find it really hard to mix untyped code with typed one... The
+;; `with-type` construction is not a good solution.  It doesn't
+;; benefit from type definitions outside of it (that I use a lot with
+;; `typed/no-check` to document my code).  So I have to write type
+;; annotation twice (outside `with-type` for documentation and inside
+;; `with-type` for type checking).
 ;;
-;; To circumvent this, and keep the code as clean as possible, I put
-;; environments definition here.
+;; To circumvent this -- and keep the code as clean as possible -- I
+;; put environments definition in this typed module. Here, I relies on
+;; `unsafe-require/typed` and then provides a safe interface.
 
 (require racket/function
          racket/list

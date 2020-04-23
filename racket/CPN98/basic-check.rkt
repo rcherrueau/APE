@@ -6,18 +6,37 @@
 ;;   '   `-' `-^ `-^ `-' `-^ `-^ `-' `-'
 ;; Ownership Types Checker.
 ;;
-;; Basic checking transformation (?>)
+;; Basic checking phase (?>)
 ;; - Checks no duplicate class/field/def names.
 ;; - Type checks the program (for simple type -- "simple" as in simply
 ;;   typed λ calculus, i.e., no ownership).
 ;; - Based on [FKF98] (see Bibliography).
 ;;
 ;; Environments:
-;; - Γ is the map of locally bound variables
-;; - τ is the type of the current class
-;; - CS is the set of defined types
-;; - FS is the map of fields
-;; - DS is the map of definitions
+;; - Γ is the map of locally bound variables.  Used to track free
+;;   variables.
+;; - τ is the type of the current class.  Used to get the type of
+;;   `this`.
+;; - CS is the set of defined types.  A type which does not exist in
+;;   CS raises an `unknown-type` error.
+;; - FS is the map of fields.  The map has the class name and field
+;;   name as value, and the field type as key.  Used to:
+;;   + Ensure that a field is a member of specific class (raise an
+;;     `unknown-field` error otherwise).
+;;   + Ensure that an expression that is going to be set into a
+;;     specific field is of the correct type (raise an `unknown-type`
+;;     error otherwise).
+;;   + Get the type of a `get-field` operation.
+;; - DS is the map of definitions.  The map has the class name, def
+;;   name and def arguments type as values, and the return type as
+;;   key.  Used to:
+;;   + Ensure that a def is a member of specific class (raise an
+;;     `unknown-def` error otherwise).
+;;   + Ensure that a call of a def has the expected number of
+;;     arguments (raise an `arity-error` otherwise).
+;;   + Ensure that a call of a def has arguments of the expected type
+;;     (raise an `unknown-type` error otherwise).
+;;   + Get the type of a `send` operation.
 ;;
 ;; Naming conventions:
 ;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
@@ -40,19 +59,19 @@
          syntax/stx
          "utils.rkt"
          "meta.rkt"
+         (prefix-in env: (submod "env.rkt" basic-check))
          (rename-in "definitions.rkt"
                     [dict-ref      def/dict-ref]
                     [dict-has-key? def/dict-has-key?]
                     [dict-map      def/dict-map]
-                    [dict-keys     def/dict-keys])
-         (prefix-in env: (submod "env.rkt" basic-check)))
+                    [dict-keys     def/dict-keys]))
 
 (module+ test (require rackunit))
 
 (provide ?>)
 
 
-;; Transformation (?>)
+;; Phase ?>
 
 (define-parser (?> stx)
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -81,9 +100,6 @@
        #:partial-app ([env:CS-member? CS-member?])]
 
    ;; Map of fields
-   ;;
-   ;; With the syntax #'(Class-type . Field-name) as key and the Field
-   ;; type as value.
    [FS : (HashTable
           (Syntaxof (Pairof B-TYPE Identifier)) ;; #'(Class-type . Field-name)
           B-TYPE)                               ;; #'Field-type
@@ -95,9 +111,6 @@
                       [env:FS-ref FS-ref])]
 
    ;; Map of definitions
-   ;;
-   ;; With the syntax #'(Class-type Def-name (Def-arg-type ...)) as
-   ;; key and the Def return type as value.
    [DS : (HashTable
           (Syntaxof (List Identifier                    ; Class type
                           Identifier                    ; Def name
@@ -121,8 +134,6 @@
   (⊢p stx))
 
 
-;; Rules
-
 ;; ⊢p P ≫ ?P : t
 ;;
 ;; `P` elaborates to `?P` and has type `t`
@@ -139,7 +150,7 @@
    ;; ⊢p (prog CLASS ... E) ≫ (prog ?CLASS ... ?E) : t
    (add-τ this-syntax #'t)])
 
-
+
 ;; P ⊢d CLASS ≫ ?CLASS
 ;;
 ;; In context `P`, `CLASS` elaborates to `?CLASS`
@@ -169,6 +180,7 @@
 ;; (check-true (no-name-clash? #'((class foo (field foo) (def foo (foo))))))
 ;; ;; (check-true (no-name-clash? #'((class foo (field foo) (field foo)))))
 
+
 ;; P,τ ⊢m DEF ≫ ?DEF
 ;;
 ;; In context `P,τ`, `DEF` elaborates to `?DEF`
@@ -192,7 +204,7 @@
    ;;           (def (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) ?E)
    this-syntax])
 
-
+
 ;; P,Γ ⊢e E ≫ ?E : t
 ;;
 ;; In context `P,Γ`, `E` elaborates to `?E` and has type `t`
@@ -208,14 +220,14 @@
   ;; [var]
   ;; Check ID ∈ dom(Γ)
   ;;;; ID is locally bound (including `this` and `???`).
-  [ID:id #:when (Γ-member? #'ID)
+  [ID:id #:when (or (Γ-member? #'ID)
+                    ;; Unbound identifier. This is not supposed to
+                    ;; happened thanks to desugaring, but who knows
+                    ;; ...
+                    (raise-syntax-error #f "unbound identifier" #'ID))
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e ID ≫ ID : Γ(ID)
    (add-τ this-syntax (Γ-ref #'ID))]
-  ;;; Unbound identifier. This is not supposed to happened thanks to
-  ;;; desugaring, but who knows ...
-  [ID:id
-   (raise-syntax-error #f "unbound identifier" #'ID)]
 
   ;; [get]
   [(get-field ~! E FNAME)
@@ -265,7 +277,9 @@
    (add-τ this-syntax (DS-ref #'DS-key))]
 
   ;; [let]
-  [(let ~! (VAR-NAME VAR-SCHEME:ow-scheme E) BODY)
+  ;;
+  ;; The type of let is the type of the last expression of its body.
+  [(let ~! (VAR-NAME VAR-SCHEME:ow-scheme E) BODY ...)
    #:when (⊢τ #'VAR-SCHEME.TYPE)
    ;; Check  P,Γ ⊢e E ≫ ?E : VAR-OW-SCHEME
    #:with [?E t] (get-τ (with-Γ (Γ-add #'(??? . VAR-SCHEME.TYPE))
@@ -273,11 +287,19 @@
    #:when (or (τ=? #'t #'VAR-SCHEME.TYPE)
               (raise-type-mismatch #'t #'VAR-SCHEME.TYPE #'?E))
    ;; Check P,Γ{VAR-NAME: VAR-OW-SCHEME} ⊢e BODY ≫ ?BODY : t
-   #:with [_ t-body] (get-τ (with-Γ (Γ-add #'(VAR-NAME . VAR-SCHEME.TYPE))
-                              (⊢e #'BODY)))
+   ;;;; Note: This is a generalization regarding [FKF98].  The paper
+   ;;;; only accept one expression in the body of a `let`.  Here we
+   ;;;; accept many, with the idea that the results of the last
+   ;;;; expression is returned as the result of the `let`.  In such a
+   ;;;; case the type of the `let` is the type of the Last Expression
+   ;;;; of its BODY (LEB).
+   ;;;; Check P,Γ{VAR-NAME: VAR-OW-SCHEME} ⊢e BODY ... LEB ≫ ?BODY ... ?LEB : t-body
+   #:with [?BODY ... ?LEB] (with-Γ (Γ-add #'(VAR-NAME . VAR-SCHEME.TYPE))
+                             (stx-map ⊢e #'(BODY ...)))
+   #:with [_ t-body] (get-τ #'?LEB)
    ;; ------------------------------------------------------------------
-   ;; P,Γ ⊢e *let (VAR-NAME VAR-OW-SCHEME E) BODY ≫
-   ;;           *let (VAR-NAME VAR-OW-SCHEME ?E) ?BODY : t
+   ;; P,Γ ⊢e *let (VAR-NAME VAR-OW-SCHEME E) BODY ... LEB ≫
+   ;;           *let (VAR-NAME VAR-OW-SCHEME ?E) ?BODY ... ?LEB : t-body
    (add-τ this-syntax #'t-body)])
 
 ;; P ⊢τ t
@@ -285,7 +307,7 @@
 ;; In context `P`, `t` exists
 (define-rules ⊢τ
   ;; [type]
-  [t #:when (or (CS-member? #'t) (raise-type-unknown #'t))
+  [t #:when (or (CS-member? #'t) (raise-unknown-type #'t))
      this-syntax])
 
 
@@ -335,9 +357,9 @@
   ;; I met the cname=/dname=? criteria but not arity=? => arity error
   (when (empty? met-cname=/dname=/arity=-defs)
     (define expected-def (car met-cname=/dname=-defs))
-    (match-define (list _ _ EXPECTED-DEF-ARGs) expected-def)
+    (match-define (list _ EXPECTED-DEF-NAME EXPECTED-DEF-ARGs) expected-def)
     (define expected-def-arity (length EXPECTED-DEF-ARGs))
-    (raise-arity-error LOOKED-DEF-NAME expected-def-arity LOOKED-DEF-ARGs))
+    (raise-arity-error EXPECTED-DEF-NAME expected-def-arity LOOKED-DEF-ARGs))
 
   ;; Here, I met my three criterion => type mismatch
   (define expected-def (car met-cname=/dname=/arity=-defs))
@@ -378,16 +400,16 @@
 
 
 ;; Unknown type
-(struct exn:type-unknown exn:fail:syntax ()
-  #:extra-constructor-name make-exn:type-unknown
+(struct exn:unknown-type exn:fail:syntax ()
+  #:extra-constructor-name make-exn:unknown-type
   #:transparent)
 
-(define (raise-type-unknown B-TYPE)
+(define (raise-unknown-type B-TYPE)
   (define srcloc-msg (srcloc->string (build-source-location B-TYPE)))
   (define id (format "~s" (syntax->datum B-TYPE)))
   (define err-msg "unknown type in this scope")
 
-  (raise (make-exn:type-unknown
+  (raise (make-exn:unknown-type
           (string-append srcloc-msg ": " id ": " err-msg)
           (current-continuation-marks)
           (list (syntax-taint B-TYPE)))))
@@ -432,12 +454,12 @@
   #:transparent)
 
 ;; (: raise-arity-error (Identifier Integer (Listof B-TYPE) STX -> exn:arity-error))
-(define (raise-arity-error def-name expected-args-size given-args [context #f])
+(define (raise-arity-error def expected-args-size given-args [context #f])
   (define CTX (or context (current-syntax-context)))
   (log-sclang-debug "Original error in ~.s" CTX)
   (define CTX-SURFACE (syntax-property CTX 'surface))
   (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
-  (define id (format "~s" (extract-exp-name def-name)))
+  (define id (format "~s" (extract-exp-name def)))
   (define err-msg "arity mismatch")
   (define given-args-size (length given-args))
   (define arity-msg
@@ -448,8 +470,8 @@
                     expected-args-size)
             (format (if (<= given-args-size 1) "~s was" "~s were")
                     given-args-size)
-            (syntax-line def-name)
-            (syntax-column def-name)
+            (syntax-line def)
+            (syntax-column def)
             (syntax->datum CTX-SURFACE)))
 
   (raise (make-exn:arity-error
@@ -571,8 +593,10 @@
     (check-exn exn:name-clash? (thunk (no-name-clash? #'((def (foo) ???) (def (foo) ???)))))
     )
   )
+
 
 ;; Tests
+
 (module+ test
   (require rackunit/text-ui
            (prefix-in env: (submod "env.rkt" basic-check test)))

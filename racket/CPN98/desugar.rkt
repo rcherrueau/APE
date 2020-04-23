@@ -6,16 +6,17 @@
 ;;   '   `-' `-^ `-^ `-' `-^ `-^ `-' `-'
 ;; Ownership Types Checker.
 ;;
-;; Desugaring syntax transformation (∗>)
-;; - Introduce missing CPARAM.
+;; Desugaring syntax phase (∗>)
+;; - Introduce missing Context parameters (CPARAM).
 ;; - Transform let with multiple binding into nested lets of one
 ;;   binding.
-;; - Expand short field access to canonical field access: (get-field
-;;   *this* field).
+;; - Expand "short field" access to "canonical field" access:
+;;   (do-something field) ∗> (do-something (get-field *this* field)).
 ;; - Expand types to ownership schemes.
 ;;
 ;; Environment:
-;; - Γ is the set of locally bound variables
+;; - Γ is the set of locally bound variables.  Used to track free
+;;   variables, that are judged as "short fields".
 ;;
 ;; Naming conventions:
 ;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
@@ -38,7 +39,8 @@
 (provide ∗>)
 
 
-;; Transformation (∗>)
+;; Phase ∗>
+
 (define-parser (∗> stx)
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #:Env
@@ -54,7 +56,7 @@
   (∗p> stx))
 
 
-;; Rules
+;; Program rules
 
 ;; A prog is a list of CLASS and one expression E
 (define-rules ∗p>
@@ -68,6 +70,8 @@
    #:with *E           (∗e> #'E)
    #@(prog *CLASS ... *E)])
 
+
+;; Class rules
 
 ;; A class is a NAME, an optional list of context parameters
 ;; CPARAM, and a list of fields and definitions.
@@ -87,12 +91,14 @@
                  #'(class foo () (field bar (t o ())))
                  #:msg "`class` with no CPARAM implies empty CPARAMS")
     (check-ill-parsed
-     (∗c> #'(class foo (field [bar : o/t]) bar))
-     #:msg (string-append
-            "A class is a list of Fields and Defs "
-            "(Arbitrary expression such as `bar` is not allowed)"))))
+      (∗c> #'(class foo (field [bar : o/t]) bar))
+      #:msg (string-append
+             "A class is a list of Fields and Defs "
+             "(Arbitrary expression such as `bar` is not allowed)"))))
 
-;; Fields and Defs
+
+;; Fields and defs rules
+
 (define-rules ∗f/d>
   ;; A field declares one argument ARG (i.e., no initialization).
   ;;
@@ -121,9 +127,11 @@
 
 (module+ test
   (define-test-suite ∗f/d>-parse
+    ;; field
     (check-stx=? (∗f/d> #'(field [name : o/t]))
                  #'(field name (t o ())))
 
+    ;; def
     (check-stx=? (∗f/d> #'(def (name -> o/t) ???))
                  #'(def (name (t o ())) ???)
                  #:msg "`def` with no argument is valid")
@@ -141,7 +149,9 @@
                  #'(def (name (foo (t o ())) (t o ())) foo)
                  #:msg "`def` binds `foo` identifier")))
 
-;; Expression
+
+;; Expression rules
+
 (define-rules ∗e>
   ;; A let binds a variables VAR with a type T to an expression E in
   ;; a BODY. During the transformation of BODY, Γ is extended with
@@ -151,14 +161,14 @@
   ;; ∗>  (let (VAR OW-SCHEME *E) (let... (...) *BODY)
   ;; with
   ;;     OW-SCHEME := (TYPE OWNER CPARAMS)
-  [(let (ARG:arg-expr) ~! BODY:expr)
-   #:with *E        (∗e> #'ARG.EXPR)
-   #:with *BODY     (with-Γ (Γ-add #'ARG.VAR) (∗e> #'BODY))
-   #@(let (ARG.VAR ARG.OW-SCHEME *E) *BODY)]
+  [(let ([VAR:id : T:type E:expr]) ~! BODY:expr ...+)
+   #:with *E (∗e> #'E)
+   #:with [*BODY ...]  (with-Γ (Γ-add #'VAR) (stx-map ∗e> #'(BODY ...)))
+   #@(let (VAR T.OW-SCHEME *E) *BODY ...)]
   ;; Transforms a `let` with multiple binding into multiple nested
   ;; `let`s with one unique binding (such as the previous let)
-  [(let ~! (B1:arg-expr BS ...) BODY:expr)
-   (∗e> #@(let (B1) (let (BS ...) BODY)))]
+  [(let ~! ([~and HD (VAR:id : T:type E:expr)] TL ...) BODY:expr ...+)
+   (∗e> #@(let (HD) (let (TL ...) BODY ...)))]
 
   ;; A new takes the class type C-TYPE of the class to instantiate
   ;; (i.e., no constructor).
@@ -202,16 +212,14 @@
 
   ;; An identifier is either:
   ;;
-  ;;;; A local binding (from a def or let). It include the `this`
-  ;;;; keyword in the case we are in the context of a def.
+  ;;;; The debug placeholder ???
+  [??? this-syntax]
+  ;;;; A bound identifier (from a def or let)
   [ID:id #:when (Γ-member? #'ID)
     this-syntax]
-  ;;;; The debug placeholder ???
-  [???
-   this-syntax]
-  ;;;; A class level binding (no binder). In that case, it presumably
-  ;;;; refers to a field of the current class: A sort of shortcut for
-  ;;;; (get-field this id) -- i.e., `id` instead of `this.id` in Java
+  ;;;; A free identifier. In that case, it presumably refers to a
+  ;;;; field of the current class: A sort of shortcut for (get-field
+  ;;;; this id) -- i.e., `id` instead of `this.id` in Java
   ;;;; world. E.g.,
   ;;;;
   ;;;; 1 (class C
@@ -221,9 +229,9 @@
   ;;;; With line 3, a shortcut for
   ;;;; > (def (get-id → A) (get-field this id))
   ;;;;
-  ;;;; We remove it, so the desugared syntax contains no class level
-  ;;;; binding.
-  ;;;; ID ∗> *(get-field this ID)
+  ;;;; We remove it, so the desugared syntax contains no free
+  ;;;; identifier.
+  ;;;; ID ∗> (get-field this ID)
   [ID:id
    (∗e> #@(get-field this ID))])
 
@@ -255,15 +263,28 @@
                    #'(let (bar (t o ()) ???) bar)
                    #:msg "`let` binds `bar` identifier")
       (check-stx=?
-        (∗e> #'(let ([foo : o/t ???][bar : o/t ???]) ???))
-        #'(let (foo (t o ()) ???) (let (bar (t o ()) ???) ???))
-        #:msg "`let` with multiple bindings is transformed into nested `let`s")
+         (∗e> #'(let ([foo : o/t ???]) (let ([bar : o/t ???]) ???)))
+         #'(let (foo (t o ()) ???) (let (bar (t o ()) ???) ???))
+         #:msg "Nested `let`s")
+      (check-stx=?
+         (∗e> #'(let ([foo : o/t ???][bar : o/t ???]) ???))
+         #'(let (foo (t o ()) ???) (let (bar (t o ()) ???) ???))
+         #:msg "`let` with multiple bindings is transformed into nested `let`s")
+      (check-stx=?
+         (∗e> #'(let ([foo : o/t ???]) foo ???))
+         #'(let (foo (t o ()) ???) foo ???)
+         #:msg "`let' with multiple BODY expr are kept as it")
+      (check-stx=?
+         (∗e> #'(let ([foo : o/t ???] [bar : o/t ???]) foo bar))
+         #'(let (foo (t o ()) ???) (let (bar (t o ()) ???) foo bar))
+         #:msg "`let' with multiple BODY expr are kept as it")
       (check-ill-parsed (∗e> #'(let ([]) ???)))
       (check-ill-parsed (∗e> #'(let ([foo : t c ???]) ???))
-        #:msg "context parameters `c` should be surrounded by parentheses")
-      ;;; Regression test from hotedge 2020
-      (check-ill-parsed
-       (∗e> #'(let ([foo : [o/t c] ???][bar : [o/t c] ???]) ???)))
+         #:msg "context parameters `c` should be surrounded by parentheses")
+      (check-ill-parsed (∗e> #'(let ([foo : o/t ???])))
+         #:msg "`let` always provide a BODY")
+      (check-ill-parsed  ;;; Regression test from hotedge 2020
+         (∗e> #'(let ([foo : [o/t c] ???][bar : [o/t c] ???]) ???)))
 
       ;; new
       (check-stx=? (∗e> #'(new o/t))     #'(new (t o ())))
@@ -302,7 +323,7 @@
       (check-ill-parsed (∗e> #'(send foo def ()))))))
 
 
-;; Syntax for type and arg
+;; Syntax for type
 
 (define-splicing-syntax-class type
   #:description (string-append
@@ -315,7 +336,7 @@
   #:attributes [TYPE OWNER CPARAMS OW-SCHEME]
   ;; Note: Do not commit to enable backtrack in `let`
   ;; #:commit
-
+  ;;
   ;; Note: Order of pattern matter!
   ;; owner/type {param ...}
   (pattern (~seq O/T:id {PARAM:id ...+}) #:when (is-stx-owner/type? #'O/T)
@@ -374,18 +395,24 @@
       (check-stx=? #'t.CPARAMS   #'(c1 c2))
       (check-stx=? #'t.OW-SCHEME #'(type world (c1 c2))))
 
-    #;(check-ill-parsed
+    (check-ill-parsed
+     (syntax-parse #'(_ (owner/type))    [(_ t:type) #t])
+     #:msg (string-append "A type is a *splicing* head pattern "
+                          "and cannot be used as a single term pattern. "
+                          "Therefore it cannot be surrounded by parentheses."))
+    (check-ill-parsed
      (syntax-parse #'(_ (owner/type {c1 c2}))    [(_ t:type) #t])
      #:msg (string-append "A type is a *splicing* head pattern "
-                          "and cannot be used as a single term pattern."
+                          "and cannot be used as a single term pattern. "
                           "Therefore it cannot be surrounded by parentheses."))
-    #;(check-ill-parsed
-     (syntax-parse #'(type c1 c2)        [_:type #t]))))
+    ))
 
+
+;; Syntax for return type (of a def)
 
 (define-syntax-class rtype
   #:description "a return type"
-  #:datum-literals [-> →]
+  #:literal-sets [type-lits]
   #:commit
   (pattern (-> T:type) #:attr OW-SCHEME #'T.OW-SCHEME)
   (pattern (→  T:type) #:attr OW-SCHEME #'T.OW-SCHEME))
@@ -396,14 +423,12 @@
       (test-case (format "Arrow is ~a" (stx->string ~> #:newline? #f))
         (test-pattern #`(#,~> owner/type) r:rtype
           (check-stx=? #'r.OW-SCHEME #'(type owner ())))
-        ;; TODO: put in ill-parsed
-        #;(test-pattern #`(#,~> (owner/type {c1 c2})) r:rtype
+        (test-pattern #`(#,~> owner/type {c}) r:rtype
+          (check-stx=? #'r.OW-SCHEME #'(type owner (c))))
+        (test-pattern #`(#,~> owner/type {c1 c2}) r:rtype
           (check-stx=? #'r.OW-SCHEME #'(type owner (c1 c2))))
         (test-pattern #`(#,~> owner/type/ {c1 c2}) r:rtype
           (check-stx=? #'r.OW-SCHEME #'(type/ owner (c1 c2))))
-        (test-pattern #`(#,~> owner/type {c1 c2}) r:rtype
-          (check-stx=? #'r.OW-SCHEME #'(type owner (c1 c2)))
-          #:msg "`rtype` accepts no surrounded o/t(c) syntax")
 
         (test-pattern #`(#,~> type) r:rtype
           (check-stx=? #'r.OW-SCHEME #'(type world ())))
@@ -411,15 +436,25 @@
           (check-stx=? #'r.OW-SCHEME #'(type world (c1 c2))))
 
         (check-ill-parsed
-         (syntax-parse #`(#,~> owner/type c1 c2)    [_:rtype #t])
-         #:msg (string-append "A type with params have to be "
-                              "surrounded by parentheses: "
-                              "#'(owner/type (c1 c2))"))))))
+         (syntax-parse #`(#,~> o/t c)          [_:rtype #t])
+         #:msg (string-append "Context param `c` has to be surrounded by "
+                              "parentheses (or mustaches): `o/t {c}`"))
+        (check-ill-parsed
+         (syntax-parse #`(#,~> owner/type {})  [_:rtype #t])
+         #:msg (string-append "Surrounded parentheses of context params"
+                              "have to be omitted if there are empty"))
+        (check-ill-parsed
+         (syntax-parse #`(#,~> (o/t {c}))      [_:rtype #t])
+         #:msg (string-append "A type is a *splicing* syntax therefore "
+                              "it requires no surrounding parentheses"))
+      ))))
 
+
+;; Syntax for arguments (of a def, let)
 
 (define-syntax-class arg
   #:description "an argument with its type"
-  #:datum-literals [:]
+  #:literal-sets [type-lits]
   #:commit
   (pattern (NAME:id : T:type)
            #:attr OW-SCHEME #'T.OW-SCHEME))
@@ -442,30 +477,19 @@
     (check-ill-parsed
      (syntax-parse #'(name {owner/type})            [_:arg #t]))))
 
-
-;; TODO: remove me
-(define-syntax-class arg-expr
-  #:description "an argument with its type and a binding"
-  #:datum-literals [:]
-  #:attributes [VAR OW-SCHEME EXPR]
-  #:commit
-  (pattern (VAR:id : T:type E:expr)
-           #:attr EXPR #'E
-           #:attr OW-SCHEME #'T.OW-SCHEME))
-
 
 ;; Utils
 
-;; Returns #t if a syntax object is of the form #'owner/type, or #f
-;; otherwise.
+;; Regexp to match owner/type syntax
+(: rx-owner/type Regexp)
+(define rx-owner/type #rx"([^/]+)/(.+)")
+
+;; Returns #t if a syntax object is of the form #'owner/type (i.e.,
+;; with the `/` separator), or #f otherwise.
 (: is-stx-owner/type? (Syntax -> Boolean))
 (define (is-stx-owner/type? stx)
   (and (identifier? stx)
-       (string-contains? (symbol->string (syntax-e stx)) "/")))
-
-;; Regexp to match owner/type syntax
-(: px-owner/type Regexp)
-(define px-owner/type #rx"([^/]+)/(.+)")
+       (regexp-match rx-owner/type (symbol->string (syntax-e stx)))))
 
 ;; Split a #'owner/type syntax object on the first `/` and returns a
 ;; syntax pair #'(owner . type).
@@ -474,7 +498,7 @@
 (define (owner/type->OWNER.TYPE stx)
   ;; Get owner and type from `stx`
   (match-define (list _ owner type)
-    (regexp-match px-owner/type (symbol->string (syntax-e stx))))
+    (regexp-match rx-owner/type (symbol->string (syntax-e stx))))
 
   ;; Compute the new syntax
   (with-syntax ([OWNER (format-id stx "~a" owner #:source stx)]
@@ -487,6 +511,7 @@
     (check-true  (is-stx-owner/type? #'owner/ty/pe))
     (check-true  (is-stx-owner/type? #'owner/t/y/p/e/))
     (check-false (is-stx-owner/type? #'ownertype))
+    (check-false (is-stx-owner/type? #'ownertype/))
 
     (check-stx=? (owner/type->OWNER.TYPE #'owner/type)
                  #'(owner . type))
@@ -497,6 +522,7 @@
 
 
 ;; Tests
+
 (module+ test
   (require rackunit/text-ui
            (prefix-in env: (submod "env.rkt" desugar test)))

@@ -6,7 +6,7 @@
 ;;   '   `-' `-^ `-^ `-' `-^ `-^ `-' `-'
 ;; Ownership Types Checker.
 ;;
-;; Collect meta information for later (M>).
+;; Collect meta information for later use (M>).
 ;;
 ;; Naming conventions:
 ;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
@@ -30,26 +30,26 @@
 ;; Meta values
 
 (: meta:CS (Listof Identifier))
-(define meta:CS '())
+(define meta:CS #f)
 
 (: meta:FS (Dict FS-key OW-SCHEME))
-(define meta:FS '())
+(define meta:FS #f)
 
 (: meta:DS (Dict DS-key OW-SCHEME))
-(define meta:DS '())
+(define meta:DS #f)
 
 
 ;; Function to find and set meta values
 
 (define (M> stx)
   (set!-values
+
    (meta:CS meta:FS meta:DS)
 
    (for/foldr ([cs '()][fs '()][ds '()])
               ([class-stx (in-syntax (get-classes-stx stx))])
      (define-values (ctype fields-stx defs-stx)
        (get-ctype/fields/defs-stx class-stx))
-
      (values
       ;; cs
       (cons ctype cs)

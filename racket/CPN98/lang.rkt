@@ -9,7 +9,6 @@
 (require racket/port
          racket/pretty
          "utils.rkt"
-         "definitions.rkt"
          "desugar.rkt"
          "meta.rkt"
          "basic-check.rkt"
@@ -42,12 +41,16 @@
        ;; Basic Checks
        [prog (?> prog)]
        ;; Ownership
-       #;[prog (θ> prog)]
-       ;; Final AST
-       [prog (stx->string prog)])
+       #;[prog (θ> prog)])
+
+    ;; Log final AST
+    (log-sclang-debug (stx->string prog #:newline? #f))
+
     ;; Execution
     #`(module cpn98-lang racket/base
-        (time (display #,prog)))))
+        ;; #,prog
+        (void)
+        )))
 
 ;; See, https://github.com/racket/racket/blob/2b567b4488ff92e2bc9c0fbd32bf7e2442cf89dc/pkgs/at-exp-lib/at-exp/lang/reader.rkt#L15
 ;; (define-values

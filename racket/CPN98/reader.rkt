@@ -1,3 +1,9 @@
+;; ,-,-,-.
+;; `,| | |   ,-. . . ,-. ,-. . . ,-. ,-.
+;;   | ; | . ,-| | | |   ,-| | | |   | |
+;;   '   `-' `-^ `-^ `-' `-^ `-^ `-' `-'
+;; Ownership Types Checker.
+
 ;; From https://klibert.pl/posts/adding_string_interpolation_to_racket.html
 ;;
 ;; See also

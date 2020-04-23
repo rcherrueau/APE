@@ -104,10 +104,8 @@
           [x : rep/X                (send safe x)])
       (send safe y))))
 
-;; (send (new Main) main)
-(let ([main : Main (new Main)])
-  (send main main)
-  )
+(send (new Main) main)
+
 
 ;; Local Variables:
 ;; eval: (progn (defun racket/run-lang () (interactive) (save-buffer) (with-current-buffer "ctx-params-example.rkt" (racket-run))) (evil-define-key (quote normal) (quote racket-mode-map) (kbd "E") (quote racket/run-lang)))
