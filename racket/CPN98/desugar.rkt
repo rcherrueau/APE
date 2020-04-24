@@ -486,10 +486,10 @@
 
 ;; Returns #t if a syntax object is of the form #'owner/type (i.e.,
 ;; with the `/` separator), or #f otherwise.
-(: is-stx-owner/type? (Syntax -> Boolean))
+(: is-stx-owner/type? (Identifier -> Boolean))
 (define (is-stx-owner/type? stx)
-  (and (identifier? stx)
-       (regexp-match rx-owner/type (symbol->string (syntax-e stx)))))
+  (and (regexp-match rx-owner/type (symbol->string (syntax-e stx)))
+       #t))
 
 ;; Split a #'owner/type syntax object on the first `/` and returns a
 ;; syntax pair #'(owner . type).
@@ -529,8 +529,7 @@
   (provide desugar-tests)
 
   (define desugar-tests
-    (test-suite
-     "Tests for desugaring"
+    (test-suite "Desugaring phase"
      ;; Check env
      env:Γ-tests
      ;; Check syntax class

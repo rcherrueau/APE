@@ -6,6 +6,9 @@
 ;; Prog
 (class Driver #;... )
 
+;; ;; Check duplicated class declaration
+;; (class Driver)
+
 (class Pair {m n}
   (field [fst : m/X])
   (field [snd : n/Y])
@@ -69,10 +72,8 @@
   ;; (def (call-with-args-arity-error2 → Unit)
   ;;   (send this with-args p1))
 
-  ;; ;; FIXME
-  ;; ;; Note: seems fixed
-  ;; (def (call-with-args → Unit)
-  ;;   (send this with-args p4))
+  (def (call-with-args → Unit)
+    (send this with-args p4))
 
   (def (get-engine [e : rep/Engine]
                    [b : rep/X{a c}]

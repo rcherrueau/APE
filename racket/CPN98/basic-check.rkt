@@ -7,9 +7,6 @@
 ;; Ownership Types Checker.
 ;;
 ;; Basic checking phase (?>)
-;; - Checks no duplicate class/field/def names. // TODO: move into meta
-;;                                              // and rename this file
-;;                                              // simple-type.rkt
 ;; - Type checks the program (for simple type -- "simple" as in simply
 ;;   typed λ calculus, i.e., no ownership).
 ;; - Based on [FKF98] (see Bibliography).
@@ -142,8 +139,6 @@
 (define-rules ⊢p
   ;; [prog]
   [(prog ~! CLASS ... E)
-   ;; Check no duplicated class names
-   #:when (no-name-clash? #'(CLASS ...))
    ;; Check P ⊢d CLASS ≫ ?CLASS
    #:with [?CLASS ...] (stx-map ⊢d #'(CLASS ...))
    ;; Check P,[] ⊢e E ≫ ?E : t
@@ -161,9 +156,6 @@
   [(class ~! NAME [CPARAM ...] FIELD/DEF ...)
    #:with [FIELD ...] (filter field? (stx->list #'(FIELD/DEF ...)))
    #:with [DEF ...] (filter def? (stx->list #'(FIELD/DEF ...)))
-   ;; Check no duplicated field and def names
-   #:when (no-name-clash? #'(FIELD ...))
-   #:when (no-name-clash? #'(DEF ...))
    ;; Check P ⊢τ t on fields
    #:with [(field ~! F-NAME F:ow-scheme) ...] #'(FIELD ...)
    #:when (stx-for/and ([T #'(F.TYPE ...)]) (⊢τ T))
@@ -173,14 +165,6 @@
    ;; P ⊢d (class NAME FIELD ... DEF ...) ≫ (class NAME FIELD ... ?DEF ...)
    ;; #@(class NAME [CPARAM ...] FIELD ... ?DEF ...)]
    this-syntax])
-
-
-;; (check-true (no-name-clash? #'((class foo (field foo)) (class bar (field bar)))))
-
-;; (check-true (no-name-clash? #'((class foo (field foo)) (class bar (field foo))))
-;;             "Two field could have the same name in different class")
-;; (check-true (no-name-clash? #'((class foo (field foo) (def foo (foo))))))
-;; ;; (check-true (no-name-clash? #'((class foo (field foo) (field foo)))))
 
 
 ;; P,τ ⊢m DEF ≫ ?DEF
@@ -546,26 +530,6 @@
 
 ;; Exceptions
 
-;; Name clash
-(struct exn:name-clash exn:fail:syntax ()
-  #:extra-constructor-name make-exn:name-clash
-  #:transparent)
-
-(define (raise-name-clash ID IDs)
-  (define srcloc-msg (srcloc->string (build-source-location ID)))
-  (define id (format "~s" (syntax->datum ID)))
-  (define err-msg "multiple declaration")
-  (define previous-ID (findf (curry bound-id=? ID) IDs))
-  (define previous-ID-msg (format "~n  previously seen at line ~a:~a"
-                                  (syntax-line previous-ID)
-                                  (syntax-column previous-ID)))
-
-  (raise (make-exn:name-clash
-          (string-append srcloc-msg ": " id ": " err-msg previous-ID-msg)
-          (current-continuation-marks)
-          (list (syntax-taint ID)))))
-
-
 ;; Unknown type
 (struct exn:unknown-type exn:fail:syntax ()
   #:extra-constructor-name make-exn:unknown-type
@@ -708,56 +672,12 @@
 ;; (: τ=? (B-TYPE B-TYPE -> Boolean))
 (define τ=? bound-id=?)
 
-;; Ensures no name clash
-(define (no-name-clash? stxs)
-  ;; Extract names from a `class`, `field` or `def`
-  (define get-name
-    (syntax-parser
-      #:datum-literals [class field def]
-      [(class name:id _ ...) #'name]
-      [(field name:id _ ...) #'name]
-      [(def (name:id _ ...) _) #'name]))
-
-  ;; Extract names from `stxs`
-  (define names (stx-map get-name stxs))
-
-  (cond
-    ;; A duplicate name exists
-    [(check-duplicate-identifier names)
-     => (λ (name) (raise-name-clash name names))]
-    ;; Everything is fine
-    [else #t]))
-
 (module+ test
   (define-test-suite utils
-    ;; Check
     (check-stx=? (get-τ (add-τ #'foo #'bar)) #'(foo bar))
     (check-stx=? (get-τ (add-τ (add-τ #'foo #'bar) #'baz)) #'(foo baz))
     (check-stx=? (get-τ #'foo) #'(foo #f))  ;; TODO: raise an exception?
-
-    ;; Check name clash
-    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((clazz foo))))
-               "`clazz` is not a `class`")
-    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((class (foo)))))
-               "`(foo)` is not a valid name")
-    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((filed foo))))
-               "`filed` is not a `field`")
-    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((field (foo)))))
-               "`(foo)` is not a valid name for field")
-    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((dEf (foo) ???))))
-               "`dEf` is not a `def`")
-    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((def ((foo)) ???))))
-               "`(foo)` is not a valid name for def")
-
-    (check-true (no-name-clash? #'((class foo) (class bar))))
-    (check-true (no-name-clash? #'((field foo) (field bar))))
-    (check-true (no-name-clash? #'((def (foo) ???) (def (bar) ???))))
-
-    (check-exn exn:name-clash? (thunk (no-name-clash? #'((class foo) (class foo)))))
-    (check-exn exn:name-clash? (thunk (no-name-clash? #'((field foo) (field foo)))))
-    (check-exn exn:name-clash? (thunk (no-name-clash? #'((def (foo) ???) (def (foo) ???)))))
-    )
-  )
+    ))
 
 
 ;; Tests

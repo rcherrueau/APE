@@ -65,6 +65,7 @@
 ;;   (eq? (syntax-e id1) (syntax-e id2)))
 
 ;; A dict with custom function for comparing keys.
+;; TODO: Rename Dict into AListof for associative list
 (define-type (Dict k v) (Listof (Pairof k v)))
 
 ;; Returns the length of `the-dict`
