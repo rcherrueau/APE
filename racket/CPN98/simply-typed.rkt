@@ -166,6 +166,27 @@
    ;; #@(class NAME [CPARAM ...] FIELD ... ?DEF ...)]
    this-syntax])
 
+(module+ test
+  (define-test-suite ⊢d-parse
+    ;; P ⊢d CLASS ≫ ?CLASS
+    (with-CS (list #'Foo)
+
+      ;; Check P ⊢τ t on fields
+      (check-exn exn:unknown-type?
+                 (thunk (⊢d #'(class Foo [] (field bar (Bar o ())))))
+                 "`Bar` is not a defined type")
+      (check-exn exn:unknown-type?
+                 (thunk (⊢d #'(class Foo [] (field foo (Foo o ())) (field bar (Bar o ())))))
+                 "`Bar` is not a defined type")
+      (check-not-exn (thunk (⊢d #'(class Foo [] (field foo (Foo o ()))))))
+      (check-not-exn (thunk (⊢d #'(class Foo [] (field foo (Foo p ()))))))   ;; <| Only look at
+      (check-not-exn (thunk (⊢d #'(class Foo [] (field foo (Foo p (c)))))))  ;;  | basic type.
+
+      ;; Check P,NAME ⊢m DEF ≫ ?DEF
+      (check-not-exn (thunk (⊢d #'(class Foo [] (def/0 (Foo o ())) this)))
+                     "`this` is of type `Foo` in `def`")
+      )))
+
 
 ;; P,τ ⊢m DEF ≫ ?DEF
 ;;
@@ -192,11 +213,10 @@
 
 (module+ test
   (define-test-suite ⊢m-parse
-    (with-Γ #'{ (_ . Bar) }
-    (with-τ #'Foo
+    ;; P,τ ⊢m DEF ≫ ?DEF
     (with-CS (list #'Foo #'Bar)
+    (with-τ #'Foo
 
-      ;; [meth] (def ~! (NAME (ARG-NAME ARG:ow-scheme) ... RET:ow-scheme) E)
       ;; Check P ⊢τ t on args and return type
       (check-exn exn:unknown-type?
                  (thunk (⊢m #'(def (def/2 (arg1 (Baz o ())) (arg2 (Foo o ())) (Bar o ())) _)))
@@ -207,6 +227,7 @@
       (check-exn exn:unknown-type?
                  (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Baz o ())) _)))
                  "`Baz` is not a defined type")
+
       ;; Check P,{this: τ0, ARG-NAME: ARG-TYPE, ...} ⊢e E ≫ ?E : RET-TYPE
       (check-exn exn:type-mismatch?
                  (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Bar o ()))
@@ -215,6 +236,8 @@
       (check-not-exn
        (thunk (⊢m #'(def (def/0 (Foo o ())) this)))
        "`this` is bound in the expression with the `Foo` type (τ env)")
+      (check-not-exn (thunk (⊢m #'(def (def/0 (Foo p ())) this))))   ;; <| Only look at
+      (check-not-exn (thunk (⊢m #'(def (def/0 (Foo p (c))) this))))  ;;  | basic type.
       (check-not-exn
        (thunk (⊢m #'(def (def/0 (Foo o ())) ???)))
        "A def accepts the `???` place holder as expression" )
@@ -227,7 +250,8 @@
       (check-not-exn
        (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Foo o ())) arg2)))
        "`arg2` is bound in the expression with the `Foo` type")
-      )))))
+      ))))
+
 
 ;; P,Γ ⊢e E ≫ ?E : t
 ;;
@@ -326,11 +350,12 @@
 
 (module+ test
   (define-test-suite ⊢e-parse
-    (with-Γ #'{ (this . Foo) (_ . Bar) }
+    ;; P,Γ ⊢e E ≫ ?E : t
     (with-CS (list #'Foo #'Bar)
     (with-FS (list (cons #'(Foo . bar) #'Bar))
     (with-DS (list (cons #'(Foo def/0 ())  #'Bar)
                    (cons #'(Foo def/2 (Foo Bar)) #'Bar))
+    (with-Γ #'{ (this . Foo) (_ . Bar) }
 
       ;; [new]
       ;;;; Check P ⊢τ VAR-OW-SCHEME
@@ -754,6 +779,7 @@
      ⊢τ-parse
      ⊢e-parse
      ⊢m-parse
+     ⊢d-parse
      ))
 
   (run-tests simply-typed-tests)
