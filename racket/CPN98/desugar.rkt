@@ -538,7 +538,7 @@
      type-parse
      rtype-parse
      arg-parse
-     ;; Check rules
+     ;; Check phase rules
      ∗e>-parse
      ∗f/d>-parse
      ∗c>-parse))

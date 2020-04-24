@@ -33,6 +33,10 @@
   ;; (def (c → rep/Pair{rep world})
   ;;   foo)
 
+  ;; ;; Check unknow field
+  ;; (def (c → rep/Pair{rep world})
+  ;;   (get-field lala foo))
+
   (def (x → rep/X)
     (get-field p1 fst))
 

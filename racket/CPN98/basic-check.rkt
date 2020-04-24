@@ -7,7 +7,9 @@
 ;; Ownership Types Checker.
 ;;
 ;; Basic checking phase (?>)
-;; - Checks no duplicate class/field/def names.
+;; - Checks no duplicate class/field/def names. // TODO: move into meta
+;;                                              // and rename this file
+;;                                              // simple-type.rkt
 ;; - Type checks the program (for simple type -- "simple" as in simply
 ;;   typed λ calculus, i.e., no ownership).
 ;; - Based on [FKF98] (see Bibliography).
@@ -75,15 +77,15 @@
 
 (define-parser (?> stx)
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ;; TODO: Find a better syntax. Maybe something à la datatype?
+  ;; [Γ : Id~>B-TYPE
+  ;;    #:mk   env:make-Γ
+  ;;    #:init '()
+  ;;    #:partial-app ([env:Γ-member? Γ-member?]
+  ;;                   [env:Γ-add     Γ-add]
+  ;;                   [env:Γ-ref     Γ-ref])]
   #:Env
   (;; Map of locally bound variables.
-   ;; TODO:
-   ;; [Γ : Id~>B-TYPE
-   ;;    #:mk   env:make-Γ   ;; Maybe something à la datatype
-   ;;    #:init '()
-   ;;    #:partial-app ([env:Γ-member? Γ-member?]
-   ;;                   [env:Γ-add     Γ-add]
-   ;;                   [env:Γ-ref     Γ-ref])]
    [Γ : (HashTable Identifier B-TYPE)
       env:make-Γ '()
       #:partial-app ([env:Γ-member? Γ-member?]
@@ -211,27 +213,26 @@
 (define-rules ⊢e
   ;; [new]
   [(new ~! SCHEME:ow-scheme)
-   ;; Check P ⊢τ VAR-OW-SCHEME
+   ;; Check P ⊢τ SCHEME-TYPE
    #:when (⊢τ #'SCHEME.TYPE)
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e (new C) ≫ (new C) : C
    (add-τ this-syntax #'SCHEME.TYPE)]
 
   ;; [var]
-  ;; Check ID ∈ dom(Γ)
-  ;;;; ID is locally bound (including `this` and `???`).
-  [ID:id #:when (or (Γ-member? #'ID)
-                    ;; Unbound identifier. This is not supposed to
-                    ;; happened thanks to desugaring, but who knows
-                    ;; ...
-                    (raise-syntax-error #f "unbound identifier" #'ID))
+  [ID:id
+   ;; Check ID ∈ dom(Γ)
+   #:when (or (Γ-member? #'ID)
+              ;; Unbound identifier. This is not supposed to happened
+              ;; thanks to desugaring, but who knows ...
+              (raise-syntax-error #f "unbound identifier" #'ID))
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e ID ≫ ID : Γ(ID)
    (add-τ this-syntax (Γ-ref #'ID))]
 
   ;; [get]
   [(get-field ~! E FNAME)
-   ;; Check P,Γ ⊢e E ≫ ?E : ?t
+   ;; Check P,Γ ⊢e E ≫ ?E : t
    #:with [?E t] (get-τ (⊢e #'E))
    ;; Check (t . FNAME) ∈ dom(FS)
    ;;;; The field FNAME is defined in the class t
@@ -243,7 +244,7 @@
 
   ;; [set]
   [(set-field! ~! E FNAME BODY)
-   ;; Check P,Γ ⊢e E ≫ ?E : ?t
+   ;; Check P,Γ ⊢e E ≫ ?E : t
    #:with [?E t] (get-τ (⊢e #'E))
    ;; Check (t . FNAME) ∈ dom(FS)
    ;;;; The field FNAME is defined in the class t
@@ -264,7 +265,7 @@
   [(send ~! E DNAME PARAM ...)
    ;; Check P,Γ ⊢e E ≫ ?E : t
    #:with [?E t] (get-τ (⊢e #'E))
-   ;; Check P,Γ ⊢e PARAM ... ≫ (?PARAM : t) ...
+   ;; Check P,Γ ⊢e PARAM ... ≫ (?PARAM : t-param) ...
    #:with [(?PARAM t-param) ...] (stx-map (∘ get-τ ⊢e) #'(PARAM ...))
    ;; Check (t DNAME (t-param ...)) ∈ dom(DS)
    ;;;; The method DNAME with parameters (t-param ...) is defined in
@@ -273,15 +274,14 @@
    #:when (or (DS-member? #'DS-key) (raise-def-error #'DS-key))
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e (send E DNAME PARAM ...) ≫
-   ;;          (send (?E : t) DNAME ?PARAM ...) : DS(t DNAME PARAM ...)
+   ;;          (send (?E : t) DNAME ?PARAM ...) : DS(t DNAME t-param ...)
    (add-τ this-syntax (DS-ref #'DS-key))]
 
   ;; [let]
-  ;;
-  ;; The type of let is the type of the last expression of its body.
   [(let ~! (VAR-NAME VAR-SCHEME:ow-scheme E) BODY ...)
+   ;; Check P ⊢τ VAR-SCHEME-TYPE
    #:when (⊢τ #'VAR-SCHEME.TYPE)
-   ;; Check  P,Γ ⊢e E ≫ ?E : VAR-OW-SCHEME
+   ;; Check  P,Γ ⊢e E ≫ ?E : VAR-SCHEME-TYPE
    #:with [?E t] (get-τ (with-Γ (Γ-add #'(??? . VAR-SCHEME.TYPE))
                           (⊢e #'E)))
    #:when (or (τ=? #'t #'VAR-SCHEME.TYPE)
@@ -302,13 +302,180 @@
    ;;           *let (VAR-NAME VAR-OW-SCHEME ?E) ?BODY ... ?LEB : t-body
    (add-τ this-syntax #'t-body)])
 
+(module+ test
+  (define-test-suite ⊢e-parse
+    (with-Γ #'{ (this . Foo) (_ . Bar) }
+    (with-CS (list #'Foo #'Bar)
+    (with-FS (list (cons #'(Foo . bar) #'Bar))
+    (with-DS (list (cons #'(Foo def/0 ())  #'Bar)
+                   (cons #'(Foo def/2 (Foo Bar)) #'Bar))
+
+      ;; [new]
+      ;;;; Check P ⊢τ VAR-OW-SCHEME
+      (check-exn exn:unknown-type? (thunk (⊢e #'(new (Baz o ())))))
+      (check-not-exn (thunk (⊢e #'(new (Foo o ())))))
+      ;;;; P,Γ ⊢e (new C) ≫ (new C) : C
+      (check-τ (⊢e #'(new (Foo o ()))) #'Foo)
+      (check-τ (⊢e #'(new (Foo p ()))) #'Foo)
+      (check-τ (⊢e #'(new (Foo p (c)))) #'Foo)
+
+      ;; [var]
+      ;;;; Check ID ∈ dom(Γ)
+      (check-not-exn (thunk (⊢e #'this)))
+      (check-not-exn (thunk (⊢e #'_)))
+      (check-exn exn:fail:syntax? (thunk (⊢e #'baz)))
+      ;;;; P,Γ ⊢e ID ≫ ID : Γ(ID)
+      (check-τ (⊢e #'this) #'Foo)
+      (check-τ (⊢e #'_)  #'Bar)
+
+      ;; [get]
+      ;;;; Check P,Γ ⊢e E ≫ ?E : t
+      ;;;; Check (t . FNAME) ∈ dom(FS): the field FNAME is defined in
+      ;;;; the class t
+      (check-exn exn:unknown-field? (thunk (⊢e #'(get-field (new (Bar o ())) bar))))
+      (check-exn exn:unknown-field? (thunk (⊢e #'(get-field (new (Foo o ())) g))))
+      (check-exn exn:unknown-field? (thunk (⊢e #'(get-field _ bar))))
+      (check-not-exn (thunk (⊢e #'(get-field this bar))))
+      (check-not-exn (thunk (⊢e #'(get-field (new (Foo o ())) bar))))
+      (check-not-exn (thunk (⊢e #'(get-field (new (Foo p ())) bar))))   ;; <| Only look at
+      (check-not-exn (thunk (⊢e #'(get-field (new (Foo p (c))) bar))))  ;;  | basic type.
+      ;;;; P,Γ ⊢e (get-field E FNAME) ≫
+      ;;;;          (get-field (?E : t) FNAME) : FS(t . FNAME)
+      (check-τ (⊢e #'(get-field (new (Foo o ())) bar)) #'Bar)
+      (check-τ (⊢e #'(get-field this bar)) #'Bar)
+
+      ;; [set]
+      ;;;; Check P,Γ ⊢e E ≫ ?E : t
+      ;;;; Check (t . FNAME) ∈ dom(FS): the field FNAME is defined in
+      ;;;; the class ?t
+      (check-exn exn:unknown-field?
+                 (thunk (⊢e #'(set-field! (new (Foo o ())) g _))))
+      (check-exn exn:unknown-field?
+                 (thunk (⊢e #'(set-field! (new (Bar o ())) bar _))))
+      (check-exn exn:unknown-field?
+                 (thunk (⊢e #'(set-field! _ bar _))))
+      ;;;; Check P,Γ ⊢e BODY ≫ ?BODY : FS(t . FNAME): the BODY has to
+      ;;;; elaborate to something that fit into the field.
+      (check-exn exn:type-mismatch?
+                 (thunk (⊢e #'(set-field! (new (Foo o ())) bar (new (Foo o ()))))))
+      (check-exn exn:type-mismatch?
+                 (thunk (⊢e #'(set-field! (new (Foo o ())) bar this))))
+      (check-not-exn
+       (thunk (⊢e #'(set-field! (new (Foo o ())) bar _))))
+      (check-not-exn
+       (thunk (⊢e #'(set-field! (new (Foo o ())) bar (new (Bar o ()))))))
+      (check-not-exn                                                       ;; <| Only look at
+       (thunk (⊢e #'(set-field! (new (Foo o ())) bar (new (Bar p ()))))))  ;;  | basic type,
+      (check-not-exn                                                       ;;  | not owner
+       (thunk (⊢e #'(set-field! (new (Foo o ())) bar (new (Bar p (c))))))) ;;  | nor ctx params
+      ;;;; P,Γ ⊢e (set-field E FNAME BODY) ≫
+      ;;;;          (set-field (?E : t) FNAME ?BODY) : FS(t . FNAME)
+      (check-τ (⊢e #'(set-field! (new (Foo o ())) bar (new (Bar o ())))) #'Bar)
+      (check-τ (⊢e #'(set-field! (new (Foo o ())) bar _)) #'Bar)
+      ;; ;; TODO: implement me
+      ;; (check-not-exn
+      ;;  (thunk (⊢e #'(set-field! (new (Foo o ())) bar ???)))
+      ;;  "A `set-field!` accepts the `???` expression")
+      ;; (check-τ (⊢e #'(set-field! (new (Foo o ())) bar ???)) #'Bar)
+
+      ;; [call] (send ~! E DNAME PARAM ...)
+      ;;;; Check P,Γ ⊢e E ≫ ?E : t
+      ;;;; Check P,Γ ⊢e PARAM ... ≫ (?PARAM : t-param) ...
+      ;;;; Check (t DNAME (t-param ...)) ∈ dom(DS): the method DNAME
+      ;;;; with parameters (t-param ...) is defined in the class t.
+      (check-exn exn:unknown-def?
+                 (thunk (⊢e #'(send (new (Foo o ())) udef))))
+      (check-exn exn:arity-error?
+                 (thunk (⊢e #'(send (new (Foo o ())) def/0 _))))
+      (check-exn exn:arity-error?
+                 (thunk (⊢e #'(send (new (Foo o ())) def/0 _ _))))
+      (check-exn exn:arity-error?
+                 (thunk (⊢e #'(send (new (Foo o ())) def/2))))
+      (check-exn exn:arity-error?
+                 (thunk (⊢e #'(send (new (Foo o ())) def/2 _))))
+      (check-exn exn:arity-error?
+                 (thunk (⊢e #'(send (new (Foo o ())) def/2 _ _ _))))
+      (check-exn exn:type-mismatch?
+                 (thunk (⊢e #'(send (new (Foo o ())) def/2 _ _))))
+      (check-exn exn:type-mismatch?
+                 (thunk (⊢e #'(send (new (Foo o ())) def/2 this this))))
+      (check-exn exn:type-mismatch?
+                 (thunk (⊢e #'(send (new (Foo o ())) def/2 _ this))))
+      (check-not-exn
+       (thunk (⊢e #'(send (new (Foo o ())) def/0))))
+      (check-not-exn
+       (thunk (⊢e #'(send (new (Foo o ())) def/2 this _))))
+      (check-not-exn
+       (thunk (⊢e #'(send (new (Foo o ())) def/2 (new (Foo o ())) (new (Bar o ()))))))
+      ;;;; Only look at basic type, not owner nor ctx params.
+      (check-not-exn
+       (thunk (⊢e #'(send (new (Foo o ())) def/2 (new (Foo p ())) (new (Bar p ()))))))
+      (check-not-exn
+       (thunk (⊢e #'(send (new (Foo o ())) def/2 (new (Foo p (c))) (new (Bar p (c)))))))
+      ;;;; P,Γ ⊢e (send E DNAME PARAM ...) ≫
+      ;;;;          (send (?E : t) DNAME ?PARAM ...) : DS(t DNAME PARAM ...)
+      (check-τ (⊢e #'(send (new (Foo o ())) def/0)) #'Bar)
+      (check-τ
+       (⊢e #'(send (new (Foo o ())) def/2 (new (Foo o ())) (new (Bar o ()))))
+       #'Bar)
+      (check-τ (⊢e #'(send (new (Foo o ())) def/2 this _)) #'Bar)
+      ;; ;; TODO: implement me
+      ;; (check-not-exn
+      ;;  (thunk (⊢e #'(send (new (Foo o ())) def/2 ?arg1 ?arg2)))
+      ;;  "A `send` accepts the `?_` expression")
+      ;; (check-τ (⊢e #'(send (new (Foo o ())) def/2 ?arg1 ?arg2)) #'Bar)
+
+      ;; [let] (let ~! (VAR-NAME VAR-SCHEME:ow-scheme E) BODY ...)
+      ;;;; Check P ⊢τ VAR-SCHEME-TYPE
+      (check-exn exn:unknown-type? (thunk (⊢e #'(let (baz (Baz o ()) _) _))))
+      ;;;; Check  P,Γ ⊢e E ≫ ?E : VAR-OW-SCHEME
+      (check-exn exn:type-mismatch? (thunk (⊢e #'(let (baz (Foo o ()) (new (Bar o ()))) _))))
+      ;;;; Check P,Γ{VAR-NAME: VAR-OW-SCHEME} ⊢e BODY ... LEB ≫ ?BODY ... ?LEB : t-body
+      (check-not-exn
+       (thunk (⊢e #'(let (foo (Foo o ()) this) foo))))
+      (check-not-exn
+       (thunk (⊢e #'(let (foo (Foo o ()) this) _))))
+      (check-not-exn
+       (thunk (⊢e #'(let (foo (Foo o ()) this) _ _))))
+      (check-not-exn
+       (thunk (⊢e #'(let (foo (Foo o ()) ???) _)))
+       "A let binding accepts the `???` as expression")
+      (check-not-exn
+       (thunk (⊢e #'(let (foo (Foo o ())  (new (Foo o ()))) _))))
+      (check-not-exn                                               ;; <| Only look at
+       (thunk (⊢e #'(let (foo (Foo p ())  (new (Foo o ()))) _))))  ;;  | basic type,
+      (check-not-exn                                               ;;  | not owner
+       (thunk (⊢e #'(let (foo (Foo p (c)) (new (Foo o ()))) _))))  ;;  | nor ctx params
+      ;;;; P,Γ ⊢e *let (VAR-NAME VAR-OW-SCHEME E) BODY ... LEB ≫
+      ;;;;           *let (VAR-NAME VAR-OW-SCHEME ?E) ?BODY ... ?LEB : t-body
+      (check-τ (⊢e #'(let (foo (Foo o ()) ???) foo))   #'Foo)
+      (check-τ (⊢e #'(let (foo (Foo o ()) ???) _))     #'Bar)
+      (check-τ (⊢e #'(let (foo (Foo o ()) ???) foo _)) #'Bar)
+      (check-τ (⊢e #'(let (foo (Foo o ()) ???) _ foo)) #'Foo)
+      (check-τ (⊢e #'(let (foo (Foo o ()) ???) _ _))   #'Bar)
+      (check-τ (⊢e #'(let (foo (Foo o ()) ???) (let (foo (Bar o ()) ???) foo)))
+               #'Bar
+               "A inner `let` shadows bindings of the outer `let`s")
+      ))))))
+
+
 ;; P ⊢τ t
 ;;
 ;; In context `P`, `t` exists
+;;
+;; Note: I put this in a specific rules because checking `t` will get
+;; more hairy if I eventually implement inheritance.
 (define-rules ⊢τ
   ;; [type]
   [t #:when (or (CS-member? #'t) (raise-unknown-type #'t))
      this-syntax])
+
+(module+ test
+  (define-test-suite ⊢τ-parse
+    (with-CS (list #'Foo #'Bar)
+      (check-not-exn (thunk (⊢τ #'Foo)))
+      (check-not-exn (thunk (⊢τ #'Bar)))
+      (check-exn exn:unknown-type? (thunk (⊢τ #'Baz))))))
 
 
 ;; Environment
@@ -423,8 +590,8 @@
 (define (raise-type-mismatch GIVEN-B-TYPE EXPECTED-B-TYPE [context #f]
                              #:name [n #f])
   (define CTX (or context (current-syntax-context)))
-  (log-sclang-debug "Original error in ~.s" CTX)
-  (define CTX-SURFACE (syntax-property CTX 'surface))
+  ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
+  (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
   (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
   (define name (cond
                  [(syntax? n) (extract-exp-name (syntax-property n 'surface))]
@@ -441,8 +608,6 @@
             (syntax-column EXPECTED-B-TYPE)
             (syntax->datum CTX-SURFACE)))
 
-  (log-sclang-debug "Original error in ~.s" CTX)
-
   (raise (make-exn:type-mismatch
           (string-append srcloc-msg ": " id ": " err-msg elab-msg)
           (current-continuation-marks)
@@ -456,8 +621,8 @@
 ;; (: raise-arity-error (Identifier Integer (Listof B-TYPE) STX -> exn:arity-error))
 (define (raise-arity-error def expected-args-size given-args [context #f])
   (define CTX (or context (current-syntax-context)))
-  (log-sclang-debug "Original error in ~.s" CTX)
-  (define CTX-SURFACE (syntax-property CTX 'surface))
+  ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
+  (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
   (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
   (define id (format "~s" (extract-exp-name def)))
   (define err-msg "arity mismatch")
@@ -487,8 +652,8 @@
 ;; (: raise-unknown-def (Identifier B-TYPE STX -> exn:unknown-def))
 (define (raise-unknown-def def-name c-type [context #f])
   (define CTX (or context (current-syntax-context)))
-  (log-sclang-debug "Original error in ~.s" CTX)
-  (define CTX-SURFACE (syntax-property CTX 'surface))
+  ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
+  (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
   (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
   (define id (format "~s" (extract-exp-name def-name)))
   (define err-msg "unknown def")
@@ -512,8 +677,8 @@
 ;; (: raise-unknown-field (Identifier B-TYPE Syntax -> exn:unknown-field))
 (define (raise-unknown-field field-name c-type [CONTEXT #f])
   (define CTX (or CONTEXT (current-syntax-context)))
-  (log-sclang-debug "Original error in ~.s" CTX)
-  (define CTX-SURFACE (syntax-property CTX 'surface))
+  ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
+  (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
   (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
   (define id (format "~s" (extract-exp-name field-name)))
   (define err-msg "unknown field")
@@ -578,11 +743,11 @@
     (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((filed foo))))
                "`filed` is not a `field`")
     (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((field (foo)))))
-               "`(foo)` is not a valid name")
+               "`(foo)` is not a valid name for field")
     (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((dEf (foo) ???))))
                "`dEf` is not a `def`")
     (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((def ((foo)) ???))))
-               "`(foo)` is not a valid name")
+               "`(foo)` is not a valid name for def")
 
     (check-true (no-name-clash? #'((class foo) (class bar))))
     (check-true (no-name-clash? #'((field foo) (field bar))))
@@ -602,6 +767,21 @@
            (prefix-in env: (submod "env.rkt" basic-check test)))
   (provide basic-check-tests)
 
+  (define-check (check-τ stx b-type)
+    (define stx-type (syntax-parse (get-τ stx) [(_ t) #'t]))
+
+    (with-check-info*
+      (list (make-check-name 'check-τ)
+            (make-check-location (build-source-location-list stx))
+            (make-check-actual stx-type)
+            (make-check-expected b-type)
+            #;(make-check-message
+               (or msg
+                   (format "#'~.a does not structurally equal to #'~.a"
+                           (syntax->datum stx1)
+                           (syntax->datum stx2)))))
+      (thunk (check-true (τ=? stx-type b-type)))))
+
   (define basic-check-tests
     (test-suite
      "Tests for basic checks"
@@ -612,6 +792,9 @@
      env:DS-tests
      ;; Check utils
      utils
+     ;; Check phase rules
+     ⊢τ-parse
+     ⊢e-parse
      ))
 
   (run-tests basic-check-tests)
