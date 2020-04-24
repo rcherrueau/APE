@@ -6,7 +6,7 @@
 ;;   '   `-' `-^ `-^ `-' `-^ `-^ `-' `-'
 ;; Ownership Types Checker.
 ;;
-;; Basic checking phase (?>)
+;; Simple type checking phase (?>)
 ;; - Type checks the program (for simple type -- "simple" as in simply
 ;;   typed λ calculus, i.e., no ownership).
 ;; - Based on [FKF98] (see Bibliography).
@@ -685,7 +685,7 @@
 (module+ test
   (require rackunit/text-ui
            (prefix-in env: (submod "env.rkt" basic-check test)))
-  (provide basic-check-tests)
+  (provide simply-typed-tests)
 
   (define-check (check-τ stx b-type)
     (define stx-type (syntax-parse (get-τ stx) [(_ t) #'t]))
@@ -702,9 +702,9 @@
                            (syntax->datum stx2)))))
       (thunk (check-true (τ=? stx-type b-type)))))
 
-  (define basic-check-tests
+  (define simply-typed-tests
     (test-suite
-     "Tests for basic checks"
+     "Simple type checking phase"
      ;; Check env
      env:CS-tests
      env:Γ-tests
@@ -717,7 +717,7 @@
      ⊢e-parse
      ))
 
-  (run-tests basic-check-tests)
+  (run-tests simply-typed-tests)
   )
 
 

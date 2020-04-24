@@ -11,7 +11,7 @@
          "utils.rkt"
          "desugar.rkt"
          "meta.rkt"
-         "basic-check.rkt"
+         "simply-typed.rkt"
          )
 
 (provide (rename-out
