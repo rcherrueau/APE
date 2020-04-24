@@ -190,6 +190,44 @@
    ;;           (def (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) ?E)
    this-syntax])
 
+(module+ test
+  (define-test-suite ⊢m-parse
+    (with-Γ #'{ (_ . Bar) }
+    (with-τ #'Foo
+    (with-CS (list #'Foo #'Bar)
+
+      ;; [meth] (def ~! (NAME (ARG-NAME ARG:ow-scheme) ... RET:ow-scheme) E)
+      ;; Check P ⊢τ t on args and return type
+      (check-exn exn:unknown-type?
+                 (thunk (⊢m #'(def (def/2 (arg1 (Baz o ())) (arg2 (Foo o ())) (Bar o ())) _)))
+                 "`Baz` is not a defined type")
+      (check-exn exn:unknown-type?
+                 (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Baz o ())) (Bar o ())) _)))
+                 "`Baz` is not a defined type")
+      (check-exn exn:unknown-type?
+                 (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Baz o ())) _)))
+                 "`Baz` is not a defined type")
+      ;; Check P,{this: τ0, ARG-NAME: ARG-TYPE, ...} ⊢e E ≫ ?E : RET-TYPE
+      (check-exn exn:type-mismatch?
+                 (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Bar o ()))
+                                (new (Foo o ())))))
+                 "`def/2` should return a `Bar` but the expression is of type `Foo`")
+      (check-not-exn
+       (thunk (⊢m #'(def (def/0 (Foo o ())) this)))
+       "`this` is bound in the expression with the `Foo` type (τ env)")
+      (check-not-exn
+       (thunk (⊢m #'(def (def/0 (Foo o ())) ???)))
+       "A def accepts the `???` place holder as expression" )
+      (check-not-exn
+       (thunk (⊢m #'(def (def/0 (Bar o ())) ???)))
+       "A def accepts the `???` place holder as expression" )
+      (check-not-exn
+       (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Bar o ())) arg1)))
+       "`arg1` is bound in the expression with the `Bar` type")
+      (check-not-exn
+       (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Foo o ())) arg2)))
+       "`arg2` is bound in the expression with the `Foo` type")
+      )))))
 
 ;; P,Γ ⊢e E ≫ ?E : t
 ;;
@@ -715,6 +753,7 @@
      ;; Check phase rules
      ⊢τ-parse
      ⊢e-parse
+     ⊢m-parse
      ))
 
   (run-tests simply-typed-tests)
