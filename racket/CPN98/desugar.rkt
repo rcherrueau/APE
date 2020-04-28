@@ -1,4 +1,4 @@
-#lang reader "reader.rkt" typed/racket/base/no-check
+#lang typed/racket/base/no-check
 
 ;; ,-,-,-.
 ;; `,| | |   ,-. . . ,-. ,-. . . ,-. ,-.
@@ -68,7 +68,7 @@
   [(prog ~! CLASS:expr ... E:expr)
    #:with [*CLASS ...] (stx-map ∗c> #'(CLASS ...))
    #:with *E           (∗e> #'E)
-   #@(prog *CLASS ... *E)])
+   (stx/surface (prog *CLASS ... *E) this-syntax)])
 
 
 ;; Class rules
@@ -78,10 +78,10 @@
 (define-rules ∗c>
   [(class NAME:id [CPARAM:id ...] ~! FIELD/DEF:expr ...)
    #:with [*FIELD/DEF ...] (stx-map ∗f/d> #'(FIELD/DEF ...))
-   #@(class NAME [CPARAM ...] *FIELD/DEF ...)]
+   (stx/surface (class NAME [CPARAM ...] *FIELD/DEF ...) this-syntax)]
   ;; Transforms a `class` without `CPARAM ...` into a `class` with.
   [(class NAME:id ~! FIELD/DEF ...)
-   (∗c> #@(class NAME [] FIELD/DEF ...))])
+   (∗c> (stx/surface (class NAME [] FIELD/DEF ...) this-syntax))])
 
 (module+ test
   (define-test-suite ∗c>-parse
@@ -107,7 +107,7 @@
   ;; with
   ;;     OW-SCHEME := (ow-scheme TYPE OWNER CPARAMS)
   [(field ~! ARG:arg)
-   #@(field ARG.NAME ARG.OW-SCHEME)]
+   (stx/surface (field ARG.NAME ARG.OW-SCHEME) this-syntax)]
 
   ;; A def (i.e., method) is a NAME, a list of arguments ARG, a
   ;; return type RET and the BODY of the def. The def binds ARG in
@@ -123,7 +123,8 @@
    #:with [A-OW-SCHEME ...] #'(ARG.OW-SCHEME ...)
    #:with RET-OW-SCHEME     #'RET.OW-SCHEME
    #:with *BODY             (with-Γ #'(this A-NAME ...) (∗e> #'BODY))
-   #@(def (NAME (~@ (A-NAME A-OW-SCHEME)) ... RET-OW-SCHEME) *BODY)])
+   (stx/surface (def (NAME (~@ (A-NAME A-OW-SCHEME)) ... RET-OW-SCHEME) *BODY)
+                this-syntax)])
 
 (module+ test
   (define-test-suite ∗f/d>-parse
@@ -164,11 +165,11 @@
   [(let ([VAR:id : T:type E:expr]) ~! BODY:expr ...+)
    #:with *E (∗e> #'E)
    #:with [*BODY ...]  (with-Γ (Γ-add #'VAR) (stx-map ∗e> #'(BODY ...)))
-   #@(let (VAR T.OW-SCHEME *E) *BODY ...)]
+   (stx/surface (let (VAR T.OW-SCHEME *E) *BODY ...) this-syntax)]
   ;; Transforms a `let` with multiple binding into multiple nested
   ;; `let`s with one unique binding (such as the previous let)
   [(let ~! ([~and HD (VAR:id : T:type E:expr)] TL ...) BODY:expr ...+)
-   (∗e> #@(let (HD) (let (TL ...) BODY ...)))]
+   (∗e> (stx/surface (let (HD) (let (TL ...) BODY ...)) this-syntax))]
 
   ;; A new takes the class type C-TYPE of the class to instantiate
   ;; (i.e., no constructor).
@@ -177,7 +178,7 @@
   ;; ∗>  (new (TYPE OWNER CPARAMS))
   [(new C-TYPE:type)
    #:cut
-   #@(new C-TYPE.OW-SCHEME)]
+   (stx/surface (new C-TYPE.OW-SCHEME) this-syntax)]
 
   ;; A get-field takes an expression E that should reduce to an
   ;; object and the name of the field FNAME to get on that object.
@@ -186,7 +187,7 @@
   ;; ∗>  (get-field *E FNAME)
   [(get-field ~! E:expr FNAME:id)
    #:with *E (∗e> #'E)
-   #@(get-field *E FNAME)]
+   (stx/surface (get-field *E FNAME) this-syntax)]
 
   ;; A set-field! takes an expression E that should reduce to an
   ;; object, the name of the field FNAME to change the value of, and
@@ -197,7 +198,7 @@
   [(set-field! ~! E:expr FNAME:id BODY:expr)
    #:with *E    (∗e> #'E)
    #:with *BODY (∗e> #'BODY)
-   #@(set-field! *E FNAME *BODY)]
+   (stx/surface (set-field! *E FNAME *BODY) this-syntax)]
 
   ;; A send takes an expression E that should reduce to an object,
   ;; the name of the def DNAME to call on that object, and a list of
@@ -208,7 +209,7 @@
   [(send ~! E:expr DNAME:id E-ARG:expr ...)
    #:with *E           (∗e> #'E)
    #:with [*E-ARG ...] (stx-map ∗e> #'(E-ARG ...))
-   #@(send *E DNAME *E-ARG ...)]
+   (stx/surface (send *E DNAME *E-ARG ...) this-syntax)]
 
   ;; An identifier is either:
   ;;
@@ -233,7 +234,7 @@
   ;;;; identifier.
   ;;;; ID ∗> (get-field this ID)
   [ID:id
-   (∗e> #@(get-field this ID))])
+   (∗e> (stx/surface (get-field this ID) this-syntax))])
 
 (module+ test
   (define-test-suite ∗e>-parse
@@ -419,7 +420,7 @@
 
 (module+ test
   (define-test-suite rtype-parse
-    (for ([~> (list #'→ #'->)])
+    (for ([~> (in-list (list #'→ #'->))])
       (test-case (format "Arrow is ~a" (stx->string ~> #:newline? #f))
         (test-pattern #`(#,~> owner/type) r:rtype
           (check-stx=? #'r.OW-SCHEME #'(type owner ())))
