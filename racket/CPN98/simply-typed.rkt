@@ -1,4 +1,4 @@
-#lang typed/racket/base/no-check
+#lang racket/base
 
 ;; ,-,-,-.
 ;; `,| | |   ,-. . . ,-. ,-. . . ,-. ,-.
@@ -578,8 +578,8 @@
   ;; Here, I met my three criterion => type mismatch
   (define expected-def (car met-cname=/dname=/arity=-defs))
   (match-define (list _ _ EXPECTED-DEF-ARGs) expected-def)
-  (for ([looked-b-type LOOKED-DEF-ARGs]
-        [expected-b-type EXPECTED-DEF-ARGs]
+  (for ([looked-b-type (in-list LOOKED-DEF-ARGs)]
+        [expected-b-type (in-list EXPECTED-DEF-ARGs)]
         [arg-pos (in-range (length LOOKED-DEF-ARGs))])
     (when (not (bound-id=? looked-b-type expected-b-type))
       ;; I found the type which is incorrect, and it is located a

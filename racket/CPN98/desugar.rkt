@@ -1,4 +1,4 @@
-#lang typed/racket/base/no-check
+#lang racket/base
 
 ;; ,-,-,-.
 ;; `,| | |   ,-. . . ,-. ,-. . . ,-. ,-.
@@ -22,13 +22,9 @@
 ;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
 
 (require (for-syntax racket/base)
-         racket/function
-         racket/list
          racket/match
          racket/syntax
-         racket/string
          syntax/parse
-         syntax/parse/define
          syntax/stx
          "utils.rkt"
          "definitions.rkt"
@@ -482,20 +478,23 @@
 ;; Utils
 
 ;; Regexp to match owner/type syntax
-(: rx-owner/type Regexp)
+;;
+;; (: rx-owner/type Regexp)
 (define rx-owner/type #rx"([^/]+)/(.+)")
 
 ;; Returns #t if a syntax object is of the form #'owner/type (i.e.,
 ;; with the `/` separator), or #f otherwise.
-(: is-stx-owner/type? (Identifier -> Boolean))
+;;
+;; (: is-stx-owner/type? (Identifier -> Boolean))
 (define (is-stx-owner/type? stx)
   (and (regexp-match rx-owner/type (symbol->string (syntax-e stx)))
        #t))
 
 ;; Split a #'owner/type syntax object on the first `/` and returns a
 ;; syntax pair #'(owner . type).
-(: owner/type->OWNER.TYPE
-   (Syntax -> (Syntaxof (Pairof Identifier Identifier))))
+;;
+;; (: owner/type->OWNER.TYPE
+;;    (Syntax -> (Syntaxof (Pairof Identifier Identifier))))
 (define (owner/type->OWNER.TYPE stx)
   ;; Get owner and type from `stx`
   (match-define (list _ owner type)
