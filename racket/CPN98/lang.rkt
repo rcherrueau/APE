@@ -6,9 +6,7 @@
 ;;   '   `-' `-^ `-^ `-' `-^ `-^ `-' `-'
 ;; Ownership Types Checker.
 
-(require racket/port
-         racket/pretty
-         "utils.rkt"
+(require "utils.rkt"
          "desugar.rkt"
          "meta.rkt"
          "simply-typed.rkt"
@@ -51,6 +49,26 @@
         ;; #,prog
         (void)
         )))
+
+;; Profiling lang:
+;;
+;; Remove compiled directory. Then run with
+;; > racket -l errortrace -t lang.rkt
+;;
+;; (module+ main
+;;   (require profile)
+
+;;   (define ctx-params-example
+;;      (bytes->path #"/home/rfish/prog/APE/racket/CPN98/examples/ctx-params-example.rkt"))
+
+;;   (profile
+;;    (call-with-input-file ctx-params-example
+;;      (λ (in)
+;;        (read-line in) ;; Strip `#lang ...` from `in`
+;;        (lang-read-syntax ctx-params-example in)))
+;;    #:repeat 100
+;;    #:use-errortrace? #t)
+;;   )
 
 ;; See, https://github.com/racket/racket/blob/2b567b4488ff92e2bc9c0fbd32bf7e2442cf89dc/pkgs/at-exp-lib/at-exp/lang/reader.rkt#L15
 ;; (define-values
