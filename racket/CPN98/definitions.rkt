@@ -19,175 +19,29 @@
 
 (module+ test (require typed/rackunit))
 
-;; (require/typed syntax/parse
-;;   ;; Coerce `flatten` to only return Listof String (instead of Listof
-;;   ;; Any). This helps type-checking the `unlines` function.
-;;   [syntax-parser (Any -> Any)])
 (require/typed "utils.rkt"
-  ;; [check-stx=? (->* (Syntax Syntax) (String) Any)]
   [zip (All (a b) ((Listof a) (Listof b) -> (Listof (Pairof a b))))]
-  [unzip (All (a b) ((Listof (Pairof a b)) -> (Values (Listof a) (Listof b))))]
-  [bound-id=? (Identifier Identifier -> Boolean)])
+  [unzip (All (a b) ((Listof (Pairof a b)) -> (Values (Listof a) (Listof b))))])
 
 (require/typed racket/list
   [index-of (All (a) ((Listof a) a (a a -> Boolean) -> (U Nonnegative-Integer #f)))])
 
+(unsafe-require/typed racket/sequence
+  [in-syntax (All (a) (Syntaxof (Listof (Syntaxof a))) -> (Sequenceof (Syntaxof a)))])
+
 (provide (except-out (all-defined-out)
                      ;; keyword-lits expr-lits
-                     private:dict-index-of
-                     dict-set
-                     ;; FIXME: make them private and define a proper
-                     ;; interface to define them in order to ensure
-                     ;; type safety with contracts.
-                     ;; meta:FS
+                     private:alist-index-of
+                     alist-set
                      )
          (all-from-out "_definitions.rkt")
          )
 
-;; Provide without the generation of contracts
-;;
-;; Macros defined in typed modules may not be used in untyped modules.
-;; A workaround for such macros is provided them with `unsafe-provide`
-;; which exports the macro without any contracts generated. See,
-;; https://docs.racket-lang.org/ts-guide/typed-untyped-interaction.html#%28part._.Using_.Typed_.Code_in_.Untyped_.Code%29
-;; https://groups.google.com/d/msg/racket-users/eowl6RpdDwY/1wrCluDcAwAJ
-(unsafe-provide ;; keyword-lits expr-lits
-                #;meta:FS)
-
-;; TODO: Use https://docs.racket-lang.org/ts-reference/Utilities.html#%28part._.Untyped_.Utilities%29
-;; for a better def of typed dict
-
 
 ;; Utils
-
-;; (: bound-id=? (Identifier Identifier -> Boolean))
-;; (define (bound-id=? id1 id2)
-;;   (eq? (syntax-e id1) (syntax-e id2)))
-
-;; A dict with custom function for comparing keys.
-;; TODO: Rename Dict into AListof for associative list
-(define-type (Dict k v) (Listof (Pairof k v)))
-
-;; Returns the length of `the-dict`
-(: dict-length (All (k v) ((Dict k v) -> Index)))
-(define (dict-length the-dict)
-  (length the-dict))
-
-;; Returns the value for `key` in `the-dict` using `key-eq?` comparison
-(: dict-ref (All (k v) ((Dict k v) k (k k -> Boolean) -> v)))
-(define (dict-ref the-dict key key-eq?)
-  (cond
-    [(assoc key the-dict key-eq?) => cdr]
-    [else (error "the key ~s does not exist in Dict" key)]))
-
-;; Functionally extends `the-dict` by mapping `key` to `val`,
-;; overwriting any existing mapping for `key`, and returning an
-;; extended dict.
-(: dict-set (All (k v) ((Dict k v) k v (k k -> Boolean) -> (Dict k v))))
-(define (dict-set the-dict key val key-eq?)
-  (cond
-    [(private:dict-index-of the-dict key key-eq?)
-     => (λ (idx) (list-set the-dict idx (cons key val)))]
-    [else (cons (cons key val) the-dict)]))
-
-;; Indice of the `key` in `the-dict`
-(: private:dict-index-of
-   (All (k v) ((Dict k v) k (k k -> Boolean) -> (U Nonnegative-Integer #f))))
-(define (private:dict-index-of the-dict key key-eq?)
-  (let-values ([(keys _) (unzip the-dict)])
-    (index-of keys key key-eq?)))
-
-;; Returns `#t` if `the-dict` contains a value for the given `key`,
-;; `#f` otherwise.
-(: dict-has-key? (All (k v) ((Dict k v) k (k k -> Boolean) -> Boolean)))
-(define (dict-has-key? the-dict key key-eq?)
-  (and (private:dict-index-of the-dict key key-eq?) #t))
-
-;; Returns `#t` if `dict1` is equal to `dict2` according to `k-eq?` to
-;; compare keys and `v-eq?` to compare values.
-(: dict-eq?
-   (All (k v) ((Dict k v) (Dict k v) (k k -> Boolean) (v v -> Boolean) -> Boolean)))
-(define (dict-eq? dict1 dict2 k-eq? v-eq?)
-  (cond
-    ;; Both dict should contain the same number of entries
-    [(not (eq? (dict-length dict1) (dict-length dict2))) #f]
-    [else
-     (for/and ([kv dict1])
-       (let ([k (car kv)]
-             [v (cdr kv)])
-         (and
-          ;; k exists in dict2
-          (dict-has-key? dict2 k k-eq?)
-          ;; value of dict1(k) and dict2(k) are equal
-          (v-eq? v (dict-ref dict2 k k-eq?)))))]))
-
-;; Maps values of `the-dict` with `f`
-(: dict-map (All (k v w) ((v -> w) (Dict k v) -> (Dict k w))))
-(define (dict-map f the-dict)
-  (map (λ ([kv : (Pairof k v)])
-         (let ([k (car kv)]
-               [v (cdr kv)])
-           (cons k (f v))))
-       the-dict))
-
-;; Maps values of `the-dict` with `f`
-(: meta-map (All (k v w) ((v -> w) (Dict k v) -> (Dict k w))))
-(define (meta-map f the-dict)
-  (map (λ ([kv : (Pairof k v)])
-         (let ([k (car kv)]
-               [v (cdr kv)])
-           (cons k (f v))))
-       the-dict))
-
-;; Maps keys of `the-dict` with `f`
-(: dict-kmap (All (k l v) ((k -> l) (Dict k v) -> (Dict l v))))
-(define (dict-kmap f the-dict)
-  (map (λ ([kv : (Pairof k v)])
-         (let ([k (car kv)]
-               [v (cdr kv)])
-           (cons (f k) v)))
-       the-dict))
-
-;; Maps keys of `the-dict` with `f`
-(: meta-kmap (All (k l v) ((k -> l) (Dict k v) -> (Dict l v))))
-(define (meta-kmap f the-dict)
-  (map (λ ([kv : (Pairof k v)])
-         (let ([k (car kv)]
-               [v (cdr kv)])
-           (cons (f k) v)))
-       the-dict))
-
-(: meta-map-kv (All (k l v w) ((k -> l) (v -> w) (Dict k v) -> (Dict l w))))
-(define (meta-map-kv f g the-dict)
-  (map (λ ([kv : (Pairof k v)])
-         (let ([k (car kv)]
-               [v (cdr kv)])
-           (cons (f k) (g v))))
-       the-dict))
-
-;; Returns the keys of `the-dict`
-(: dict-keys (All (k v) (Dict k v) -> (Listof k)))
-(define (dict-keys the-dict)
-  (map (λ ([kv : (Pairof k v)]) (car kv)) the-dict))
-
-;; Make a dict
-(: make-dict (All (a b) ((Parameterof (Dict a b))
-                        (a a -> Boolean) ->
-                        (Values
-                         ;; dict-ref
-                         (a -> b)
-                         ;; dict-set
-                         (a b -> (Dict a b))
-                         ;; dict-has-key?
-                         (a -> Boolean)
-                         ;; dict-eq?
-                         ((Dict a b) (b b -> Boolean) -> Boolean)))))
-(define (make-dict the-dict k-eq?)
-  (values
-   (λ (key) (dict-ref (the-dict) key k-eq?))
-   (λ (key val) (dict-set (the-dict) key val k-eq?))
-   (λ (key) (dict-has-key? (the-dict) key k-eq?))
-   (λ (dict2 v-eq?) (dict-eq? (the-dict) dict2 k-eq? v-eq?))))
+(: bound-id=? (Identifier Identifier -> Boolean))
+(define (bound-id=? id1 id2)
+  (eq? (syntax-e id1) (syntax-e id2)))
 
 
 ;; Language definitions
@@ -252,8 +106,8 @@
               [(list TYPE2 OWNER2 CPARAMS2) (syntax-e ow2)])
     (and (bound-id=? TYPE1 TYPE2)
          (bound-id=? OWNER1 OWNER2)
-         (for/and ([id1 (syntax->list CPARAMS1)]
-                   [id2 (syntax->list CPARAMS2)])
+         (for/and ([id1 (in-syntax CPARAMS1)]
+                   [id2 (in-syntax CPARAMS2)])
            (bound-id=? id1 id2)))))
 
 ;; ;; (ids-eq? #'(a b c d) #'(a b c d))
@@ -312,40 +166,109 @@
     [(stx B-TYPE) (syntax-property stx 'b-type B-TYPE)]))
 
 
-;; Environments
+;; Meta
+
+;; An associative list with custom function for comparing keys.
+(define-type (AList k v) (Listof (Pairof k v)))
+
+;; Returns the length of `als`
+(: alist-length (All (k v) ((AList k v) -> Index)))
+(define (alist-length als)
+  (length als))
+
+;; Returns the value for `key` in `als` using `key-eq?` comparison
+(: alist-ref (All (k v) ((AList k v) k (k k -> Boolean) -> v)))
+(define (alist-ref als key key-eq?)
+  (cond
+    [(assoc key als key-eq?) => cdr]
+    [else (error "the key ~s does not exist in AList" key)]))
+
+;; Functionally extends `als` by mapping `key` to `val`,
+;; overwriting any existing mapping for `key`, and returning an
+;; extended dict.
+(: alist-set (All (k v) ((AList k v) k v (k k -> Boolean) -> (AList k v))))
+(define (alist-set als key val key-eq?)
+  (cond
+    [(private:alist-index-of als key key-eq?)
+     => (λ (idx) (list-set als idx (cons key val)))]
+    [else (cons (cons key val) als)]))
+
+;; Indice of the `key` in `als`
+(: private:alist-index-of
+   (All (k v) ((AList k v) k (k k -> Boolean) -> (U Nonnegative-Integer #f))))
+(define (private:alist-index-of als key key-eq?)
+  (let-values ([(keys _) (unzip als)])
+    (index-of keys key key-eq?)))
+
+;; Returns `#t` if `als` contains a value for the given `key`,
+;; `#f` otherwise.
+(: alist-has-key? (All (k v) ((AList k v) k (k k -> Boolean) -> Boolean)))
+(define (alist-has-key? als key key-eq?)
+  (and (private:alist-index-of als key key-eq?) #t))
+
+;; Returns `#t` if `als1` is equal to `als2` according to `k-eq?` to
+;; compare keys and `v-eq?` to compare values.
+(: alist-eq?
+   (All (k v) ((AList k v) (AList k v) (k k -> Boolean) (v v -> Boolean) -> Boolean)))
+(define (alist-eq? als1 als2 k-eq? v-eq?)
+  (cond
+    ;; Both dict should contain the same number of entries
+    [(not (eq? (alist-length als1) (alist-length als2))) #f]
+    [else
+     (for/and ([kv als1])
+       (let ([k (car kv)]
+             [v (cdr kv)])
+         (and
+          ;; k exists in als2
+          (alist-has-key? als2 k k-eq?)
+          ;; value of als1(k) and als2(k) are equal
+          (v-eq? v (alist-ref als2 k k-eq?)))))]))
+
+;; Maps values of `als` with `f`
+(: alist-map (All (k v w) ((v -> w) (AList k v) -> (AList k w))))
+(define (alist-map f als)
+  (map (λ ([kv : (Pairof k v)])
+         (let ([k (car kv)]
+               [v (cdr kv)])
+           (cons k (f v))))
+       als))
+
+;; Maps values of `als` with `f`
+(: meta-map (All (k v w) ((v -> w) (AList k v) -> (AList k w))))
+(define meta-map alist-map)
+
+;; Maps keys of `als` with `f`
+(: alist-kmap (All (k l v) ((k -> l) (AList k v) -> (AList l v))))
+(define (alist-kmap f als)
+  (map (λ ([kv : (Pairof k v)])
+         (let ([k (car kv)]
+               [v (cdr kv)])
+           (cons (f k) v)))
+       als))
+
+;; Maps keys of `als` with `f`
+(: meta-kmap (All (k l v) ((k -> l) (AList k v) -> (AList l v))))
+(define meta-kmap alist-kmap)
+
+(: alist-kvmap (All (k l v w) ((k -> l) (v -> w) (AList k v) -> (AList l w))))
+(define (alist-kvmap f g als)
+  (map (λ ([kv : (Pairof k v)])
+         (let ([k (car kv)]
+               [v (cdr kv)])
+           (cons (f k) (g v))))
+       als))
+
+(: meta-map-kv (All (k l v w) ((k -> l) (v -> w) (AList k v) -> (AList l w))))
+(define meta-map-kv alist-kvmap)
+
+;; Returns the keys of `als`
+(: alist-keys (All (k v) (AList k v) -> (Listof k)))
+(define (alist-keys als)
+  (map (λ ([kv : (Pairof k v)]) (car kv)) als))
 
 ;;~~~~~~~~~~~~~~~~~
 ;; CS: Set of Types
-
-;; (: meta:CS (Boxof (Listof Identifier)))
-;; (define meta:CS (box '()))
-
-;; ;; Make `the-CS` the value of `CS` in `A`.
-;; (: private:with-CS
-;;    (All (A) (U (Syntaxof (Listof Identifier)) (Listof Identifier)) (-> A) -> A))
-;; (define (private:with-CS the-CS thunk-E)
-;;   (parameterize
-;;       ([meta:CS
-;;         (cond
-;;           [(and (syntax? the-CS) (syntax->list the-CS)) => identity]
-;;           [else the-CS])])
-;;     ;; (dbg (CS))
-;;     (thunk-E)))
-
-;; ;; Automatically create the `thunk` around E expressions
-;; (define-syntax (with-CS stx)
-;;   (syntax-case stx ()
-;;     [(_ THE-CS E ...) #'(private:with-CS THE-CS (thunk E ...))]))
-
-(module+ test
-  ;; (with-CS #'(foo bar)
-  ;;   (check-true  (CS-member? #'foo))
-  ;;   (check-false (CS-member? #'baz)))
-  ;;
-  ;; (with-CS (list #'foo #'bar)
-  ;;   (check-true  (CS-member? #'foo))
-  ;;   (check-false (CS-member? #'baz)))
-  )
+(define-type CS (Listof Identifier))
 
 ;;~~~~~~~~~~~~~~~~~~
 ;; FS: Map of fields
@@ -353,23 +276,7 @@
 ;; With the syntax #'(Class-type . Field-name) as key and the Field
 ;; OW-SCHEME as value.
 (define-type FS-key (Syntaxof (Pairof B-TYPE Identifier)))
-(define-type FS (Dict FS-key OW-SCHEME))
-;; (: meta:FS (Boxof FS))
-;; (define meta:FS (box '()))
-
-;; (: make-FS
-;;    ((FS-key FS-key -> Boolean) ->
-;;     (Values
-;;      ;; dict-ref
-;;      (FS-key -> OW-SCHEME)
-;;      ;; dict-set
-;;      (FS-key OW-SCHEME -> FS)
-;;      ;; dict-has-key?
-;;      (FS-key -> Boolean)
-;;      ;; dict-eq?
-;;      (FS (OW-SCHEME OW-SCHEME -> Boolean) -> Boolean))))
-;; (define (make-FS fs-key=?) (make-dict meta:FS fs-key=?))
-
+(define-type FS (AList FS-key OW-SCHEME))
 
 (module+ test
 
@@ -426,7 +333,7 @@
                            (Syntaxof (Listof OW-SCHEME))  ; Type of def args
                            )))
 
-(define-type DS (Dict DS-key OW-SCHEME))
+(define-type DS (AList DS-key OW-SCHEME))
 ;; (: meta:DS (Boxof DS))
 ;; (define meta:DS (box '()))
 
@@ -442,8 +349,8 @@
     (and
      (bound-id=? C-TYPE1 C-TYPE2)
      (bound-id=? D-NAME1 D-NAME2)
-     (for/and ([ow1 (syntax->list ARGs-OW-SCHEME1)]
-               [ow2 (syntax->list ARGs-OW-SCHEME2)])
+     (for/and ([ow1 (in-syntax ARGs-OW-SCHEME1)]
+               [ow2 (in-syntax ARGs-OW-SCHEME2)])
        (ow-scheme=? ow1 ow2)))))
 
 ;; Same as `DS-key` except that is as a (Listof B-TYPE) instead of a
@@ -461,22 +368,6 @@
   (cast (datum->syntax k* (list class def ows) k*)
         DS-key)
   )
-
-;; (: DS-member? ((OW-SCHEME OW-SCHEME -> Boolean) DS-key  -> Boolean))
-;; (define (DS-member? ow-scheme=? ds-key)
-;;   (dict-has-key? (meta:DS) ds-key (curry ds-key=? ow-scheme=?)))
-
-;; (: DS-set ((OW-SCHEME OW-SCHEME -> Boolean) DS-key OW-SCHEME -> DS))
-;; (define (DS-set ow-scheme=? ds-key OW-SCHEME)
-;;   (dict-set (meta:DS) ds-key OW-SCHEME (curry ds-key=? ow-scheme=?)))
-
-;; (: DS-ref ((OW-SCHEME OW-SCHEME -> Boolean) DS-key -> OW-SCHEME))
-;; (define (DS-ref ow-scheme=? ds-key)
-;;   (dict-ref (meta:DS) ds-key (curry ds-key=? ow-scheme=?)))
-
-
-(define-predicate Γ-stx?
-  (Syntaxof (Listof (Syntaxof (Pairof Identifier B-TYPE)))))
 
 
 

@@ -56,14 +56,10 @@
          syntax/parse/define
          syntax/srcloc
          syntax/stx
+         "definitions.rkt"
          "utils.rkt"
          "meta.rkt"
-         (prefix-in env: (submod "env.rkt" basic-check))
-         (rename-in "definitions.rkt"
-                    [dict-ref      def/dict-ref]
-                    [dict-has-key? def/dict-has-key?]
-                    [dict-map      def/dict-map]
-                    [dict-keys     def/dict-keys]))
+         (prefix-in env: (submod "env.rkt" basic-check)))
 
 (module+ test (require rackunit))
 
@@ -158,7 +154,7 @@
    #:with [DEF ...] (filter def? (stx->list #'(FIELD/DEF ...)))
    ;; Check P ⊢τ t on fields
    #:with [(field ~! F-NAME F:ow-scheme) ...] #'(FIELD ...)
-   #:when (stx-for/and ([T #'(F.TYPE ...)]) (⊢τ T))
+   #:when (stx-for/and ([t #'(F.TYPE ...)]) (⊢τ t))
    ;; Check P,NAME ⊢m DEF ≫ ?DEF
    #:with [?DEF ...] (with-τ #'NAME (stx-map ⊢m #'(DEF ...)))
    ;; ----------------------------------------------------------------
@@ -197,7 +193,7 @@
    ;; Get current class type store in τ environment
    #:with τ0 (τ)
    ;; Check P ⊢τ t on args and return type
-   #:when (stx-for/and ([T #'(ARG.TYPE ... RET.TYPE)]) (⊢τ T))
+   #:when (stx-for/and ([t #'(ARG.TYPE ... RET.TYPE)]) (⊢τ t))
    ;; Check P,{this: τ0, ARG-NAME: ARG-TYPE, ...} ⊢e E ≫ ?E : RET-TYPE
    #:with [?E t-e] (get-τ
                     (with-Γ #'{ (this     . τ0)

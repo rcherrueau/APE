@@ -350,8 +350,3 @@
          (log-sclang-debug $dbg-msg 'srcloc 'ctx res)
          res)]
     [(_ E) #'(dbg E #:ctx E)]))
-
-
-;; (: bound-id=? (Identifier Identifier -> Boolean))
-(define (bound-id=? id1 id2)
-  (eq? (syntax-e id1) (syntax-e id2)))

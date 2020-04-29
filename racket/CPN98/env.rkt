@@ -32,16 +32,12 @@
          syntax/parse
          typed/racket/unsafe
          "definitions.rkt"
-         "utils.rkt"
-         )
+         "utils.rkt")
 
 (require/typed "utils.rkt"
   [check-stx=? ((Syntax Syntax) (#:msg String) . ->* . Any)]
   [zip (All (a b) ((Listof a) (Listof b) -> (Listof (Pairof a b))))]
   [unzip (All (a b) ((Listof (Pairof a b)) -> (Values (Listof a) (Listof b))))]
-  ;; TODO: Get bound-id=? from definition.
-  ;; TODO: Rename bound-id? ou id=?
-  [bound-id=? (Identifier Identifier -> Boolean)]
   )
 
 
@@ -110,10 +106,10 @@
 
     (define Γ-tests
       (test-suite "Test for Γ env"
-       (for ([Γ (list (make-Γ (list #'foo #'bar))
-                           (make-Γ #'(foo bar))
-                           (make-Γ (make-Γ (list #'foo #'bar)))
-                           (make-Γ (make-Γ #'(foo bar))))])
+       (for ([Γ (in-list (list (make-Γ (list #'foo #'bar))
+                               (make-Γ #'(foo bar))
+                               (make-Γ (make-Γ (list #'foo #'bar)))
+                               (make-Γ (make-Γ #'(foo bar)))))])
          (check-true  (Γ-member? Γ #'foo))
          (check-true  (Γ-member? Γ #'bar))
          (check-false (Γ-member? Γ #'baz))
@@ -156,7 +152,7 @@
 
   ;; Untyped world
   (module untyped-Γ racket/base
-    (require racket/dict "utils.rkt")
+    (require racket/dict "definitions.rkt")
     (provide (rename-out
               [immutable-Γ?     u:Γ?]
               [make-immutable-Γ u:make-Γ]
@@ -164,7 +160,6 @@
               [dict-set         u:Γ-set]
               [dict-ref         u:Γ-ref]))
 
-    ;; TODO: put bound-id=? in definition.rkt
     (define-custom-hash-types Γ bound-id=?))
 
   (unsafe-require/typed 'untyped-Γ
@@ -217,10 +212,10 @@
                                 (fizz . buzz) })
     (define Γ-tests
       (test-suite "Test for Γ env"
-       (for ([Γ (list (make-Γ listof-id~>bytes)
-                      (make-Γ stxof-id~>bytes)
-                      (make-Γ (make-Γ listof-id~>bytes))
-                      (make-Γ (make-Γ stxof-id~>bytes)))])
+       (for ([Γ (in-list (list (make-Γ listof-id~>bytes)
+                               (make-Γ stxof-id~>bytes)
+                               (make-Γ (make-Γ listof-id~>bytes))
+                               (make-Γ (make-Γ stxof-id~>bytes))))])
          (check-true  (Γ-member? Γ #'foo))
          (check-stx=? (Γ-ref Γ #'foo) #'bar)
          (check-true  (Γ-member? Γ #'fizz))
@@ -242,7 +237,7 @@
   ;; Untyped world
   (module untyped-FS racket/base
     (require racket/dict racket/match
-             "utils.rkt")
+             "definitions.rkt")
     (provide (rename-out
               [immutable-FS?     u:FS?]
               [make-immutable-FS u:make-FS]
@@ -313,7 +308,7 @@
   ;; Untyped world
   (module untyped-DS racket/base
     (require racket/dict racket/match
-             "utils.rkt")
+             "definitions.rkt")
     (provide (rename-out
               [immutable-DS?     u:DS?]
               [make-immutable-DS u:make-DS]
@@ -342,7 +337,7 @@
          (c-type=? C-TYPE1 C-TYPE2)
          (d-name=? D-NAME1 D-NAME2)
          (num-args=? b-types1 b-types2)
-         (for/and ([bt1 b-types1] [bt2 b-types2])
+         (for/and ([bt1 (in-list b-types1)] [bt2 (in-list b-types2)])
            (b-type=? bt1 bt2)))))
 
     (define-custom-hash-types DS ds-key=?))
