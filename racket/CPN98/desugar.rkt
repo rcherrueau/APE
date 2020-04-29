@@ -25,6 +25,7 @@
          racket/match
          racket/syntax
          syntax/parse
+         syntax/srcloc
          syntax/stx
          "utils.rkt"
          "definitions.rkt"
@@ -222,10 +223,10 @@
   ;;;; A bound identifier (from a def or let)
   [ID:id #:when (Γ-member? #'ID)
     this-syntax]
-  ;;;; A free identifier. In that case, it presumably refers to a
-  ;;;; field of the current class: A sort of shortcut for (get-field
-  ;;;; this id) -- i.e., `id` instead of `this.id` in Java
-  ;;;; world. E.g.,
+  ;;;; A free identifier in a class (i.e., `this' is bound).  In that
+  ;;;; case, it presumably refers to a field of the current class: A
+  ;;;; sort of shortcut for (get-field this id) -- i.e., `id` instead
+  ;;;; of `this.id` in Java world. E.g.,
   ;;;;
   ;;;; 1 (class C
   ;;;; 2   (field [id : A])
@@ -237,8 +238,12 @@
   ;;;; We remove it, so the desugared syntax contains no free
   ;;;; identifier.
   ;;;; ID ∗> (get-field this ID)
+  [ID:id #:when (Γ-member? #'this)
+    (∗e> (stx/surface (get-field this ID) this-syntax))]
+  ;;;; Unbound identifier
   [ID:id
-   (∗e> (stx/surface (get-field this ID) this-syntax))])
+   (raise (mk-exn:unbound-id #'ID))]
+  )
 
 (module+ test
   (define-test-suite ∗e>-parse
@@ -248,9 +253,12 @@
       (check-stx=? (∗e> #'foo) #'foo
                    #:msg "Bound identifier is left as it")
       (check-stx=? (∗e> #'bar) #'(get-field this bar)
-                   #:msg "Free identifier is expended with `get-field`")
+                   #:msg "Free identifier is expended with `get-field` under `this'")
       (check-stx=? (∗e> #'???) #'???
                    #:msg "The debug placeholder `???` is a valid expr")
+      (check-exn exn:fail:syntax:unbound?
+                 (λ () (with-Γ #'() (∗e> #'bar)))
+                 "Free identifier raised unbound error")
 
       ;; let
       (check-stx=? (∗e> #'(let ([foo : o/t ???]) ???))
@@ -481,6 +489,23 @@
 
     (check-ill-parsed
      (syntax-parse #'(name {owner/type})            [_:arg #t]))))
+
+
+;; Exceptions
+
+;; (: mk-exn:unbound-id ((Identifier) ((U Syntax #f)) .->*. exn:fail:syntax:unbound))
+(define (mk-exn:unbound-id ID [context #f])
+  (define CTX (or context (current-syntax-context)))
+  ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
+  (define srcloc-msg (srcloc->string (build-source-location CTX)))
+  (define id (format "~s" (extract-exp-name ID)))
+  (define err-msg "unbound identifier")
+  (define unbound-msg (format "~n  in: ~.s" (syntax->datum CTX)))
+
+  (make-exn:fail:syntax:unbound
+   (string-append srcloc-msg ": " id ": " err-msg unbound-msg)
+   (current-continuation-marks)
+   (list (syntax-taint CTX))))
 
 
 ;; Utils
