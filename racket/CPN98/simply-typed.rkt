@@ -189,22 +189,29 @@
 ;; In context `P,τ`, `DEF` elaborates to `?DEF`
 (define-rules ⊢m
   ;; [meth]
-  [(def ~! (NAME (ARG-NAME ARG:ow-scheme) ... RET:ow-scheme) E)
+  [(def ~! (NAME (ARG-NAME ARG:ow-scheme) ... RET:ow-scheme) E ...+)
    ;; Get current class type store in τ environment
    #:with τ0 (τ)
    ;; Check P ⊢τ t on args and return type
    #:when (stx-for/and ([t #'(ARG.TYPE ... RET.TYPE)]) (⊢τ t))
    ;; Check P,{this: τ0, ARG-NAME: ARG-TYPE, ...} ⊢e E ≫ ?E : RET-TYPE
-   #:with [?E t-e] (get-τ
-                    (with-Γ #'{ (this     . τ0)
-                                (???      . RET.TYPE)
-                                (ARG-NAME . ARG.TYPE) ... }
-                      (⊢e  #'E)))
+   ;;;; Note: This is a generalization regarding [FKF98].  The paper
+   ;;;; only accept one expression in the body of a `def`.  Here we
+   ;;;; accept many, with the idea that the results of the last
+   ;;;; expression is returned as the result of the `def`.  In such a
+   ;;;; case the type of the `def` is the type of the Last Expression
+   ;;;; of its BODY (LEB).
+   ;;;; Check P,{this: τ0, ARG-NAME: ARG-TYPE, ...} ⊢e E ... LEB ≫ ?E ... ?LEB : RET-TYPE
+   #:with [?E ... ?LEB] (with-Γ #'{ (this     . τ0)
+                                       (???      . RET.TYPE)
+                                       (ARG-NAME . ARG.TYPE) ... }
+                             (stx-map ⊢e #'(E ...)))
+   #:with [_ t-e] (get-τ #'?LEB)
    #:when (or (τ=? #'t-e #'RET.TYPE)
-              (raise-type-mismatch #'t-e #'RET.TYPE #'?E))
+              (raise-type-mismatch #'t-e #'RET.TYPE #'?LEB))
    ;; ----------------------------------------------------------------
-   ;; P,τ0 ⊢m (def (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) E) ≫
-   ;;           (def (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) ?E)
+   ;; P,τ0 ⊢m (def (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) E ...+) ≫
+   ;;           (def (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) ?E ...)
    this-syntax])
 
 (module+ test
@@ -224,7 +231,7 @@
                  (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Baz o ())) _)))
                  "`Baz` is not a defined type")
 
-      ;; Check P,{this: τ0, ARG-NAME: ARG-TYPE, ...} ⊢e E ≫ ?E : RET-TYPE
+      ;; Check P,{this: τ0, ARG-NAME: ARG-TYPE, ...} ⊢e E ... LEB ≫ ?E ... ?LEB : RET-TYPE
       (check-exn exn:type-mismatch?
                  (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Bar o ()))
                                 (new (Foo o ())))))
@@ -246,6 +253,10 @@
       (check-not-exn
        (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Foo o ())) arg2)))
        "`arg2` is bound in the expression with the `Foo` type")
+      (check-not-exn
+       (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Foo o ())) arg1 arg2))))
+      (check-not-exn
+       (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Bar o ())) arg2 arg1))))
       ))))
 
 

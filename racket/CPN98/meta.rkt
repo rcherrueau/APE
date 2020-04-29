@@ -122,7 +122,7 @@
 (define (mk-ds C-TYPE DEF...)
   (define mk-ds-item (syntax-parser
       #:literal-sets [keyword-lits]
-      [(def (NAME (A-NAME A-OWS:ow-scheme) ...  R-OWS:ow-scheme) BODY)
+      [(def (NAME (A-NAME A-OWS:ow-scheme) ...  R-OWS:ow-scheme) _ ...)
        #:with C-TYPE C-TYPE
        (cons #'(C-TYPE NAME (A-OWS ...)) #'R-OWS)]))
 
@@ -163,7 +163,7 @@
     (syntax-parser
       #:literal-sets [keyword-lits]
       [(field name:id _ ...) #'name]
-      [(def (name:id _ ...) _) #'name]
+      [(def (name:id _ ...) _ ...) #'name]
       [name:id #'name]))
 
   ;; Extract names from `stxs`

@@ -114,12 +114,12 @@
   ;; ∗>  (def (NAME (A-NAME A-OW-SCHEME) ... RET-OW-SCHEME) *BODY)
   ;; with
   ;;     A-OW-SCHEME := (A-TYPE A-OWNER A-CPARAMS)
-  [(def ~! (NAME:id ARG:arg ... . RET:rtype) BODY:expr)
+  [(def ~! (NAME:id ARG:arg ... . RET:rtype) BODY:expr ...+)
    #:with [A-NAME ...]      #'(ARG.NAME ...)
    #:with [A-OW-SCHEME ...] #'(ARG.OW-SCHEME ...)
    #:with RET-OW-SCHEME     #'RET.OW-SCHEME
-   #:with *BODY             (with-Γ #'(this A-NAME ...) (∗e> #'BODY))
-   (stx/surface (def (NAME (~@ (A-NAME A-OW-SCHEME)) ... RET-OW-SCHEME) *BODY)
+   #:with [*BODY ...]       (with-Γ #'(this A-NAME ...) (stx-map ∗e> #'(BODY ...)))
+   (stx/surface (def (NAME (~@ (A-NAME A-OW-SCHEME)) ... RET-OW-SCHEME) *BODY ...)
                 this-syntax)])
 
 (module+ test
@@ -135,8 +135,13 @@
     (check-stx=? (∗f/d> #'(def (name [foo : o/t] [bar : o/t] -> o/t) ???))
                  #'(def (name (foo (t o ())) (bar (t o ())) (t o ())) ???)
                  #:msg "`def` with multiple arguments is valid")
+    (check-stx=? (∗f/d> #'(def (name [foo : o/t] [bar : o/t] -> o/t) foo ???))
+                 #'(def (name (foo (t o ())) (bar (t o ())) (t o ())) foo ???)
+                 #:msg "`def` with multiple BODY exprs are kept in order")
     (check-ill-parsed (∗f/d> #'(def (name [foo : o/t]) ???))
                       #:msg "`def` with no return type is not valid")
+    (check-ill-parsed (∗f/d> #'(def (name [foo : o/t])))
+                      #:msg "`def` always provide a BODY")
 
     ;; arg bind
     (check-stx=? (∗f/d> #'(def (name [foo : o/t] -> o/t) bar))
@@ -144,7 +149,10 @@
                  #:msg "`def` expands its BODY and binds `this`")
     (check-stx=? (∗f/d> #'(def (name [foo : o/t] -> o/t) foo))
                  #'(def (name (foo (t o ())) (t o ())) foo)
-                 #:msg "`def` binds `foo` identifier")))
+                 #:msg "`def` binds `foo` identifier")
+    (check-stx=? (∗f/d> #'(def (name [foo : o/t] [bar : o/t] -> o/t) foo bar))
+                 #'(def (name (foo (t o ())) (bar (t o ())) (t o ())) foo bar)
+                 #:msg "`def` args are bind for all expressions of the BODY")))
 
 
 ;; Expression rules
@@ -270,11 +278,11 @@
       (check-stx=?
          (∗e> #'(let ([foo : o/t ???]) foo ???))
          #'(let (foo (t o ()) ???) foo ???)
-         #:msg "`let' with multiple BODY expr are kept as it")
+         #:msg "`let' with multiple BODY exprs are kept in order")
       (check-stx=?
          (∗e> #'(let ([foo : o/t ???] [bar : o/t ???]) foo bar))
          #'(let (foo (t o ()) ???) (let (bar (t o ()) ???) foo bar))
-         #:msg "`let' with multiple BODY expr are kept as it")
+         #:msg "`let' binds arguments for all exprs of the BODY")
       (check-ill-parsed (∗e> #'(let ([]) ???)))
       (check-ill-parsed (∗e> #'(let ([foo : t c ???]) ???))
          #:msg "context parameters `c` should be surrounded by parentheses")
