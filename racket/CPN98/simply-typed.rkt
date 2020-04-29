@@ -626,11 +626,11 @@
   (define CTX (or context (current-syntax-context)))
   ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
   (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
-  (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
   (define name (cond
-                 [(syntax? n) (extract-exp-name (syntax-property n 'surface))]
+                 [(syntax? n) (syntax-property n 'surface)]
                  [else n]))
-  (define id (format "~s" (or name (extract-exp-name CTX-SURFACE))))
+  (define srcloc-msg (srcloc->string (build-source-location (or name CTX-SURFACE))))
+  (define id (format "~s" (extract-exp-name (or name CTX-SURFACE))))
   (define err-msg "type mismatch")
   (define elab-msg
     (format (string-append "~n  The expression elaborate to the type ~s"

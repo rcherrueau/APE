@@ -12,9 +12,9 @@
   (field [engine : rep/Engine])
   (field [driver : world/Driver])
 
-  (def (init → Unit)
+  (def (init → Car)
     (set-field! this engine (new rep/Engine))
-    ???)
+    this)
 
   (def (get-engine → rep/Engine)
     engine)
@@ -27,8 +27,7 @@
 
 
 (let ([bob : world/Driver (new Driver)]
-      [car : wordl/Car    (new Car)])
-  (send car init)
+      [car : world/Car    (send (new Car) init)])
   (set-field! car driver bob)
   (send car go)
   (send (get-field car engine) stop) ;; fails
