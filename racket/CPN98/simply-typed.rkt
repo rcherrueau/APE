@@ -67,62 +67,64 @@
 
 
 ;; Phase ?>
-
-(define-parser (?> stx)
+(define-phase (?> stx)
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  ;; TODO: Find a better syntax. Maybe something à la datatype?
-  ;; [Γ : Id~>B-TYPE
-  ;;    #:mk   env:make-Γ
-  ;;    #:init '()
-  ;;    #:partial-app ([env:Γ-member? Γ-member?]
-  ;;                   [env:Γ-add     Γ-add]
-  ;;                   [env:Γ-ref     Γ-ref])]
-  #:Env
-  (;; Map of locally bound variables.
-   [Γ : (HashTable Identifier B-TYPE)
-      env:make-Γ '()
-      #:partial-app ([env:Γ-member? Γ-member?]
-                     [env:Γ-add     Γ-add]
-                     [env:Γ-ref     Γ-ref])]
+  ;; Env
 
-   ;; Store of the current class type
-   [τ : B-TYPE
-      #'Top]
+  ;; Map of locally bound variables.
+  ;;
+  ;; (: Γ (Identifier ~> B-TYPE))
+  (Γ #:init   '()
+     #:mk     env:make-Γ
+     #:apply? [env:Γ-member? env:Γ-add env:Γ-ref])
 
-   ;; Set of existing types
-   [CS : (Setof B-TYPE)
-       env:make-CS meta:CS
-       #:partial-app ([env:CS-member? CS-member?])]
+  ;; Store of the current class type
+  ;;
+  ;; (: τ B-TYPE)
+  (τ #:init #'Bottom
+     #:mk   identity)
 
-   ;; Map of fields
-   [FS : (HashTable
-          (Syntaxof (Pairof B-TYPE Identifier)) ;; #'(Class-type . Field-name)
-          B-TYPE)                               ;; #'Field-type
-       env:make-FS
-       (meta-map  ;; Instantiate ows in values
-        (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
-        meta:FS)
-       #:partial-app ([env:FS-member? FS-member?]
-                      [env:FS-ref FS-ref])]
+  ;; Set of existing types
+  ;;
+  ;; (: CS (Setof B-TYPE))
+  (CS #:init   meta:CS  ;; Types have been gathered at meta
+      #:mk     env:make-CS
+      #:apply? (env:CS-member?))
 
-   ;; Map of definitions
-   [DS : (HashTable
-          (Syntaxof (List Identifier                    ; Class type
-                          Identifier                    ; Def name
-                          (Syntaxof (Listof B-TYPE))))  ; Type of def args
-          B-TYPE)                                       ; Def return type
-       env:make-DS
-       (meta-map-kv
-        ;; Instantiate ows in keys
-        (syntax-parser [(c-type:id def:id (scheme:ow-scheme ...))
-                        #:with b-types #'(scheme.TYPE ...)
-                        #'(c-type def b-types)])
-        ;; Instantiate ows in values
-        (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
-        meta:DS)
-       #:partial-app ([env:DS-member? DS-member?]
-                      [env:DS-ref DS-ref]
-                      [env:DS-domain DS-domain])])
+  ;; Map of fields
+  ;;
+  ;; The init instantiate the scheme of owner ships of meta:FS to
+  ;; basic types.
+  ;;
+  ;; (: FS ((Syntaxof (Pairof B-TYPE        ; Class type
+  ;;                          Identifier))  ; Field name
+  ;;        ~> B-TYPE))                     ; Field return type
+  (FS #:init
+      (meta-map
+       (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
+       meta:FS)
+      #:mk env:make-FS
+      #:apply? (env:FS-member? env:FS-ref))
+
+  ;; Map of definitions
+  ;;
+  ;; The init instantiate the scheme of owner ships of meta:DS to
+  ;; basic types.
+  ;;
+  ;; (: DS ((Syntaxof (List Identifier                    ; Class type
+  ;;                        Identifier                    ; Def name
+  ;;                        (Syntaxof (Listof B-TYPE))))  ; Type of def args
+  ;;        ~> B-TYPE)                                    ; Def return type
+  (DS #:init
+      (meta-map-kv
+       ;; Instantiate ows of keys
+       (syntax-parser [(c-type:id def:id (scheme:ow-scheme ...))
+                       #'(c-type def (scheme.TYPE ...))])
+       ;; Instantiate ows of values
+       (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
+       meta:DS)
+      #:mk env:make-DS
+      #:apply? (env:DS-member? env:DS-ref env:DS-domain))
 
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ;; Parse

@@ -36,19 +36,22 @@
 (provide ∗>)
 
 
+
 ;; Phase ∗>
 
-(define-parser (∗> stx)
-  ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  #:Env
-  (;; Set of local bindings
-   [Γ : (Setof Identifier)
-      env:make-Γ '()
-      #:partial-app ([env:Γ-member? Γ-member?]
-                     [env:Γ-add     Γ-add])
-      ])
+(define-phase (∗> stx)
 
-  ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ;; Env
+
+  ;; Set of local bindings
+  ;;
+  ;; (: Γ (Setof Identifier))
+  (Γ #:init   '()
+     #:mk     env:make-Γ
+     #:apply? (env:Γ-member? env:Γ-add))
+
+  ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ;; Parser
   (∗p> stx))
 

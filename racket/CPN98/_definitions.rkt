@@ -12,6 +12,7 @@
 (require (for-syntax racket/base
                      racket/function
                      racket/list
+                     racket/string
                      racket/syntax
                      syntax/stx
                      syntax/parse/define
@@ -101,35 +102,58 @@
 ;;                (parameterize ([def-K Env] ... [topCall #f]) (PARSER-ID stx))
 ;;                (PARSER-ID stx))))]))
 (begin-for-syntax
+
+  ;; Returns #t if a syntax object is of the form #'env:the-id (i.e.,
+  ;; an identifier that starts with `env:`), or #f otherwise.
+  ;;
+  ;; (: is-stx-env:the-id? (Identifier -> Boolean))
+  (define (is-stx-env:the-id? stx)
+    (string-prefix? (symbol->string (syntax-e stx)) "env:"))
+
+  ;; Strips the `env:` part of a #'env:the-id syntax object
+  ;;
+  ;; (: env:the-id->the-id (Identifier -> Identifier))
+  (define (env:the-id->the-id stx)
+    (define the-id (string-trim (symbol->string (syntax-e stx))
+                                "env:" #:right? #f))
+    (format-id stx "~a" the-id #:source stx))
+
   (define-syntax-class env
-    #:description "an environment variable and its type"
-    #:datum-literals [:]
-    #:attributes [NAME TYPE MAKER VAL DEFS WITH]
+    #:description "an environment variable"
+    #:attributes [NAME MAKER VAL DEFS WITH]
     #:commit
-    (pattern (NAME:id : TYPE:expr (~optional MK:expr) VAL:expr)
+    (pattern (NAME:id #:init VAL:expr
+                      #:mk MAKER:expr)
              #:attr DEFS #'()
-             #:attr MAKER #'(~? MK (λ (x) x))
              #:attr WITH (format-id #'NAME "with-~a" (syntax-e #'NAME))
              )
-    (pattern (NAME:id : TYPE:expr (~optional MK:expr) VAL:expr
-                      #:partial-app [(DEF:id DEF-LIFTED-NAME:id) ...])
-             #:attr DEFS #'((DEF DEF-LIFTED-NAME) ...)
-             #:attr MAKER #'(~? MK const)  ;; Use the const function if no MAKER
+    (pattern (NAME:id #:init VAL:expr
+                      #:mk MAKER:expr
+                      #:apply? [envDEF:id ...])
+             ;; Check that all def that should be applied to the env starts with `env:`
+             #:fail-unless (stx-for/and ([id #'(envDEF ...)])
+                                        (is-stx-env:the-id? id))
+             "expected an identifier that starts with `env:`"
+             #:with [DEF-APPLY-NAME ...] (stx-map env:the-id->the-id #'(envDEF ...))
+             #:attr DEFS #'((envDEF DEF-APPLY-NAME) ...)
              #:attr WITH (format-id #'NAME "with-~a" (syntax-e #'NAME))
-             )))
+             )
 
-(define-syntax (define-parser parser-stx)
-  (define (env->name/def/lift stx)
-    (syntax-parse stx
+    ))
+
+(define-syntax (define-phase parser-stx)
+  (define env->name/def/apply
+    (syntax-parser
       [e:env
-       #:with [(e-def e-lift) ...] #'e.DEFS
-       #'((e.NAME e-def e-lift) ...)]))
+       #:with [(e-def e-apply) ...] #'e.DEFS
+       #'((e.NAME e-def e-apply) ...)]))
 
   (syntax-parse parser-stx
-    [(_ (ID:id stx:expr)      ;; Parser name (e.g., `?>`) and its syntax object/id
-        #:Env (E:env ...)     ;; Environment variables ...
-        DEF)                  ;; parser definition
-     #:with ((E-NAME E-DEF E-LIFT) ...) (stx-flatten (stx-map env->name/def/lift #'(E ...)))
+    [(_ (ID:id stx:expr)  ;; Phase name (e.g., `?>`) and its syntax object/id
+        E:env ...         ;; Environment variables ...
+        DEF)              ;; Phase definition
+     #:with ((E-NAME E-DEF E-APPLY) ...)
+       (stx-flatten (stx-map env->name/def/apply #'(E ...)))
      #'(begin
          ;; Define environment variables as parameters
          ;; (: E.NAME (Parameterof E.TYPE)) ...
@@ -144,8 +168,8 @@
             (parameterize ([E.NAME (E.MAKER THE-PARAM)]) EXPR ...)))
          ...
 
-         ;; lifted DEF with E-NAME parameter
-         (define (E-LIFT . args) (apply E-DEF (E-NAME) args)) ...
+         ;; Partially applied DEF with E-NAME parameter
+         (define (E-APPLY . args) (apply E-DEF (E-NAME) args)) ...
 
          ;; Define the parser as a global definition. We parameterize
          ;; the first call of `DEF` with `Env` values
