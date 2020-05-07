@@ -205,12 +205,12 @@
    ;;;; of its BODY (LEB).
    ;;;; Check P,{this: τ0, ARG-NAME: ARG-TYPE, ...} ⊢e E ... LEB ≫ ?E ... ?LEB : RET-TYPE
    #:with [?E ... ?LEB] (with-Γ #'{ (this     . τ0)
-                                       (???      . RET.TYPE)
-                                       (ARG-NAME . ARG.TYPE) ... }
+                                    (???      . RET.TYPE)
+                                    (ARG-NAME . ARG.TYPE) ... }
                              (stx-map ⊢e #'(E ...)))
    #:with [_ t-e] (get-τ #'?LEB)
    #:when (or (τ=? #'t-e #'RET.TYPE)
-              (raise-type-mismatch #'t-e #'RET.TYPE #'?LEB))
+              (raise (mk-exn:type-mismatch #'t-e #'RET.TYPE #'?LEB)))
    ;; ----------------------------------------------------------------
    ;; P,τ0 ⊢m (def (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) E ...+) ≫
    ;;           (def (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) ?E ...)
@@ -291,7 +291,8 @@
    #:with [?E t] (get-τ (⊢e #'E))
    ;; Check (t . FNAME) ∈ dom(FS)
    ;;;; The field FNAME is defined in the class t
-   #:when (or (FS-member? #'(t . FNAME)) (raise-unknown-field #'FNAME #'t))
+   #:when (or (FS-member? #'(t . FNAME))
+              (raise (mk-exn:unknown-field #'FNAME #'t)))
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e (get-field E FNAME) ≫
    ;;          (get-field (?E : t) FNAME) : FS(t . FNAME)
@@ -303,14 +304,15 @@
    #:with [?E t] (get-τ (⊢e #'E))
    ;; Check (t . FNAME) ∈ dom(FS)
    ;;;; The field FNAME is defined in the class t
-   #:when (or (FS-member? #'(t . FNAME)) (raise-unknown-field #'FNAME #'t))
+   #:when (or (FS-member? #'(t . FNAME))
+              (raise (mk-exn:unknown-field #'FNAME #'t)))
    ;; Check P,Γ ⊢e BODY ≫ ?BODY : FS(t . FNAME)
    ;;;; The BODY has to elaborate to something that fit into the
    ;;;; field.
    #:with [?BODY t-body] (get-τ (⊢e #'BODY))
    #:with t-field (FS-ref #'(t . FNAME))
    #:when (or (τ=? #'t-body #'t-field)
-              (raise-type-mismatch #'t-body #'t-field))
+              (raise (mk-exn:type-mismatch #'t-body #'t-field)))
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e (set-field E FNAME BODY) ≫
    ;;          (set-field (?E : t) FNAME ?BODY) : FS(t . FNAME)
@@ -326,7 +328,8 @@
    ;;;; The method DNAME with parameters (t-param ...) is defined in
    ;;;; the class t.
    #:with DS-key #'(t DNAME (t-param ...))
-   #:when (or (DS-member? #'DS-key) (raise-def-error #'DS-key))
+   #:when (or (DS-member? #'DS-key)
+              (raise-def-error #'DS-key))
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e (send E DNAME PARAM ...) ≫
    ;;          (send (?E : t) DNAME ?PARAM ...) : DS(t DNAME t-param ...)
@@ -340,7 +343,7 @@
    #:with [?E t] (get-τ (with-Γ (Γ-add #'(??? . VAR-SCHEME.TYPE))
                           (⊢e #'E)))
    #:when (or (τ=? #'t #'VAR-SCHEME.TYPE)
-              (raise-type-mismatch #'t #'VAR-SCHEME.TYPE #'?E))
+              (raise (mk-exn:type-mismatch #'t #'VAR-SCHEME.TYPE #'?E)))
    ;; Check P,Γ{VAR-NAME: VAR-OW-SCHEME} ⊢e BODY ≫ ?BODY : t
    ;;;; Note: This is a generalization regarding [FKF98].  The paper
    ;;;; only accept one expression in the body of a `let`.  Here we
@@ -523,7 +526,8 @@
 ;; more hairy if I eventually implement inheritance.
 (define-rules ⊢τ
   ;; [type]
-  [t #:when (or (CS-member? #'t) (raise-unknown-type #'t))
+  [t #:when (or (CS-member? #'t)
+                (raise (mk-exn:unknown-type #'t)))
      this-syntax])
 
 (module+ test
@@ -536,6 +540,8 @@
 
 ;; Environment
 
+;; Raise one of exn:unknown-def exn:arity-error exn:type-mismatch
+;;
 ;; DS-key is not a member implies three possible causes:
 ;;;; I met no c-name=? and d-name=? => unknown definition
 ;;;; I met c-name=? and d-name=? but not num-args? => arity error
@@ -571,7 +577,7 @@
 
   ;; I met zero criterion => unknown definition
   (when (empty? met-cname=/dname=-defs)
-    (raise-unknown-def LOOKED-DEF-NAME LOOKED-DEF-C-TYPE))
+    (raise (mk-exn:unknown-def LOOKED-DEF-NAME LOOKED-DEF-C-TYPE)))
 
   ;; Lets refine entries in dom(DS) with same arity
   (define met-cname=/dname=/arity=-defs
@@ -582,7 +588,7 @@
     (define expected-def (car met-cname=/dname=-defs))
     (match-define (list _ EXPECTED-DEF-NAME EXPECTED-DEF-ARGs) expected-def)
     (define expected-def-arity (length EXPECTED-DEF-ARGs))
-    (raise-arity-error EXPECTED-DEF-NAME expected-def-arity LOOKED-DEF-ARGs))
+    (raise (mk-exn:arity-error EXPECTED-DEF-NAME expected-def-arity LOOKED-DEF-ARGs)))
 
   ;; Here, I met my three criterion => type mismatch
   (define expected-def (car met-cname=/dname=/arity=-defs))
@@ -595,8 +601,8 @@
       ;; position `arg-pos`.
       (define send-stx (current-syntax-context))
       (define ill-typed-arg (list-ref (syntax-e send-stx) (+ arg-pos 3)))
-      (raise-type-mismatch looked-b-type expected-b-type
-                           #:name ill-typed-arg)
+      (raise (mk-exn:type-mismatch looked-b-type expected-b-type
+                                   #:name ill-typed-arg))
       )))
 
 
@@ -604,27 +610,25 @@
 
 ;; Unknown type
 (struct exn:unknown-type exn:fail:syntax ()
-  #:extra-constructor-name make-exn:unknown-type
   #:transparent)
 
-(define (raise-unknown-type B-TYPE)
+(define (mk-exn:unknown-type B-TYPE)
   (define srcloc-msg (srcloc->string (build-source-location B-TYPE)))
   (define id (format "~s" (syntax->datum B-TYPE)))
   (define err-msg "unknown type in this scope")
 
-  (raise (make-exn:unknown-type
-          (string-append srcloc-msg ": " id ": " err-msg)
-          (current-continuation-marks)
-          (list (syntax-taint B-TYPE)))))
+  (exn:unknown-type
+   (string-append srcloc-msg ": " id ": " err-msg)
+   (current-continuation-marks)
+   (list (syntax-taint B-TYPE))))
 
 ;; Type mismatch
 (struct exn:type-mismatch exn:fail:syntax ()
-  #:extra-constructor-name make-exn:type-mismatch
   #:transparent)
 
-;; (: raise-type-mismatch  B-TYPE B-TYPE Syntax #:name (U Syntax Symbol #f) -> exn:type-mismatch)
-(define (raise-type-mismatch GIVEN-B-TYPE EXPECTED-B-TYPE [context #f]
-                             #:name [n #f])
+;; (: mk-exn:type-mismatch  B-TYPE B-TYPE Syntax #:name (U Syntax Symbol #f) -> exn:type-mismatch)
+(define (mk-exn:type-mismatch GIVEN-B-TYPE EXPECTED-B-TYPE [context #f]
+                              #:name [n #f])
   (define CTX (or context (current-syntax-context)))
   ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
   (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
@@ -644,18 +648,17 @@
             (syntax-column EXPECTED-B-TYPE)
             (syntax->datum CTX-SURFACE)))
 
-  (raise (make-exn:type-mismatch
-          (string-append srcloc-msg ": " id ": " err-msg elab-msg)
-          (current-continuation-marks)
-          (list (syntax-taint CTX)))))
+  (exn:type-mismatch
+   (string-append srcloc-msg ": " id ": " err-msg elab-msg)
+   (current-continuation-marks)
+   (list (syntax-taint CTX))))
 
 ;; Def arity error
 (struct exn:arity-error exn:fail:syntax ()
-  #:extra-constructor-name make-exn:arity-error
   #:transparent)
 
-;; (: raise-arity-error (Identifier Integer (Listof B-TYPE) STX -> exn:arity-error))
-(define (raise-arity-error def expected-args-size given-args [context #f])
+;; (: mk-exn:arity-error (Identifier Integer (Listof B-TYPE) STX -> exn:arity-error))
+(define (mk-exn:arity-error def expected-args-size given-args [context #f])
   (define CTX (or context (current-syntax-context)))
   ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
   (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
@@ -675,18 +678,17 @@
             (syntax-column def)
             (syntax->datum CTX-SURFACE)))
 
-  (raise (make-exn:arity-error
-          (string-append srcloc-msg ": " id ": " err-msg arity-msg)
-          (current-continuation-marks)
-          (list (syntax-taint CTX)))))
+  (exn:arity-error
+   (string-append srcloc-msg ": " id ": " err-msg arity-msg)
+   (current-continuation-marks)
+   (list (syntax-taint CTX))))
 
 ;; Unknown def
 (struct exn:unknown-def exn:fail:syntax ()
-  #:extra-constructor-name make-exn:unknown-def
   #:transparent)
 
-;; (: raise-unknown-def (Identifier B-TYPE STX -> exn:unknown-def))
-(define (raise-unknown-def def-name c-type [context #f])
+;; (: mk-exn:unknown-def (Identifier B-TYPE STX -> exn:unknown-def))
+(define (mk-exn:unknown-def def-name c-type [context #f])
   (define CTX (or context (current-syntax-context)))
   ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
   (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
@@ -700,18 +702,17 @@
             (syntax->datum c-type)
             (syntax->datum CTX-SURFACE)))
 
-  (raise (make-exn:unknown-def
-          (string-append srcloc-msg ": " id ": " err-msg def-msg)
-          (current-continuation-marks)
-          (list (syntax-taint CTX)))))
+  (exn:unknown-def
+   (string-append srcloc-msg ": " id ": " err-msg def-msg)
+   (current-continuation-marks)
+   (list (syntax-taint CTX))))
 
 ;; Unknown def
 (struct exn:unknown-field exn:fail:syntax ()
-  #:extra-constructor-name make-exn:unknown-field
   #:transparent)
 
-;; (: raise-unknown-field (Identifier B-TYPE Syntax -> exn:unknown-field))
-(define (raise-unknown-field field-name c-type [CONTEXT #f])
+;; (: mk-exn:unknown-field (Identifier B-TYPE Syntax -> exn:unknown-field))
+(define (mk-exn:unknown-field field-name c-type [CONTEXT #f])
   (define CTX (or CONTEXT (current-syntax-context)))
   ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
   (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
@@ -725,10 +726,10 @@
             (syntax->datum field-name)
             (syntax->datum CTX-SURFACE)))
 
-  (raise (make-exn:unknown-field
-          (string-append srcloc-msg ": " id ": " err-msg field-msg)
-          (current-continuation-marks)
-          (list (syntax-taint CTX)))))
+  (exn:unknown-field
+   (string-append srcloc-msg ": " id ": " err-msg field-msg)
+   (current-continuation-marks)
+   (list (syntax-taint CTX))))
 
 
 ;; Utils
