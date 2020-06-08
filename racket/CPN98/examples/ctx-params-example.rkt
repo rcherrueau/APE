@@ -12,6 +12,19 @@
 (class Pair {m n}
   (field [fst : m/X])
   (field [snd : n/Y])
+
+  ;; ;; Check unknown context parameter
+  ;; (field [foo : x/Y])
+
+  ;; ;; Check unknown context parameter + wrong number
+  ;; (field [foo : x/Y{n}])
+
+  ;; ;; Check wrong number of context parameters
+  ;; (field [Foo : n/Y{n}])
+
+  ;; ;; Check unknown context parameter
+  ;; (field [Foo : n/Pair{m x}])
+
   )
 
 (class Intermediate
@@ -32,11 +45,11 @@
   ;; ;; Check duplicated def
   ;; (def (b → world/Pair{rep world}) ???)
 
-  ;; ;; Check unknow field
+  ;; ;; Check unknown field
   ;; (def (c → rep/Pair{rep world})
   ;;   foo)
 
-  ;; ;; Check unknow field
+  ;; ;; Check unknown field
   ;; (def (c → rep/Pair{rep world})
   ;;   (get-field lala foo))
 
@@ -76,12 +89,12 @@
     (send this with-args p4))
 
   (def (get-engine [e : rep/Engine]
-                   [b : rep/X{a c}]
+                   [b : rep/X]
                    → rep/Pair{rep world})
     (get-field this p1))
 
   (def (get-engine2 [e : rep/Engine]
-                    [b : rep/X{a c}]
+                    [b : rep/X]
                     → rep/Engine)
     e)
 
@@ -90,12 +103,12 @@
 
   ;; ;; Check: type mismatch get-field
   ;; (def (get-engine-bad [e : rep/Engine]
-  ;;                      [b : rep/X{a c}]
+  ;;                      [b : rep/X]
   ;;                      → rep/Engine)
   ;;   p1)
 
   (def (get-engine3 [e : rep/Engine]
-                    [b : rep/X{a c}]
+                    [b : rep/X]
                     → rep/Engine)
     ???)
   )

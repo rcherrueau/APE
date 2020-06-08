@@ -55,6 +55,8 @@
 ;; #'(a b [c d])
 (define-type OW-SCHEME (Syntaxof (List B-TYPE OWNER C-PARAMS)))
 
+(define-type O-TYPE (Syntaxof (List OWNER C-PARAMS)))
+
 ;; > (ow-scheme? #'(a b ()))       ; #t
 ;; > (ow-scheme? #'(a b [c d e]))  ; #t
 ;; > (ow-scheme? #'(a 1 []))       ; #f
@@ -62,7 +64,19 @@
 (define-predicate b-type? B-TYPE)
 (define-predicate owner? OWNER)
 (define-predicate c-params? C-PARAMS)
+(define-predicate o-type? O-TYPE)
 
+;; Make an ownership type
+(: mk-ow-scheme (B-TYPE OWNER (Listof Identifier) -> OW-SCHEME))
+(define (mk-ow-scheme B-TYPE OWNER C-PARAMS)
+  (cast (datum->syntax B-TYPE `(,B-TYPE ,OWNER ,C-PARAMS) B-TYPE)
+        OW-SCHEME))
+
+;; Destruct an ownership type
+(: strip-ow-scheme (OW-SCHEME -> (List B-TYPE OWNER C-PARAMS)))
+(define strip-ow-scheme syntax-e)
+
+;; More destructors
 (: ow-scheme->b-type   (OW-SCHEME -> B-TYPE))
 (: ow-scheme->owner    (OW-SCHEME -> Identifier))
 (: ow-scheme->c-params (OW-SCHEME -> (Syntaxof (Listof Identifier))))
@@ -110,6 +124,7 @@
                    [id2 (in-syntax CPARAMS2)])
            (bound-id=? id1 id2)))))
 
+
 ;; ;; (ids-eq? #'(a b c d) #'(a b c d))
 ;; ;; > #t
 ;; ;; (ids-eq? #'(a b c d) #'(d c b a))
@@ -153,11 +168,11 @@
 
 
 ;; Get or set the basic type of a syntax object.
-(: type-prop
+(: b-type-prop
    (All (a) (case->
              [(Syntaxof a) -> (U B-TYPE #f)]
              [(Syntaxof a) B-TYPE -> (Syntaxof a)])))
-(define type-prop
+(define b-type-prop
   (case-lambda
     ;; Get the b-type of a syntax object.
     [(stx) (let ([τ (syntax-property stx 'b-type)])
@@ -165,11 +180,25 @@
     ;; Set the basic type of a syntax object
     [(stx B-TYPE) (syntax-property stx 'b-type B-TYPE)]))
 
+;; Get or set the basic type of a syntax object.
+(: ow-scheme-prop
+   (All (a) (case->
+             [(Syntaxof a) -> (U OW-SCHEME #f)]
+             [(Syntaxof a) OW-SCHEME -> (Syntaxof a)])))
+(define ow-scheme-prop
+  (case-lambda
+    ;; Get the b-type of a syntax object.
+    [(stx) (let ([τ (syntax-property stx 'ow-scheme)])
+             (and (ow-scheme? τ) τ))]
+    ;; Set the basic type of a syntax object
+    [(stx B-TYPE) (syntax-property stx 'ow-scheme B-TYPE)]))
+
 
 ;; Meta
 
 ;; An associative list with custom function for comparing keys.
 (define-type (AList k v) (Listof (Pairof k v)))
+(define-type (~> k v) (AList k v))
 
 ;; Returns the length of `als`
 (: alist-length (All (k v) ((AList k v) -> Index)))
@@ -177,11 +206,12 @@
   (length als))
 
 ;; Returns the value for `key` in `als` using `key-eq?` comparison
-(: alist-ref (All (k v) ((AList k v) k (k k -> Boolean) -> v)))
-(define (alist-ref als key key-eq?)
+(: alist-ref (All (k v) (((AList k v) k (k k -> Boolean)) ((U (k -> v) #f)) . ->* . v)))
+(define (alist-ref als key key-eq? [failure-result #f])
   (cond
     [(assoc key als key-eq?) => cdr]
-    [else (error "the key ~s does not exist in AList" key)]))
+    [else (if failure-result (failure-result key)
+              (error "the key ~s does not exist in AList" key))]))
 
 ;; Functionally extends `als` by mapping `key` to `val`,
 ;; overwriting any existing mapping for `key`, and returning an

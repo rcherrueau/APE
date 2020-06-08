@@ -18,7 +18,7 @@
 pkgs.mkShell {
   buildInputs = [
     # pkgs.racket
-    temci  # mesure performances
+    # temci  # mesure performances
   ];
 
   shellHook = ''

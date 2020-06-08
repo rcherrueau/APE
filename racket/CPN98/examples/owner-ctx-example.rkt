@@ -1,14 +1,15 @@
 #lang reader "../lang.rkt"
 ;; #lang s-exp "lang.rkt"
 
-(class Link [n]
+(class Link{n}
   (field [next : (Θ / (Link n))])
   (field [data : (n / X)])
 
-  (def (init [inDate : (n / X)] → Unit)
-    (set-field! this data inData)))
+  (def (init [inDate : (n / X)] → Link{n})
+    (set-field! this data inData)
+    this))
 
-(class XStack [n]
+(class XStack{n}
   (field [top : (rep / (Link m))])
 
   (def (push [data : (m / X)] → Unit)

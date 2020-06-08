@@ -10,6 +10,7 @@
          "desugar.rkt"
          "meta.rkt"
          "simply-typed.rkt"
+         "ownership.rkt"
          )
 
 (provide (rename-out
@@ -39,7 +40,8 @@
        ;; Basic Checks
        [prog (?> prog)]
        ;; Ownership
-       #;[prog (θ> prog)])
+       [prog (θ> prog)]
+       )
 
     ;; Log final AST
     (log-sclang-debug (stx->string prog #:newline? #f))

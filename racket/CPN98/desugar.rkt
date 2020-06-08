@@ -174,7 +174,7 @@
    #:with *E (∗e> #'E)
    #:with [*BODY ...]  (with-Γ (Γ-add #'VAR) (stx-map ∗e> #'(BODY ...)))
    (stx/surface (let (VAR T.OW-SCHEME *E) *BODY ...) this-syntax)]
-  ;; Transforms a `let` with multiple binding into multiple nested
+  ;; Lowering a `let` with multiple binding into multiple nested
   ;; `let`s with one unique binding (such as the previous let)
   [(let ~! ([~and HD (VAR:id : T:type E:expr)] TL ...) BODY:expr ...+)
    (∗e> (stx/surface (let (HD) (let (TL ...) BODY ...)) this-syntax))]
@@ -303,6 +303,7 @@
          (∗e> #'(let ([foo : [o/t c] ???][bar : [o/t c] ???]) ???)))
 
       ;; new
+      (check-stx=? (∗e> #'(new t))       #'(new (t world ())))
       (check-stx=? (∗e> #'(new o/t))     #'(new (t o ())))
       (check-stx=? (∗e> #'(new o/t (c))) #'(new (t o (c))))
       (check-stx=? (∗e> #'(new o/t (c))) #'(new (t o (c)))
@@ -360,23 +361,23 @@
            #:with [OWNER . TYPE] (owner/type->OWNER.TYPE #'O/T)
            #:with CPARAMS #'(PARAM ...)
            #:with SURFACE-STX (syntax/loc #'O/T (O/T CPARAMS))
-           #:with OW-SCHEME (stx/surface (TYPE OWNER CPARAMS) #'SURFACE-STX))
+           #:attr OW-SCHEME (stx/surface (TYPE OWNER CPARAMS) #'SURFACE-STX))
   ;; owner/type -- there are no context parameters
   (pattern (~seq O/T:id) #:when (is-stx-owner/type? #'O/T)
            #:with [OWNER . TYPE] (owner/type->OWNER.TYPE #'O/T)
            #:with CPARAMS #'()
-           #:with OW-SCHEME (stx/surface (TYPE OWNER CPARAMS) #'O/T))
+           #:attr OW-SCHEME (stx/surface (TYPE OWNER CPARAMS) #'O/T))
   ;; type {param ...} -- owner is implicitly world
   (pattern (~seq TYPE:id {PARAM:id ...+})
            #:with OWNER #'world
            #:with CPARAMS #'(PARAM ...)
            #:with SURFACE-STX (syntax/loc #'TYPE (TYPE CPARAMS))
-           #:with OW-SCHEME (stx/surface (TYPE OWNER CPARAMS) #'SURFACE-STX))
+           #:attr OW-SCHEME (stx/surface (TYPE OWNER CPARAMS) #'SURFACE-STX))
   ;; type -- owner is implicitly world and there are no context parameters
   (pattern (~seq TYPE:id)
            #:with OWNER #'world
            #:with CPARAMS #'()
-           #:with OW-SCHEME (stx/surface (TYPE OWNER CPARAMS) #'TYPE)))
+           #:attr OW-SCHEME (stx/surface (TYPE OWNER CPARAMS) #'TYPE)))
 
 (module+ test
   (define-test-suite type-parse

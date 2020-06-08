@@ -91,8 +91,8 @@
 
   ;; Map of fields
   ;;
-  ;; The init instantiate the scheme of owner ships of meta:FS to
-  ;; basic types.
+  ;; The init instantiate ownership schemes in meta:FS into basic
+  ;; types.
   ;;
   ;; (: FS ((Syntaxof (Pairof B-TYPE        ; Class type
   ;;                          Identifier))  ; Field name
@@ -107,8 +107,8 @@
 
   ;; Map of definitions
   ;;
-  ;; The init instantiate the scheme of owner ships of meta:DS to
-  ;; basic types.
+  ;; The init instantiate ownership schemes in meta:DS into basic
+  ;; types.
   ;;
   ;; TODO: I do not support method overloading, so indexing by class
   ;; type and def name and then returning the type of def args and the
@@ -518,6 +518,7 @@
       (check-τ (⊢e #'(let (foo (Foo o ()) ???) foo _)) #'Bar)
       (check-τ (⊢e #'(let (foo (Foo o ()) ???) _ foo)) #'Foo)
       (check-τ (⊢e #'(let (foo (Foo o ()) ???) _ _))   #'Bar)
+      (check-τ (⊢e #'(let (foo (Foo o ()) ???) (let (bar (Bar o ()) ???) bar))) #'Bar)
       (check-τ (⊢e #'(let (foo (Foo o ()) ???) (let (foo (Bar o ()) ???) foo)))
                #'Bar
                "A inner `let` shadows bindings of the outer `let`s")
@@ -557,7 +558,7 @@
   (match-define (list LOOKED-DEF-C-TYPE LOOKED-DEF-NAME _LOOKED-DEF-ARGs)
     (syntax-e LOOKED-DS-key))
   (define LOOKED-DEF-ARGs (syntax->list _LOOKED-DEF-ARGs))
-  (define looked-def-arity (length LOOKED-DEF-ARGs))
+  (define looked-def-number-args (length LOOKED-DEF-ARGs))
 
   ;; Get the domain of `DS` and transform info for latter analysis
   ;; (: def-dom (Listof (List B-TYPE Identifier (Listof B-TYPE))))
@@ -576,7 +577,7 @@
 
   (define (met-def-arity=? ds-key)
     (match-define (list _ _ ARGs-B-TYPE) ds-key)
-    (eq? looked-def-arity (length ARGs-B-TYPE)))
+    (eq? looked-def-number-args (length ARGs-B-TYPE)))
 
   ;; Lets find entries in dom(DS) with same class and def name
   (define met-cname=/dname=-defs (filter met-cname=/dname=? def-dom))
@@ -594,7 +595,9 @@
     (define expected-def (car met-cname=/dname=-defs))
     (match-define (list _ EXPECTED-DEF-NAME EXPECTED-DEF-ARGs) expected-def)
     (define expected-def-arity (length EXPECTED-DEF-ARGs))
-    (raise (mk-exn:arity-error EXPECTED-DEF-NAME expected-def-arity LOOKED-DEF-ARGs)))
+    (raise (mk-exn:arity-error EXPECTED-DEF-NAME
+                               expected-def-arity
+                               looked-def-number-args)))
 
   ;; Here, I met my three criterion => type mismatch
   (define expected-def (car met-cname=/dname=/arity=-defs))
@@ -664,14 +667,13 @@
   #:transparent)
 
 ;; (: mk-exn:arity-error (Identifier Integer (Listof B-TYPE) STX -> exn:arity-error))
-(define (mk-exn:arity-error def expected-args-size given-args [context #f])
+(define (mk-exn:arity-error def expected-args-size given-args-size [context #f])
   (define CTX (or context (current-syntax-context)))
   ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
   (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
   (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
   (define id (format "~s" (extract-exp-name def)))
   (define err-msg "arity mismatch")
-  (define given-args-size (length given-args))
   (define arity-msg
     (format (string-append "~n  def takes ~a but ~a supplied"
                            "~n  The def refers to declaration at ~a:~a"
@@ -742,11 +744,12 @@
 
 ;; (Syntaxof a) -> (Syntaxof (Pairof (Syntaxof a) B-TYPE))
 (define (get-τ stx)
-  (with-syntax ([e-stx stx] [τ-stx (type-prop stx)])
-    #'(e-stx τ-stx)))
+  (with-syntax ([the-stx stx]
+                [τ-stx (b-type-prop stx)])
+    #'(the-stx τ-stx)))
 
 ;; (Syntaxof a) B-TYPE -> (Syntaxof a)
-(define add-τ type-prop)
+(define add-τ b-type-prop)
 
 ;; (: τ=? (B-TYPE B-TYPE -> Boolean))
 (define τ=? bound-id=?)

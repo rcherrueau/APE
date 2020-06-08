@@ -151,7 +151,7 @@
   (syntax-parse parser-stx
     [(_ (ID:id stx:expr)  ;; Phase name (e.g., `?>`) and its syntax object/id
         E:env ...         ;; Environment variables ...
-        DEF)              ;; Phase definition
+        DEF:expr)         ;; Phase definition
      #:with ((E-NAME E-DEF E-APPLY) ...)
        (stx-flatten (stx-map env->name/def/apply #'(E ...)))
      #'(begin
