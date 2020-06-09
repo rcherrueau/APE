@@ -164,7 +164,7 @@
               ;; ..., ~?, and ~@ are interpreted as constants instead
               ;; of template forms. See
               ;; https://docs.racket-lang.org/reference/stx-patterns.html#%28form._%28%28lib._racket%2Fprivate%2Fstxcase-scheme..rkt%29._syntax%29%29
-          (define-simple-macro (E.WITH THE-PARAM EXPR:expr ...)
+          (define-simple-macro (E.WITH THE-PARAM EXPR:expr ...+)
             (parameterize ([E.NAME (E.MAKER THE-PARAM)]) EXPR ...)))
          ...
 
