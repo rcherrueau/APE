@@ -87,7 +87,7 @@
   ;; Set of existing types
   ;;
   ;; (: CS (Setof B-TYPE))
-  (CS #:init   meta:CS  ;; Types have been gathered at meta
+  (CS #:init   (map car meta:CS)
       #:mk     env:make-CS
       #:apply? (env:CS-member?))
 

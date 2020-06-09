@@ -34,7 +34,9 @@
 
 ;; Meta values
 
-(: meta:CS (Listof Identifier))
+(: meta:CS (Listof (Pairof Identifier           ;; class type
+                           (Listof Identifier)  ;; context parameters
+                           )))
 (define meta:CS #f)
 
 (: meta:FS (Dict FS-key OW-SCHEME))
@@ -57,9 +59,9 @@
    (for/foldr ([cs '()][fs '()][ds '()])
               ([CLASS (in-syntax (get-CLASS... stx))])
      ;; For the current class syntax object, extracts its type (i.e.,
-     ;; name) field and def syntax objects.
-     (define-values (C-TYPE FIELD... DEF...)
-       (get-class-C-TYPE/FIELD.../DEF... CLASS))
+     ;; name), context parameters, and field and def syntax objects.
+     (define-values (C-TYPE CPARAM... FIELD... DEF...)
+       (get-class-C-TYPE/CPARAM.../FIELD.../DEF... CLASS))
 
      ;; Ensure all fields and defs are unique in there class
      (no-name-clash? FIELD...)
@@ -68,14 +70,14 @@
      ;; Compute the new value for cs, fs, ds
      (values
       ;; cs
-      (cons C-TYPE cs)
+      (cons (cons C-TYPE CPARAM...) cs)
       ;; fs
       (append (mk-fs C-TYPE FIELD...) fs)
       ;; ds
       (append (mk-ds C-TYPE DEF...) ds))))
 
   ;; Ensure all class types are unique
-  (no-name-clash? meta:CS)
+  (no-name-clash? (map car meta:CS))
   )
 
 
@@ -89,17 +91,18 @@
     [(prog ~! CLASS ... E) #'(CLASS ...)]))
 
 ;; Extracts the type, fields and defs syntax objects of a class
-(: get-class-C-TYPE/FIELD.../DEF...
+(: get-class-C-TYPE/CPARAM.../FIELD.../DEF...
    ('class-stx -> (List Identifier                        ;; class type
+                        (Syntaxof (Listof Identifier))    ;; context parameters
                         (Syntaxof (Listof 'field-stx))    ;; Fields stx
                         (Syntaxof (Listof 'def-stx)))))   ;; Defs stx
-(define get-class-C-TYPE/FIELD.../DEF...
+(define get-class-C-TYPE/CPARAM.../FIELD.../DEF...
   (syntax-parser
     #:literal-sets [keyword-lits]
     [(class ~! NAME [CPARAM ...] FIELD/DEF ...)
      #:with [FIELD ...] (filter field? (stx->list #'(FIELD/DEF ...)))
      #:with [DEF ...] (filter def? (stx->list #'(FIELD/DEF ...)))
-     (values #'NAME #'(FIELD ...) #'(DEF ...))]))
+     (values #'NAME #'(CPARAM ...) #'(FIELD ...) #'(DEF ...))]))
 
 ;; Transforms a list of field stx objects `FIELD...` of a specific
 ;; class `C-TYPE` into an associative list of `FS-key` and
