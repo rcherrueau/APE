@@ -329,7 +329,7 @@
 (define-syntax-rule (stx/surface stx origin)
   (let* (;; Set source location of `stx' by the one of `surface'
          [stx/loc (syntax/loc origin stx)]
-         ;; Reuse 'surface property of `surface' or make `surface' the
+         ;; Reuse 'surface property of `surface' or make `surface' a
          ;; property
          [surface-prop (or (syntax-property origin 'surface) origin)]
          [new-stx (syntax-property stx/loc 'surface surface-prop #t)])

@@ -349,66 +349,54 @@
                  "\n  - owner/type{param ...}"
                  "\n  - type -- owner is implictly world"
                  "\n  - type{param ...} -- owner is implicitly world.")
-  #:attributes [TYPE OWNER CPARAMS OW-SCHEME]
+  #:attributes [OW-SCHEME]
   ;; Note: Do not commit to enable backtrack in `let`
   ;; #:commit
   ;;
-  ;; Note: Order of pattern matter!
+  ;; Note: Also, order of patterns matters!
+  ;;
   ;; owner/type {param ...}
   (pattern (~seq O/T:id {PARAM:id ...+}) #:when (is-stx-owner/type? #'O/T)
            #:with [OWNER . TYPE] (owner/type->OWNER.TYPE #'O/T)
            #:with CPARAMS #'(PARAM ...)
-           #:with OW-SCHEME (syntax/loc #'O/T (TYPE OWNER CPARAMS)))
-  ;; owner/type
+           #:with SURFACE-STX (syntax/loc #'O/T (O/T CPARAMS))
+           #:with OW-SCHEME (stx/surface (TYPE OWNER CPARAMS) #'SURFACE-STX))
+  ;; owner/type -- there are no context parameters
   (pattern (~seq O/T:id) #:when (is-stx-owner/type? #'O/T)
            #:with [OWNER . TYPE] (owner/type->OWNER.TYPE #'O/T)
            #:with CPARAMS #'()
-           #:with OW-SCHEME (syntax/loc #'O/T (TYPE OWNER CPARAMS)))
+           #:with OW-SCHEME (stx/surface (TYPE OWNER CPARAMS) #'O/T))
   ;; type {param ...} -- owner is implicitly world
   (pattern (~seq TYPE:id {PARAM:id ...+})
-             #:with OWNER #'world
-             #:with CPARAMS #'(PARAM ...)
-             #:with OW-SCHEME (syntax/loc #'TYPE (TYPE OWNER CPARAMS)))
-  ;; type -- owner is implicitly world
+           #:with OWNER #'world
+           #:with CPARAMS #'(PARAM ...)
+           #:with SURFACE-STX (syntax/loc #'TYPE (TYPE CPARAMS))
+           #:with OW-SCHEME (stx/surface (TYPE OWNER CPARAMS) #'SURFACE-STX))
+  ;; type -- owner is implicitly world and there are no context parameters
   (pattern (~seq TYPE:id)
            #:with OWNER #'world
            #:with CPARAMS #'()
-           #:with OW-SCHEME (syntax/loc #'TYPE (TYPE OWNER CPARAMS))))
+           #:with OW-SCHEME (stx/surface (TYPE OWNER CPARAMS) #'TYPE)))
 
 (module+ test
   (define-test-suite type-parse
     ;; The weird `_' in the test is because the `type' is a *splicing*
     ;; syntax pattern. Therefore it is only allowed to appear as a
-    ;; /head pattern/ and not /single term pattern/. See,
+    ;; /head pattern/ and not /single term pattern/. See,
     ;; https://docs.racket-lang.org/syntax/stxparse-patterns.html?q=splicing-syntax#%28tech._single._term._pattern%29
     (test-pattern #'(_ owner/type) (_ t:type)
-      (check-stx=? #'t.TYPE      #'type)
-      (check-stx=? #'t.OWNER     #'owner)
-      (check-stx=? #'t.CPARAMS   #'())
       (check-stx=? #'t.OW-SCHEME #'(type owner ())))
 
     (test-pattern #'(_ owner/type/) (_ t:type)
-      (check-stx=? #'t.TYPE      #'type/)
-      (check-stx=? #'t.OWNER     #'owner)
-      (check-stx=? #'t.CPARAMS   #'())
       (check-stx=? #'t.OW-SCHEME #'(type/ owner ())))
 
     (test-pattern #'(_ owner/type {c1 c2}) (_ t:type)
-      (check-stx=? #'t.TYPE      #'type)
-      (check-stx=? #'t.OWNER     #'owner)
-      (check-stx=? #'t.CPARAMS   #'(c1 c2))
       (check-stx=? #'t.OW-SCHEME #'(type owner (c1 c2))))
 
     (test-pattern #'(_ type) (_ t:type)
-      (check-stx=? #'t.TYPE      #'type)
-      (check-stx=? #'t.OWNER     #'world)
-      (check-stx=? #'t.CPARAMS   #'())
       (check-stx=? #'t.OW-SCHEME #'(type world ())))
 
     (test-pattern #'(_ type{c1 c2}) (_ t:type)
-      (check-stx=? #'t.TYPE      #'type)
-      (check-stx=? #'t.OWNER     #'world)
-      (check-stx=? #'t.CPARAMS   #'(c1 c2))
       (check-stx=? #'t.OW-SCHEME #'(type world (c1 c2))))
 
     (check-ill-parsed
