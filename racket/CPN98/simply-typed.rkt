@@ -47,13 +47,11 @@
 ;;   value
 
 (require (for-syntax racket/base)
-         racket/dict
          racket/function
          racket/list
          racket/match
          racket/syntax
          syntax/parse
-         syntax/parse/define
          syntax/srcloc
          syntax/stx
          "definitions.rkt"
@@ -115,14 +113,16 @@
   ;;                        Identifier                    ; Def name
   ;;                        (Syntaxof (Listof B-TYPE))))  ; Type of def args
   ;;        ~> B-TYPE)                                    ; Def return type
-  (DS #:init
-      (meta-map-kv
-       ;; Instantiate ows of keys
-       (syntax-parser [(c-type:id def:id (scheme:ow-scheme ...))
-                       #'(c-type def (scheme.TYPE ...))])
-       ;; Instantiate ows of values
-       (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
-       meta:DS)
+  (DS #:init (meta-map-w/key
+              (;; Instantiate ows of keys
+               (syntax-parser
+                 [(c-type:id def:id (scheme:ow-scheme ...))
+                  #'(c-type def (scheme.TYPE ...))])
+               . *** .
+               ;; Instantiate ows of values
+               (syntax-parser
+                 [SCHEME:ow-scheme #'SCHEME.TYPE]))
+              meta:DS)
       #:mk env:make-DS
       #:apply? (env:DS-member? env:DS-ref env:DS-domain))
 
@@ -151,17 +151,16 @@
 ;; In context `P`, `CLASS` elaborates to `?CLASS`
 (define-rules ⊢d
   ;; [defn]
-  [(class ~! NAME [CPARAM ...] FIELD/DEF ...)
+  [(class ~! NAME [_CPARAM ...] FIELD/DEF ...)
    #:with [FIELD ...] (filter field? (stx->list #'(FIELD/DEF ...)))
    #:with [DEF ...] (filter def? (stx->list #'(FIELD/DEF ...)))
    ;; Check P ⊢τ t on fields
-   #:with [(field ~! F-NAME F:ow-scheme) ...] #'(FIELD ...)
+   #:with [(field ~! _F-NAME F:ow-scheme) ...] #'(FIELD ...)
    #:when (stx-for/and ([t #'(F.TYPE ...)]) (⊢τ t))
    ;; Check P,NAME ⊢m DEF ≫ ?DEF
-   #:with [?DEF ...] (with-τ #'NAME (stx-map ⊢m #'(DEF ...)))
+   #:when (with-τ #'NAME (stx-map ⊢m #'(DEF ...)))
    ;; ----------------------------------------------------------------
    ;; P ⊢d (class NAME FIELD ... DEF ...) ≫ (class NAME FIELD ... ?DEF ...)
-   ;; #@(class NAME [CPARAM ...] FIELD ... ?DEF ...)]
    this-syntax])
 
 (module+ test
@@ -256,9 +255,11 @@
        (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Foo o ())) arg2)))
        "`arg2` is bound in the expression with the `Foo` type")
       (check-not-exn
-       (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Foo o ())) arg1 arg2))))
+       (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Foo o ())) arg1 arg2)))
+       "The type of the BODY is the type of the LEB")
       (check-not-exn
-       (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Bar o ())) arg2 arg1))))
+       (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Bar o ())) arg2 arg1)))
+       "The type of the BODY is the type of the LEB")
       ))))
 
 
@@ -747,9 +748,11 @@
 
 (module+ test
   (define-test-suite utils
-    (check-stx=? (get-τ (add-τ #'foo #'bar)) #'(foo bar))
-    (check-stx=? (get-τ (add-τ (add-τ #'foo #'bar) #'baz)) #'(foo baz))
-    (check-stx=? (get-τ #'foo) #'(foo #f))  ;; TODO: raise an exception?
+    (check-stx=? (get-τ (add-τ #'Foo #'Bar)) #'(Foo Bar))
+    (check-stx=? (get-τ (add-τ (add-τ #'Foo #'Bar) #'Baz)) #'(Foo Baz))
+    (check-stx=? (get-τ #'Foo) #'(Foo #f))  ;; TODO: raise an exception?
+    (check-true  (τ=? #'Foo #'Foo))
+    (check-false (τ=? #'Foo #'Bar))
     ))
 
 

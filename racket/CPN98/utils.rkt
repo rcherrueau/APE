@@ -41,6 +41,18 @@
 
 (define ∘ compose1)
 
+;; (: *** (All (a b c d) ((a -> b) (c -> d) -> ((Pairof a c) -> (Pairof b d)))))
+;; map over a tuple (haskell bimap)
+;;
+;; (map (integer? . *** . string?)
+;;      '((1 . "one") (2 . "two") (3.14 . #\π)))
+;; > '((#t . #t) (#t . #t) (#f . #f))
+(define (*** f g)
+  (λ (ac)
+    (let ([a (car ac)]
+          [c (cdr ac)])
+      (cons (f a) (g c)))))
+
 ;; (zip '(1 2 3) '(a b c))
 ;; > '((1 . a) (2 . b) (3 . c))
 ;; (: zip (All (a b) ((Listof a) (Listof b) -> (Listof (Pairof a b)))))
@@ -75,6 +87,7 @@
 (define (string-contains-once? str contained)
   (eq? (length (indexes-of (string->list str) contained)) 1))
 
+
 ;; Syntax to string
 (define (stx->string stx #:newline? [newline? #t])
   (call-with-output-string

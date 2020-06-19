@@ -250,16 +250,12 @@
 (: meta-kmap (All (k l v) ((k -> l) (AList k v) -> (AList l v))))
 (define meta-kmap alist-kmap)
 
-(: alist-kvmap (All (k l v w) ((k -> l) (v -> w) (AList k v) -> (AList l w))))
-(define (alist-kvmap f g als)
-  (map (λ ([kv : (Pairof k v)])
-         (let ([k (car kv)]
-               [v (cdr kv)])
-           (cons (f k) (g v))))
-       als))
+(: alist-map-w/key (All (k l v w) (((Pairof k v) -> (Pairof l w)) (AList k v) -> (AList l w))))
+(define (alist-map-w/key f als)
+  (map f als))
 
-(: meta-map-kv (All (k l v w) ((k -> l) (v -> w) (AList k v) -> (AList l w))))
-(define meta-map-kv alist-kvmap)
+(: meta-map-w/key (All (k l v w) (((Pairof k v) -> (Pairof l w)) (AList k v) -> (AList l w))))
+(define meta-map-w/key alist-map-w/key)
 
 ;; Returns the keys of `als`
 (: alist-keys (All (k v) (AList k v) -> (Listof k)))
