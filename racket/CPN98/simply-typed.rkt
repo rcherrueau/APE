@@ -98,6 +98,7 @@
   ;;                          Identifier))  ; Field name
   ;;        ~> B-TYPE))                     ; Field return type
   (FS #:init
+      ;; TODO: make a function of these so I can unit-test it
       (meta-map
        (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
        meta:FS)
@@ -108,6 +109,10 @@
   ;;
   ;; The init instantiate the scheme of owner ships of meta:DS to
   ;; basic types.
+  ;;
+  ;; TODO: I do not support method overloading, so indexing by class
+  ;; type and def name and then returning the type of def args and the
+  ;; return type as a pair, would have been a better idea.
   ;;
   ;; (: DS ((Syntaxof (List Identifier                    ; Class type
   ;;                        Identifier                    ; Def name
