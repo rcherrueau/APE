@@ -686,7 +686,8 @@
               [immutable-FS?     u:FS?]
               [make-immutable-FS u:make-FS]
               [dict-has-key?     u:FS-has-key?]
-              [dict-ref          u:FS-ref]))
+              [dict-ref          u:FS-ref]
+              [dict-keys         u:FS-keys]))
 
     ;; TODO: put this in definition.rkt
     ;;
@@ -709,7 +710,8 @@
     [#:opaque FS u:FS?]
     [u:make-FS     ((Listof (Pairof FS-key OW-SCHEME)) -> FS)]
     [u:FS-has-key? (FS FS-key -> Boolean)]
-    [u:FS-ref      (FS FS-key -> OW-SCHEME)])
+    [u:FS-ref      (FS FS-key -> OW-SCHEME)]
+    [u:FS-keys     (FS -> (Listof FS-key))])
 
   ;; Make FS
   (: make-FS ((Listof (Pairof FS-key OW-SCHEME)) -> FS))
@@ -722,6 +724,10 @@
   ;; Returns the `TYPE` of `Field-name` in `Class-type`.
   (: FS-ref (FS FS-key -> OW-SCHEME))
   (define FS-ref u:FS-ref)
+
+  ;; List FS keys
+  (: FS-keys (FS -> (Listof FS-key)))
+  (define FS-keys u:FS-keys)
 
   (module+ test
     (provide (all-defined-out))

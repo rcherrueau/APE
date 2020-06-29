@@ -78,8 +78,7 @@
                   (cons CTYPE #`(#,CTYPE Θ #,CPARAM...)))
                 meta:CS)
       #:mk     env:make-OWS
-      #:apply? [env:OWS-arity env:OWS-ref env:ψ]
-      )
+      #:apply? [env:OWS-arity env:OWS-ref env:ψ])
 
   ;; Map of fields
   ;;
@@ -88,8 +87,7 @@
   ;;        ~> OW-SCHEME))                  ; Field return type
   (FS #:init meta:FS
       #:mk env:make-FS
-      #:apply? [env:FS-member? env:FS-ref]
-      )
+      #:apply? [env:FS-member? env:FS-ref])
 
   ;; Map of definitions
   ;;
@@ -100,12 +98,12 @@
   ;;                          OW-SCHEME))                    ; Def return type
   (DS #:init (meta-map-w/key
               (λ (kv)
-                (match-define (cons (list CTYPE NAME A-OWS...) R-OWS) kv)
-                (cons #`(#,CTYPE . #,NAME) #`(#,A-OWS... #,R-OWS)))
+                (match-let* ([`(,DS-key . ,RET-OWS) kv]
+                             [`(,CTYPE ,DNAME ,ARG-OWS...) (syntax-e DS-key)])
+                  (cons #`(#,CTYPE . #,DNAME) #`(#,ARG-OWS... #,RET-OWS))))
               meta:DS)
       #:mk env:make-DS
-      #:apply? [env:DS-member? env:DS-ref]
-      )
+      #:apply? [env:DS-member? env:DS-ref])
 
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ;; Parse
@@ -177,7 +175,7 @@
    #:with [_ ... ΘLEB] (with-Γ #'{ (this     . τ0)
                                    (???      . RET-SCHEME)
                                    (ARG-NAME . ARG-SCHEME) ... }
-                             (stx-map ⊢e #'(E ...)))
+                         (stx-map ⊢e #'(E ...)))
    #:with [_ t-e] (get-τ #'ΘLEB)
    #:when (or (τ=? #'t-e #'RET-SCHEME)
               (raise (mk-exn:ownership-mismatch #'t-e #'RET-SCHEME #'ΘLEB)))
@@ -189,7 +187,7 @@
   (define-test-suite ⊢m-parse
     ;; P,Σ,τ ⊢m DEF
     (with-OWS (list (cons #'Foo #'(Foo Θ ())) (cons #'Bar #'(Bar Θ (n m))))
-    (with-Σ #'(o n m)
+    (with-Σ #'(Θ o n m)
     (with-τ #'(Foo o ())
 
       ;; Check P,Σ ⊢τ t on return type
@@ -309,7 +307,7 @@
    #:when (or (visible? #'E #'t-field)
               (raise (mk-exn:visibility-error #'E #'t-field)))
    ;; ----------------------------------------------------------------
-   ;; P,Σ,Γ ⊢e (get-fieldield E FNAME) : σ(t-field)
+   ;; P,Σ,Γ ⊢e (get-field E FNAME) : σ(t-field)
    (add-τ this-syntax (σ #'t-field))]
 
   ;; [Field Update]
@@ -372,19 +370,35 @@
    ;; Check P,Σ,Γ ⊢e (PARAM : σ(t-arg)) ...
    ;;;; Expressions pass at `DNAME` call should fit into `DNAME`
    ;;;; arguments
-   #:with [(_ t-param) ...] (stx-map (∘ get-τ ⊢e) #'(PARAM ...))
+   #:with [(ΘPARAM t-param) ...] (stx-map (∘ get-τ ⊢e) #'(PARAM ...))
    #:when (stx-for/and ([t-param #'(t-param ...)]
-                        [t-arg   #'(t-arg ...)])
+                        [t-arg   #'(t-arg ...)]
+                        [param   #'(ΘPARAM ...)])
             (or (τ=? t-param (σ t-arg))
-                (raise (mk-exn:ownership-mismatch t-param (σ t-arg)))))
+                (raise (mk-exn:ownership-mismatch t-param (σ t-arg) param))))
    ;; Check SV(E, t-param) ...
-   ;;;; Are arguments pass to `DNAME` visible to `E`?
+   ;;;; Are arguments pass to `DNAME` visible to `E`? An argument to
+   ;;;; `DNAME` with a `rep` owner entails that such a argument can
+   ;;;; only by accessed form the context of the `t-e.TYPE`
+   ;;;; class. Therefore, we have to ensure that `E` in actually in
+   ;;;; this context.
    ;;;;
-   ;;;; TODO: I don't really understand the relevance of that one.  I
-   ;;;; should find an example.
+   ;;;; To understand this check, imagine I have a method `def` that
+   ;;;; takes one argument of type `rep/Foo`.  Going with such
+   ;;;; argument is a specification that intuitively says that
+   ;;;; "calling `def` implies to pass an argument from the context of
+   ;;;; the current instance".  I can built that argument using the
+   ;;;; expression `(new rep/Foo)`.  But, I have no clue in which
+   ;;;; context I build that argument.  To get in which context I
+   ;;;; build that argument, I have to look at the caller expression
+   ;;;; `E`.  If `E` is `this`, for instance, then my `(new rep/Foo)`
+   ;;;; is also from `this` that is the context of the current
+   ;;;; instance.  However, if `E` is something else, then my `(new
+   ;;;; rep/Foo)` is built in another context henceforth results in a
+   ;;;; visibility error.
    #:when (stx-for/and ([t-arg #'(t-arg ...)])
-            (or (visible? #'E #'t-arg)
-                (raise (mk-exn:visibility-error #'E #'t-arg))))
+            (or (visible? #'E t-arg)
+                (raise (mk-exn:visibility-error #'E t-arg))))
    ;; Check SV(E, t-field)
    ;;;; Is object returned by `DNAME` visible to `E`?
    #:when (or (visible? #'E #'t-ret)
@@ -419,7 +433,7 @@
    #:when (or (τ=? #'t #'VAR-SCHEME)
               (raise (mk-exn:ownership-mismatch #'t #'VAR-SCHEME #'E)))
    ;; Check P,Σ,{VAR-NAME: VAR-SCHEME, ...} ⊢e E ... LEB : t-leb
-   #:with [_ ... LEB] (with-Γ #'{ (VAR-NAME . VAR-SCHEME) }
+   #:with [_ ... LEB] (with-Γ (Γ-add #'(VAR-NAME . VAR-SCHEME))
                          (stx-map ⊢e #'(BODY ...)))
    #:with [_ t-leb] (get-τ #'LEB)
    ;; ------------------------------------------------------------------
@@ -430,144 +444,189 @@
   (define-test-suite ⊢e-parse
     ;; P,Σ,Γ ⊢e E : t
     (with-OWS (list (cons #'Foo #'(Foo Θ ())) (cons #'Bar #'(Bar Θ (ν μ))))
-    (with-FS  (list (cons #'(Foo . bar) #'Bar))
-    (with-DS  (list (cons #'(Foo . def/0) #'(() (Bar o (n m))))
-                    (cons #'(Foo . def/2) #'(((Foo o ()) (Bar o (n m))) (Bar o (n m)))))
-    (with-Σ #'(n m)
-    (with-Γ #'{ (this . (Foo Θ ())) (_ . (Bar o (n m))) }
+    (with-FS  (list (cons #'(Foo . rep/foo) #'(Foo rep ()))
+                    (cons #'(Foo . Θ/foo)   #'(Foo Θ ()))
+                    (cons #'(Bar . bar) #'(Bar ν (μ μ))))
+    (with-DS  (list (cons #'(Foo . rep-world/def/1) #'([(Foo rep ())] (Foo world ())))
+                    (cons #'(Foo . world-rep/def/1) #'([(Foo world ())] (Foo rep ())))
+                    (cons #'(Bar . def/0) #'([] (Foo rep ())))
+                    (cons #'(Bar . def/2) #'([(Foo ν ()) (Bar ν (μ Θ))] (Bar world (ν ν)))))
+    (with-Σ #'(n m o Θ)
+    (with-Γ #'{ (this . (Foo Θ ())) }
 
-      ;; ;; [New]             (new ~! SCHEME:ow-scheme)
-      ;; ;; Check P,Σ ⊢τ SCHEME-TYPE
-      ;; (check-exn exn:unknown-type? (thunk (⊢e #'(new (Baz o ())))))
-      ;; (check-not-exn (thunk (⊢e #'(new (Foo o ())))))
-      ;; ;; P,Σ,Γ ⊢e (new t) : t
-      ;; (check-τ (⊢e #'(new (Foo o ()))) #'Foo)
-      ;; (check-τ (⊢e #'(new (Foo p ()))) #'Foo)
-      ;; (check-τ (⊢e #'(new (Foo p (c)))) #'Foo)
+      ;; [New]             (new ~! SCHEME:ow-scheme)
+      ;; Check P,Σ ⊢τ SCHEME-TYPE
+      (check-exn exn:arity-error? (thunk (⊢e #'(new (Foo world (world))))))
+      (check-exn exn:unknown-cparam? (thunk (⊢e #'(new (Foo z ())))))
+      ;; P,Σ,Γ ⊢e (new t) : t
+      (check-τ (⊢e #'(new (Foo o ()))) #'(Foo o ()))
+      (check-τ (⊢e #'(new (Bar o (n m)))) #'(Bar o (n m)))
+      ;; `rep` and `world` are valid universal context parameters
+      ;; (universal in the sense that they don't have to be part of
+      ;; Σ).
+      (check-τ (⊢e #'(new (Foo rep ())))   #'(Foo rep ()))
+      (check-τ (⊢e #'(new (Foo world ()))) #'(Foo world ()))
 
-      ;; ;; [Local Access]    ID
-      ;; ;; Check ID ∈ dom(Γ)
-      ;; (check-not-exn (thunk (⊢e #'this)))
-      ;; (check-not-exn (thunk (⊢e #'_)))
-      ;; (check-exn exn:fail:syntax? (thunk (⊢e #'baz)))
-      ;; ;; P,Σ,Γ ⊢e ID : Γ(ID)
-      ;; (check-τ (⊢e #'this) #'Foo)
-      ;; (check-τ (⊢e #'_)  #'Bar)
+      ;; [Local Access]    ID
+      ;; Check ID ∈ dom(Γ)
+      (check-not-exn (thunk (⊢e #'this)))
+      (check-exn exn:fail:syntax? (thunk (⊢e #'baz)))
+      ;; P,Σ,Γ ⊢e ID : Γ(ID)
+      (check-τ (⊢e #'this) #'(Foo Θ ()))
 
-      ;; ;; [Field Access]    (get-field ~! E FNAME)
-      ;; ;; Check P,Σ,Γ ⊢e E : t-e
-      ;; (check-exn exn:unknown-field? (thunk (⊢e #'(get-field (new (Bar o ())) bar))))
-      ;; (check-exn exn:unknown-field? (thunk (⊢e #'(get-field (new (Foo o ())) g))))
-      ;; (check-exn exn:unknown-field? (thunk (⊢e #'(get-field _ bar))))
-      ;; (check-not-exn (thunk (⊢e #'(get-field this bar))))
-      ;; (check-not-exn (thunk (⊢e #'(get-field (new (Foo o ())) bar))))
-      ;; (check-not-exn (thunk (⊢e #'(get-field (new (Foo p ())) bar))))   ;; <| Only look at
-      ;; (check-not-exn (thunk (⊢e #'(get-field (new (Foo p (c))) bar))))  ;;  | basic type.
-      ;; ;; Check SV(E, t-field)
-      ;; ;; P,Σ,Γ ⊢e (get-fieldield E FNAME) : σ(t-field)
-      ;; (check-τ (⊢e #'(get-field (new (Foo o ())) bar)) #'Bar)
-      ;; (check-τ (⊢e #'(get-field this bar)) #'Bar)
+      ;; [Field Access]    (get-field ~! E FNAME)
+      ;; Check SV(E, t-field)
+      (check-exn exn:visibility-error?
+                 (thunk (⊢e #'(get-field (new (Foo o ())) rep/foo))))
+      (check-exn exn:visibility-error?
+                 (thunk (⊢e #'(get-field (new (Foo world ())) rep/foo))))
+      ;;;; `rep` of `(new (Foo rep ()))` symbolize the root program
+      ;;;; and so it different from the rep is the type of `rep/foo`
+      ;;;; which symbolize the instance of Foo. It is quite logic then
+      ;;;; that this expression raises a visibility error: The root
+      ;;;; program is not allowed to access an inner information of an
+      ;;;; instance of Foo.
+      (check-exn exn:visibility-error?
+                 (thunk (⊢e #'(get-field (new (Foo rep ())) rep/foo))))
+      (check-not-exn (thunk (⊢e #'(get-field this rep/foo))))
+      ;; P,Σ,Γ ⊢e (get-field E FNAME) : σ(t-field)
+      ;;;; According to FS, class Foo has one field Θ/foo of type
+      ;;;; Θ/Bar{n m}. Therefore, Θ is supposed to be substituted by
+      ;;;; Foo owner. Generally speaking, Θ is always substituted by
+      ;;;; the owner of caller expression.
+      ;;;; >  Θ/Foo{}::rep/foo is rep/Foo{}
+      ;;;; >  Θ/Foo{}::Θ/foo is Θ/Foo{}
+      (check-τ (⊢e #'(get-field this rep/foo)) #'(Foo rep ()))
+      (check-τ (⊢e #'(get-field this Θ/foo))   #'(Foo Θ ()))
+      (check-τ (⊢e #'(get-field (new (Foo o     ())) Θ/foo)) #'(Foo o ()))
+      (check-τ (⊢e #'(get-field (new (Foo rep   ())) Θ/foo)) #'(Foo rep ()))
+      (check-τ (⊢e #'(get-field (new (Foo world ())) Θ/foo)) #'(Foo world ()))
+      ;;;; Θ/Bar{ν μ}::bar is ν/Bar{μ μ}
+      (check-τ (⊢e #'(get-field (new (Bar o (rep world))) bar)) #'(Bar rep (world world)))
+      (check-τ (⊢e #'(get-field (new (Bar rep (o n))) bar))     #'(Bar o (n n)))
 
-      ;; ;; [Field Update]    (set-field! ~! E FNAME BODY)
-      ;; ;; Check P,Σ,Γ ⊢e E t-e
-      ;; ;; Check P,Σ,Γ ⊢e BODY : σ(t-field)
-      ;; (check-exn exn:unknown-field?
-      ;;            (thunk (⊢e #'(set-field! (new (Foo o ())) g _))))
-      ;; (check-exn exn:unknown-field?
-      ;;            (thunk (⊢e #'(set-field! (new (Bar o ())) bar _))))
-      ;; (check-exn exn:unknown-field?
-      ;;            (thunk (⊢e #'(set-field! _ bar _))))
-      ;; ;; Check SV(E, t-field)
-      ;; ;; P,Σ,Γ ⊢e (set-field (E : t-e) FNAME BODY) : σ(t-field)
-      ;; (check-exn exn:type-mismatch?
-      ;;            (thunk (⊢e #'(set-field! (new (Foo o ())) bar (new (Foo o ()))))))
-      ;; (check-exn exn:type-mismatch?
-      ;;            (thunk (⊢e #'(set-field! (new (Foo o ())) bar this))))
-      ;; (check-not-exn
-      ;;  (thunk (⊢e #'(set-field! (new (Foo o ())) bar _))))
-      ;; (check-not-exn
-      ;;  (thunk (⊢e #'(set-field! (new (Foo o ())) bar (new (Bar o ()))))))
-      ;; (check-not-exn                                                       ;; <| Only look at
-      ;;  (thunk (⊢e #'(set-field! (new (Foo o ())) bar (new (Bar p ()))))))  ;;  | basic type,
-      ;; (check-not-exn                                                       ;;  | not owner
-      ;;  (thunk (⊢e #'(set-field! (new (Foo o ())) bar (new (Bar p (c))))))) ;;  | nor ctx params
-      ;; (check-τ (⊢e #'(set-field! (new (Foo o ())) bar (new (Bar o ())))) #'Bar)
-      ;; (check-τ (⊢e #'(set-field! (new (Foo o ())) bar _)) #'Bar)
+      ;; [Field Update]    (set-field! ~! E FNAME BODY)
+      ;; Check P,Σ,Γ ⊢e BODY : σ(t-field)
+      (check-exn exn:ownership-mismatch?
+                 (thunk (⊢e #'(set-field! (new (Foo rep ())) Θ/foo
+                                          (new (Foo world ()))))))
+      (check-exn exn:ownership-mismatch?
+                 (thunk (⊢e #'(set-field! (new (Foo o ())) Θ/foo
+                                          (new (Foo m ()))))))
+      (check-exn exn:ownership-mismatch?
+                 (thunk (⊢e #'(set-field! (new (Bar rep (o n))) bar
+                                          (new (Bar o (n o)))))))
+      ;; Check SV(E, t-field)
+      (check-exn exn:visibility-error?
+                 (thunk (⊢e #'(set-field! (new (Foo rep ())) rep/foo
+                                          (new (Foo rep ()))))))
+      (check-not-exn (thunk (⊢e #'(set-field! this rep/foo (get-field this rep/foo)))))
+      (check-not-exn (thunk (⊢e #'(set-field! this rep/foo (get-field (new (Foo rep ())) Θ/foo)))))
+      ;; P,Σ,Γ ⊢e (set-field (E : t-e) FNAME BODY) : σ(t-field)
+      (check-τ (⊢e #'(set-field! this rep/foo (get-field this rep/foo))) #'(Foo rep ()))
+      (check-τ (⊢e #'(set-field! this Θ/foo this))                       #'(Foo Θ ()))
+      (check-τ (⊢e #'(set-field! (new (Foo o ())) Θ/foo (new (Foo o ())))) #'(Foo o ()))
+      (check-τ (⊢e #'(set-field! (new (Foo rep ())) Θ/foo (new (Foo rep ())))) #'(Foo rep ()))
+      (check-τ (⊢e #'(set-field! (new (Bar o (rep world))) bar (new (Bar rep (world world)))))
+               #'(Bar rep (world world)))
 
       ;; [Method Call]     (send ~! E DNAME PARAM ...)
-      ;; Check P,Σ,Γ ⊢e E t-e
-      ;; Check P,Σ,Γ ⊢e (PARAM : σ(t-arg)) ...
-      ;;;; Expressions pass at `DNAME` call should fit into `DNAME`
-      ;;;; arguments
-      ;; Check SV(E, t-param) ...
-      ;;;; Are arguments pass to `DNAME` visible to `E`?
-      ;; Check SV(E, t-field)
-      ;;;; Is object returned by `DNAME` visible to `E`?
-      ;; Check P,Σ,Γ ⊢e (send (E : t) DNAME PARAM ...) : σ(t-ret)
-      ;;;; P,Γ ⊢e (send E DNAME PARAM ...) ≫
-      ;;;;          (send (?E : t) DNAME ?PARAM ...) : DS(t DNAME PARAM ...)
-
-      ;; (check-exn exn:unknown-def?
-      ;;            (thunk (⊢e #'(send (new (Foo o ())) udef))))
-      ;; (check-exn exn:arity-error?
-      ;;            (thunk (⊢e #'(send (new (Foo o ())) def/0 _))))
-      ;; (check-exn exn:arity-error?
-      ;;            (thunk (⊢e #'(send (new (Foo o ())) def/0 _ _))))
-      ;; (check-exn exn:arity-error?
-      ;;            (thunk (⊢e #'(send (new (Foo o ())) def/2))))
-      ;; (check-exn exn:arity-error?
-      ;;            (thunk (⊢e #'(send (new (Foo o ())) def/2 _))))
-      ;; (check-exn exn:arity-error?
-      ;;            (thunk (⊢e #'(send (new (Foo o ())) def/2 _ _ _))))
-      ;; (check-exn exn:type-mismatch?
-      ;;            (thunk (⊢e #'(send (new (Foo o ())) def/2 _ _))))
-      ;; (check-exn exn:type-mismatch?
-      ;;            (thunk (⊢e #'(send (new (Foo o ())) def/2 this this))))
-      ;; (check-exn exn:type-mismatch?
-      ;;            (thunk (⊢e #'(send (new (Foo o ())) def/2 _ this))))
-      ;; (check-not-exn
-      ;;  (thunk (⊢e #'(send (new (Foo o ())) def/0))))
-      ;; (check-not-exn
-      ;;  (thunk (⊢e #'(send (new (Foo o ())) def/2 this _))))
-      ;; (check-not-exn
-      ;;  (thunk (⊢e #'(send (new (Foo o ())) def/2 (new (Foo o ())) (new (Bar o ()))))))
-      ;; ;;;; Only look at basic type, not owner nor ctx params.
-      ;; (check-not-exn
-      ;;  (thunk (⊢e #'(send (new (Foo o ())) def/2 (new (Foo p ())) (new (Bar p ()))))))
-      ;; (check-not-exn
-      ;;  (thunk (⊢e #'(send (new (Foo o ())) def/2 (new (Foo p (c))) (new (Bar p (c)))))))
-      ;; (check-τ (⊢e #'(send (new (Foo o ())) def/0)) #'Bar)
-      ;; (check-τ
-      ;;  (⊢e #'(send (new (Foo o ())) def/2 (new (Foo o ())) (new (Bar o ()))))
-      ;;  #'Bar)
-      ;; (check-τ (⊢e #'(send (new (Foo o ())) def/2 this _)) #'Bar)
+      (with-syntax ([new-bar #'(new (Bar o (rep world)))]
+                    [rep/arg #'(new (Foo rep ()))]
+                    [world/arg #'(new (Foo world ()))])
+        ;; Check P,Σ,Γ ⊢e E t-e
+        ;; Check P,Σ,Γ ⊢e (PARAM : σ(t-arg)) ...
+        ;;;; `new-bar` is of type `o/Bar{rep world}`. In this context,
+        ;;;; `def/2` is of type
+        ;;;; (: rep/Foo rep/Bar{world o} -> world/Bar{rep rep})
+        (check-exn exn:ownership-mismatch?
+                   (thunk (⊢e #'(send new-bar def/2
+                                      (new (Foo n ()))
+                                      (new (Bar rep (world o))))))
+                   "`n/Foo` mismatches with the expected `rep/Foo`")
+        (check-exn exn:ownership-mismatch?
+                   (thunk (⊢e #'(send new-bar def/2
+                                      (new (Foo rep ()))
+                                      (new (Bar n (world o))))))
+                   "`n/Bar{world o}` mismatches with the expected `rep/Bar{world o}`")
+        (check-exn exn:ownership-mismatch?
+                   (thunk (⊢e #'(send new-bar def/2
+                                      (new (Foo rep ()))
+                                      (new (Bar rep (n o))))))
+                   "`rep/Bar{n o}` mismatches with the expected `rep/Bar{world o}`")
+        (check-exn exn:ownership-mismatch?
+                   (thunk (⊢e #'(send new-bar def/2
+                                      (new (Foo rep ()))
+                                      (new (Bar rep (world n))))))
+                   "`rep/Bar{world n}` mismatches with the expected `rep/Bar{world o}`")
+        ;; Check SV(E, t-param) ...
+        ;;;; rep-world/def/1 takes a rep/Foo argument (with rep means
+        ;;;; something in the context of Foo), but here the rep comes
+        ;;;; from the caller `(new (Foo rep ()))` that references
+        ;;;; root...  Therefore, the caller is not supposed to be
+        ;;;; allowed to pass arguments to that method.
+        (check-exn exn:visibility-error?
+                   (thunk (⊢e #'(send (new (Foo rep ())) rep-world/def/1 rep/arg))))
+        ;; Check SV(E, t-field)
+        ;;;; world-rep/def/1 returns a rep/Foo value (with rep means
+        ;;;; something in the context of Foo and is supposed to not go
+        ;;;; out of that context).  But here, I tried to access it using
+        ;;;; the expression `(new (Foo rep ()))` which refers to the
+        ;;;; context of root.  Therefore the caller is not supposed to
+        ;;;; be allowed to access this value.
+        (check-exn exn:visibility-error?
+                   (thunk (⊢e #'(send (new (Foo rep ())) world-rep/def/1 world/arg))))
+        ;; Check P,Σ,Γ ⊢e (send (E : t) DNAME PARAM ...) : σ(t-ret)
+        (check-τ (⊢e #'(send new-bar def/2
+                             (new (Foo rep ()))
+                             (new (Bar rep (world o)))))
+                 #'(Bar world {rep rep})
+                 "(: rep/Foo rep/Bar{world o} -> world/Bar{rep rep})")
+        (check-τ (⊢e #'(send this rep-world/def/1 rep/arg))
+                 #'(Foo world {})
+                 "(: rep/Foo -> world/Foo)")
+        (check-τ (⊢e #'(send this world-rep/def/1 world/arg))
+                 #'(Foo rep {})
+                 "(: world/Foo -> rep/Foo)"))
 
       ;; [Local Update, Sequence]  (let ~! (VAR-NAME VAR-SCHEME E) BODY ...)
       ;; Check P,Σ ⊢τ VAR-SCHEME
+      (check-exn exn:arity-error?
+                 (thunk (⊢e #'(let (foo (Foo world {world}) _) _)))
+                 "type Foo does not have context parameters")
+      (check-exn exn:unknown-cparam?
+                 (thunk (⊢e #'(let (foo (Foo z {}) _) _)))
+                 "Context parameter `z` is not part of Σ")
       ;; Check  P,Σ,Γ ⊢e E : VAR-SCHEME  (τ=?)
+      (check-exn exn:ownership-mismatch?
+                 (thunk (⊢e #'(let (foo (Foo rep {}) (new (Foo world {}))) _)))
+                 "foo expects a rep/Foo but a world/Foo was given")
+      (check-exn exn:ownership-mismatch?
+                 (thunk (⊢e #'(let (bar (Bar o {n m}) (new (Bar o {m m}))) _)))
+                 "bar expects a o/Bar{n m} but a o/Bar{m m} was given")
+      (check-exn exn:ownership-mismatch?
+                 (thunk (⊢e #'(let (bar (Bar o {n m}) (new (Bar o {n n}))) _)))
+                 "bar expects a o/Bar{n m} but a o/Bar{n n} was given")
       ;; Check P,Σ,{VAR-NAME: VAR-SCHEME, ...} ⊢e E ... LEB : t-leb
+      (check-not-exn (thunk (⊢e #'(let (foo (Foo Θ {}) this) foo))))
+      (check-not-exn (thunk (⊢e #'(let (foo (Foo Θ {}) ???) foo)))
+                     "A let binding accepts the `???` as expression")
+      (check-not-exn (thunk (⊢e #'(let (foo (Foo rep {}) ???) foo)))
+                     "A let binding accepts the `???` as expression")
+      ;; FIXME:
+      ;; (check-not-exn (thunk (⊢e #'(let (bind-this (Foo Θ {}) this)
+      ;;                               (get-field bind-this rep/foo))))
+      ;;                "Binding this is still this")
       ;; P,Γ ⊢e let (VAR-NAME VAR-OW-SCHEME E) BODY ... LEB : t-leb
+      (check-τ (⊢e #'(let (foo (Foo rep {}) ???) foo))  #'(Foo rep {}))
+      (check-τ (⊢e #'(let (foo (Foo rep {}) ???) this)) #'(Foo Θ {}))
+      (check-τ (⊢e #'(let (foo (Foo rep {}) ???) this foo)) #'(Foo rep {}))
+      (check-τ (⊢e #'(let (foo (Foo rep {}) ???) foo this)) #'(Foo Θ {}))
+      (check-τ (⊢e #'(let (foo (Foo rep {}) ???)
+                       (let (foo (Bar o {n m}) ???) foo)))
+               #'(Bar o {n m})
+               "Binding of inner let shadows the binding of outer let")
 
-      ;; ;;;; Check P ⊢τ VAR-SCHEME-TYPE
-      ;; (check-exn exn:unknown-type? (thunk (⊢e #'(let (baz (Baz o ()) _) _))))
-      ;; ;;;; Check  P,Γ ⊢e E ≫ ?E : VAR-OW-SCHEME
-      ;; (check-exn exn:type-mismatch? (thunk (⊢e #'(let (baz (Foo o ()) (new (Bar o ()))) _))))
-      ;; ;;;; Check P,Γ{VAR-NAME: VAR-OW-SCHEME} ⊢e BODY ... LEB ≫ ?BODY ... ?LEB : t-body
-      ;; (check-not-exn
-      ;;  (thunk (⊢e #'(let (foo (Foo o ()) this) foo))))
-      ;; (check-not-exn
-      ;;  (thunk (⊢e #'(let (foo (Foo o ()) this) _))))
-      ;; (check-not-exn
-      ;;  (thunk (⊢e #'(let (foo (Foo o ()) this) _ _))))
-      ;; (check-not-exn
-      ;;  (thunk (⊢e #'(let (foo (Foo o ()) ???) _)))
-      ;;  "A let binding accepts the `???` as expression")
-      ;; (check-not-exn
-      ;;  (thunk (⊢e #'(let (foo (Foo o ())  (new (Foo o ()))) _))))
-      ;; (check-not-exn                                               ;; <| Only look at
-      ;;  (thunk (⊢e #'(let (foo (Foo p ())  (new (Foo o ()))) _))))  ;;  | basic type,
-      ;; (check-not-exn                                               ;;  | not owner
-      ;;  (thunk (⊢e #'(let (foo (Foo p (c)) (new (Foo o ()))) _))))  ;;  | nor ctx params
       ;; ;;;; P,Γ ⊢e *let (VAR-NAME VAR-OW-SCHEME E) BODY ... LEB ≫
       ;; ;;;;           *let (VAR-NAME VAR-OW-SCHEME ?E) ?BODY ... ?LEB : t-body
       ;; (check-τ (⊢e #'(let (foo (Foo o ()) ???) foo))   #'Foo)
@@ -772,7 +831,8 @@
 ;; Static Visibility.
 ;;
 ;; Ensure statically that `E` refers to a `this` from the class
-;; `OT.TYPE`.
+;; `OT.TYPE`.  This implementation follows the definition of CPN98,
+;; but it has few flaws.  See tests for `visible?` below.
 ;;
 ;; (: visible? (Syntax OW-SCHEME -> Boolean))
 (define (visible? E OT)
@@ -835,6 +895,9 @@
     (check-true  (visible? #'_ #'(Foo o (n m))) "Foo is not rep so it is always visible")
     (check-false (visible? #'_ #'(Foo rep (n m))) "Foo is rep so is not visible by default")
     (check-true  (visible? #'this #'(Foo rep (n m))) "rep is visible by this")
+    ;; FIXME:
+    ;; (check-true  (visible? #'(let (binder (Foo Θ (n m)) this) binder) #'(Foo rep (n m)))
+    ;;              "binding this is this")
     ))
 
 
@@ -845,7 +908,7 @@
            (prefix-in env: (submod "env.rkt" ownership test)))
   (provide ownership-tests)
 
-  #;(define-check (check-τ stx b-type)
+  (define-check (check-τ stx b-type)
     (define stx-type (syntax-parse (get-τ stx) [(_ t) #'t]))
 
     (with-check-info*
@@ -858,7 +921,10 @@
                    (format "#'~.a does not structurally equal to #'~.a"
                            (syntax->datum stx1)
                            (syntax->datum stx2)))))
-      (thunk (check-true (τ=? stx-type b-type)))))
+
+      (thunk (with-handlers ([exn:arity-error? fail]
+                             [exn:unknown-cparam? fail])
+               (check-true (τ=? stx-type b-type))))))
 
   (define ownership-tests
     (test-suite
@@ -873,7 +939,7 @@
      utils
      ;; Check phase rules
      ⊢τ-parse
-     ;; ⊢e-parse
+     ⊢e-parse
      ⊢m-parse
      ;; ⊢d-parse
      ))

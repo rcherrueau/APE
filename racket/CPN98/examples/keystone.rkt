@@ -5,10 +5,10 @@
 (class Boolean #;... )
 
 (class Keystone
-  (def (get-token → owner/Token)
+  (def (get-token → Θ/Token)
     ???)
 
-  (def (validate-token [token : owner/Token] → world/Boolean)
+  (def (validate-token [token : Θ/Token] → world/Boolean)
     ???)
   )
 
