@@ -10,8 +10,7 @@
          "desugar.rkt"
          "meta.rkt"
          "simply-typed.rkt"
-         "ownership.rkt"
-         )
+         "ownership.rkt")
 
 (provide (rename-out
           [lang-read read]
@@ -37,10 +36,10 @@
        [prog (∗> prog)]
        ;; Meta-information (Effectful computation)
        [_    (M> prog)]
-       ;; Basic Checks
+       ;; Simply Type Checks
        [prog (?> prog)]
-       ;; Ownership
-       [prog (θ> prog)]
+       ;; Ownership Type Checks
+       [prog (Θ> prog)]
        )
 
     ;; Log final AST
@@ -49,8 +48,7 @@
     ;; Execution
     #`(module cpn98-lang racket/base
         ;; #,prog
-        (void)
-        )))
+        (void))))
 
 ;; Profiling lang:
 ;;

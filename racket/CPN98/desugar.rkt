@@ -245,8 +245,7 @@
     (∗e> (stx/surface (get-field this ID) this-syntax))]
   ;;;; Unbound identifier
   [ID:id
-   (raise (mk-exn:unbound-id #'ID))]
-  )
+   (raise (mk-exn:unbound-id #'ID))])
 
 (module+ test
   (define-test-suite ∗e>-parse
@@ -409,8 +408,7 @@
      (syntax-parse #'(_ (owner/type {c1 c2}))    [(_ t:type) #t])
      #:msg (string-append "A type is a *splicing* head pattern "
                           "and cannot be used as a single term pattern. "
-                          "Therefore it cannot be surrounded by parentheses."))
-    ))
+                          "Therefore it cannot be surrounded by parentheses."))))
 
 
 ;; Syntax for return type (of a def)
@@ -451,8 +449,7 @@
         (check-ill-parsed
          (syntax-parse #`(#,~> (o/t {c}))      [_:rtype #t])
          #:msg (string-append "A type is a *splicing* syntax therefore "
-                              "it requires no surrounding parentheses"))
-      ))))
+                              "it requires no surrounding parentheses"))))))
 
 
 ;; Syntax for arguments (of a def, let)

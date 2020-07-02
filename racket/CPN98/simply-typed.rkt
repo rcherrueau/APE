@@ -185,9 +185,8 @@
       (check-not-exn (thunk (⊢d #'(class Foo [] (field foo (Foo p (c)))))))  ;;  | basic type.
 
       ;; Check P,NAME ⊢m DEF ≫ ?DEF
-      (check-not-exn (thunk (⊢d #'(class Foo [] (def/0 (Foo o ())) this)))
-                     "`this` is of type `Foo` in `def`")
-      )))
+      (check-not-exn (thunk (⊢d #'(class Foo [] (def (def/0 (Foo o ())) this))))
+                     "`this` is of type `Foo` in `def`"))))
 
 
 ;; P,τ ⊢m DEF ≫ ?DEF
@@ -264,8 +263,7 @@
        "The type of the BODY is the type of the LEB")
       (check-not-exn
        (thunk (⊢m #'(def (def/2 (arg1 (Bar o ())) (arg2 (Foo o ())) (Bar o ())) arg2 arg1)))
-       "The type of the BODY is the type of the LEB")
-      ))))
+       "The type of the BODY is the type of the LEB")))))
 
 
 ;; P,Γ ⊢e E ≫ ?E : t
@@ -521,8 +519,7 @@
       (check-τ (⊢e #'(let (foo (Foo o ()) ???) (let (bar (Bar o ()) ???) bar))) #'Bar)
       (check-τ (⊢e #'(let (foo (Foo o ()) ???) (let (foo (Bar o ()) ???) foo)))
                #'Bar
-               "A inner `let` shadows bindings of the outer `let`s")
-      ))))))
+               "A inner `let` shadows bindings of the outer `let`s")))))))
 
 
 ;; P ⊢τ t
@@ -611,8 +608,30 @@
       (define send-stx (current-syntax-context))
       (define ill-typed-arg (list-ref (syntax-e send-stx) (+ arg-pos 3)))
       (raise (mk-exn:type-mismatch looked-b-type expected-b-type
-                                   #:name ill-typed-arg))
-      )))
+                                   #:name ill-typed-arg)))))
+
+
+;; Utils
+
+;; (Syntaxof a) -> (Syntaxof (Pairof (Syntaxof a) B-TYPE))
+(define (get-τ stx)
+  (with-syntax ([the-stx stx]
+                [τ-stx (b-type-prop stx)])
+    #'(the-stx τ-stx)))
+
+;; (Syntaxof a) B-TYPE -> (Syntaxof a)
+(define add-τ b-type-prop)
+
+;; (: τ=? (B-TYPE B-TYPE -> Boolean))
+(define τ=? bound-id=?)
+
+(module+ test
+  (define-test-suite utils
+    (check-stx=? (get-τ (add-τ #'Foo #'Bar)) #'(Foo Bar))
+    (check-stx=? (get-τ (add-τ (add-τ #'Foo #'Bar) #'Baz)) #'(Foo Baz))
+    (check-stx=? (get-τ #'Foo) #'(Foo #f))  ;; TODO: raise an exception?
+    (check-true  (τ=? #'Foo #'Foo))
+    (check-false (τ=? #'Foo #'Bar))))
 
 
 ;; Exceptions
@@ -740,30 +759,6 @@
    (list (syntax-taint CTX))))
 
 
-;; Utils
-
-;; (Syntaxof a) -> (Syntaxof (Pairof (Syntaxof a) B-TYPE))
-(define (get-τ stx)
-  (with-syntax ([the-stx stx]
-                [τ-stx (b-type-prop stx)])
-    #'(the-stx τ-stx)))
-
-;; (Syntaxof a) B-TYPE -> (Syntaxof a)
-(define add-τ b-type-prop)
-
-;; (: τ=? (B-TYPE B-TYPE -> Boolean))
-(define τ=? bound-id=?)
-
-(module+ test
-  (define-test-suite utils
-    (check-stx=? (get-τ (add-τ #'Foo #'Bar)) #'(Foo Bar))
-    (check-stx=? (get-τ (add-τ (add-τ #'Foo #'Bar) #'Baz)) #'(Foo Baz))
-    (check-stx=? (get-τ #'Foo) #'(Foo #f))  ;; TODO: raise an exception?
-    (check-true  (τ=? #'Foo #'Foo))
-    (check-false (τ=? #'Foo #'Bar))
-    ))
-
-
 ;; Tests
 
 (module+ test
@@ -778,12 +773,7 @@
       (list (make-check-name 'check-τ)
             (make-check-location (build-source-location-list stx))
             (make-check-actual stx-type)
-            (make-check-expected b-type)
-            #;(make-check-message
-               (or msg
-                   (format "#'~.a does not structurally equal to #'~.a"
-                           (syntax->datum stx1)
-                           (syntax->datum stx2)))))
+            (make-check-expected b-type))
       (thunk (check-true (τ=? stx-type b-type)))))
 
   (define simply-typed-tests
@@ -803,8 +793,7 @@
      ⊢d-parse
      ))
 
-  (run-tests simply-typed-tests)
-  )
+  (run-tests simply-typed-tests))
 
 
 ;; Bibliography

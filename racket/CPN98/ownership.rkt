@@ -6,7 +6,7 @@
 ;;   '   `-' `-^ `-^ `-' `-^ `-^ `-' `-'
 ;; Ownership Types Checker.
 ;;
-;; Ownership type checking phase (θ>)
+;; Ownership type checking phase (Θ>)
 ;; - Type checks the program (for simple type -- "simple" as in simply
 ;;   typed λ calculus, i.e., no ownership).
 ;; - Based on [CPN98] (see Bibliography).
@@ -38,11 +38,11 @@
 
 (module+ test (require rackunit))
 
-(provide θ>)
+(provide Θ>)
 
 
 ;; Phase θ>
-(define-phase (θ> stx)
+(define-phase (Θ> stx)
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ;; Env
 
@@ -51,16 +51,14 @@
   ;; (: Σ (Setof Identifier))
   (Σ #:init '()
      #:mk env:make-Σ
-     #:apply? [env:Σ-member? env:Σ-union]
-     )
+     #:apply? [env:Σ-member? env:Σ-union])
 
   ;; Mapping from locally bound variables to ownership types
   ;;
   ;; (: Γ (Identifier ~> O-TYPE))
   (Γ #:init   '()
      #:mk     env:make-Γ
-     #:apply? [env:Γ-member? env:Γ-add env:Γ-ref]
-     )
+     #:apply? [env:Γ-member? env:Γ-add env:Γ-ref])
 
   ;; Store of the ownership scheme of the current class
   ;;
@@ -120,13 +118,10 @@
    ;; Check P ⊢d CLASS
    #:do [(stx-map ⊢d #'(CLASS ...))]
    ;; Check P,[],[] ⊢e E : t
-   #:with t (get-τ (with-Σ '() (with-Γ '() (⊢e #'E))))
+   #:with [_ t] (get-τ (with-Σ '() (with-Γ '() (⊢e #'E))))
    ;; ----------------------------------------------------------------
    ;; ⊢p P : t
-   ;; TODO:
-   ;; (add-τ this-syntax #'t)
-   this-syntax
-   ])
+   (add-τ this-syntax #'t)])
 
 
 ;; P ⊢d CLASS
@@ -139,7 +134,7 @@
    #:with [DEF ...] (filter def? (stx->list #'(FIELD/DEF ...)))
    ;; Σ = { Θ } ∪ { CPARAM ... }
    ;; τ = OWS(NAME) (i.e., `#'(NAME Θ [CPARAM ...])`)
-   ;;;; The `Θ` is a variable that is going to be substitute later.
+   ;;;; The `Θ` means `owner`.
    #:do [(define the-Σ #'(Θ CPARAM ...))
          (define the-τ (OWS-ref #'NAME))]
    ;; Check P,Σ ⊢τ t on fields
@@ -152,11 +147,32 @@
    ;;;; the `this` in `Γ` here, so I don't have to latter implement an
    ;;;; union operation for `Γ`.
    #:when (with-Σ the-Σ
-            (with-τ the-τ
-              (stx-map ⊢m #'(DEF ...))))
+          (with-τ the-τ
+            (stx-map ⊢m #'(DEF ...))))
    ;; ----------------------------------------------------------------
    ;; P ⊢d (class NAME [CPARAM ...] FIELD ... DEF ...)
    this-syntax])
+
+(module+ test
+  (define-test-suite ⊢d-parse
+    ;; P ⊢d CLASS
+    (with-OWS (list (cons #'Foo #'(Foo Θ ())))
+      ;; Check P,Σ ⊢τ t on fields
+      (check-exn exn:arity-error?
+                 (thunk (⊢d #'(class Foo [] (field foo (Foo rep {rep})))))
+                 "`Foo` does not takes context parameters")
+      (check-exn exn:unknown-cparam?
+                 (thunk (⊢d #'(class Foo [] (field foo (Foo o {})))))
+                 "`The context parameter `o` has not been introduced")
+      (check-not-exn (thunk (⊢d #'(class Foo [] (field foo (Foo rep {}))))))
+      (check-not-exn (thunk (⊢d #'(class Foo [] (field foo (Foo world {}))))))
+      (check-not-exn (thunk (⊢d #'(class Foo [o] (field foo (Foo o {}))))))
+
+      ;; Check P,Σ,{ this: NAME<Θ|[CPARAM ...]> } ⊢m DEF
+
+      ;; [(def ~! (_NAME (ARG-NAME ARG-SCHEME) ... RET-SCHEME) E ...+)
+      (check-not-exn (thunk (⊢d #'(class Foo [] (def (def/0 (Foo Θ ())) this))))
+                     "`this` is of type `Θ/Foo` in `def`"))))
 
 
 ;; P,Σ,τ ⊢m DEF
@@ -244,8 +260,7 @@
        "The type of the BODY is the type of the LEB")
       (check-not-exn
        (thunk (⊢m #'(def (def/2 (arg1 (Bar o (n m))) (arg2 (Foo o ())) (Bar o (n m))) arg2 arg1)))
-       "The type of the BODY is the type of the LEB")
-      )))))
+       "The type of the BODY is the type of the LEB"))))))
 
 
 ;; P,Σ,Γ ⊢e E : t
@@ -305,7 +320,7 @@
    ;; Check SV(E, t-field)
    ;;;; Is expression `E` allowed to access field `FNAME`?
    #:when (or (visible? #'E #'t-field)
-              (raise (mk-exn:visibility-error #'E #'t-field)))
+              (raise (mk-exn:visibility-error #'E #'FNAME #'t-field)))
    ;; ----------------------------------------------------------------
    ;; P,Σ,Γ ⊢e (get-field E FNAME) : σ(t-field)
    (add-τ this-syntax (σ #'t-field))]
@@ -354,7 +369,7 @@
    ;; Check SV(E, t-field)
    ;;;; Is object of field `FNAME` visible to `E`?
    #:when (or (visible? #'E #'t-field)
-              (raise (mk-exn:visibility-error #'E #'t-field)))
+              (raise (mk-exn:visibility-error #'E #'FNAME #'t-field)))
    ;; ----------------------------------------------------------------
    ;; P,Σ,Γ ⊢e (set-field (E : t-e) FNAME BODY) : σ(t-field)
    (add-τ this-syntax (σ #'t-field))]
@@ -396,13 +411,14 @@
    ;;;; instance.  However, if `E` is something else, then my `(new
    ;;;; rep/Foo)` is built in another context henceforth results in a
    ;;;; visibility error.
-   #:when (stx-for/and ([t-arg #'(t-arg ...)])
+   #:when (stx-for/and ([t-arg #'(t-arg ...)]
+                        [param #'(ΘPARAM ...)])
             (or (visible? #'E t-arg)
-                (raise (mk-exn:visibility-error #'E t-arg))))
+                (raise (mk-exn:visibility-error-param #'E param t-arg))))
    ;; Check SV(E, t-field)
    ;;;; Is object returned by `DNAME` visible to `E`?
    #:when (or (visible? #'E #'t-ret)
-              (raise (mk-exn:visibility-error #'E #'t-ret)))
+              (raise (mk-exn:visibility-error #'E #'DNAME #'t-ret)))
    ;; ----------------------------------------------------------------
    ;; Check P,Σ,Γ ⊢e (send (E : t) DNAME PARAM ...) : σ(t-ret)
    (add-τ this-syntax (σ #'t-ret))]
@@ -625,20 +641,7 @@
       (check-τ (⊢e #'(let (foo (Foo rep {}) ???)
                        (let (foo (Bar o {n m}) ???) foo)))
                #'(Bar o {n m})
-               "Binding of inner let shadows the binding of outer let")
-
-      ;; ;;;; P,Γ ⊢e *let (VAR-NAME VAR-OW-SCHEME E) BODY ... LEB ≫
-      ;; ;;;;           *let (VAR-NAME VAR-OW-SCHEME ?E) ?BODY ... ?LEB : t-body
-      ;; (check-τ (⊢e #'(let (foo (Foo o ()) ???) foo))   #'Foo)
-      ;; (check-τ (⊢e #'(let (foo (Foo o ()) ???) _))     #'Bar)
-      ;; (check-τ (⊢e #'(let (foo (Foo o ()) ???) foo _)) #'Bar)
-      ;; (check-τ (⊢e #'(let (foo (Foo o ()) ???) _ foo)) #'Foo)
-      ;; (check-τ (⊢e #'(let (foo (Foo o ()) ???) _ _))   #'Bar)
-      ;; (check-τ (⊢e #'(let (foo (Foo o ()) ???) (let (bar (Bar o ()) ???) bar))) #'Bar)
-      ;; (check-τ (⊢e #'(let (foo (Foo o ()) ???) (let (foo (Bar o ()) ???) foo)))
-      ;;          #'Bar
-      ;;          "A inner `let` shadows bindings of the outer `let`s")
-      )))))))
+               "Binding of inner let shadows the binding of outer let"))))))))
 
 
 ;; P,Σ ⊢τ t
@@ -682,117 +685,7 @@
       (check-exn exn:arity-error? (thunk (⊢τ #'(Foo world (n)))))
       (check-exn exn:arity-error? (thunk (⊢τ #'(Bar world (n n n)))))
       (check-exn exn:unknown-cparam? (thunk (⊢τ #'(Foo o ()))))
-      (check-exn exn:unknown-cparam? (thunk (⊢τ #'(Bar rep (rep o)))))
-      ))))
-
-
-;; Exceptions
-
-;; Wrong number of context parameters
-(struct exn:arity-error exn:fail:syntax ()
-  #:transparent)
-
-;; (: mk-exn:arity-error ((Identifier Integer) ([U Syntax #f]) . ->* . exn:arity-error))
-(define (mk-exn:arity-error expected-cparam-size given-cparam-size [context #f])
-  (define CTX (or context (current-syntax-context)))
-  (log-sclang-debug "Desugared syntax is ~.s" CTX)
-  (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
-  (log-sclang-debug "Surface syntax is ~.s" CTX-SURFACE)
-  (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
-  (define id (format "~s" (extract-exp-name CTX)))
-  (define err-msg "wrong number of context parameters")
-  (define arity-msg
-    (format (string-append "~n  expected ~a, found ~a"
-                           "~n  in: ~.s")
-            expected-cparam-size given-cparam-size
-            (syntax->datum CTX-SURFACE)))
-
-  (exn:arity-error
-   (string-append srcloc-msg ": " id ": " err-msg arity-msg)
-   (current-continuation-marks)
-   (list (syntax-taint CTX))))
-
-;; Unknown context parameter
-(struct exn:unknown-cparam exn:fail:syntax ()
-  #:transparent)
-
-;; (: mk-exn:unknown-cparam ((Identifer) ([U Syntax #f]) . ->* . exn:unknown-cparam))
-(define (mk-exn:unknown-cparam CPARAM [context #f])
-  (define CTX (or context (current-syntax-context)))
-  (log-sclang-debug "Desugared syntax is ~.s" CTX)
-  (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
-  (log-sclang-debug "Surface syntax is ~.s" CTX-SURFACE)
-  (define srcloc-msg (srcloc->string (build-source-location CPARAM)))
-  (define id (format "~s" (syntax->datum CPARAM)))
-  (define err-msg
-    (format (string-append "unknown context parameter in this scope"
-                           "~n  in: ~.s")
-            (syntax->datum CTX-SURFACE)))
-
-  (exn:unknown-cparam
-   (string-append srcloc-msg ": " id ": " err-msg)
-   (current-continuation-marks)
-   (list (syntax-taint CPARAM))))
-
-;; Ownership mismatch at type checking
-(struct exn:ownership-mismatch exn:fail:syntax ()
-  #:transparent)
-
-;; (: mk-exn:ownership-mismatch
-;;   ((OW-SCHEME OW-SCHEME)
-;;    ((U Syntax #f))
-;;    . ->* . exn:owner-mismatch))
-(define (mk-exn:ownership-mismatch GIVEN-OW-SCHEME EXPECTED-OW-SCHEME [context #f])
-  (define CTX (or context (current-syntax-context)))
-  ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
-  (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
-  ;; (log-sclang-debug "Surface syntax is ~.s" CTX-SURFACE)
-  (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
-  (define id (format "~s" (extract-exp-name CTX-SURFACE)))
-  (define err-msg "owner mismatch")
-  (define elab-msg
-    (format (string-append "~n  The expression elaborate to the ownership ~s"
-                           "~n  But the expected ownership is ~s, referring to declaration at ~a:~a"
-                           "~n  in: ~.s")
-            (syntax->datum GIVEN-OW-SCHEME)
-            (syntax->datum EXPECTED-OW-SCHEME)
-            (syntax-line EXPECTED-OW-SCHEME)
-            (syntax-column EXPECTED-OW-SCHEME)
-            (syntax->datum CTX-SURFACE)))
-
-  (exn:ownership-mismatch
-   (string-append srcloc-msg ": " id ": " err-msg elab-msg)
-   (current-continuation-marks)
-   (list (syntax-taint CTX))))
-
-;; Visibility error of an expression
-(struct exn:visibility-error exn:fail:syntax ()
-  #:transparent)
-
-;; (: mk-exn:visibility-error
-;;   ((Syntax OW-SCHEME)
-;;    ((U Syntax #f))
-;;    . ->* . exn:visibility-error))
-(define (mk-exn:visibility-error E OW-TYPE [context #f])
-  (define CTX (or context (current-syntax-context)))
-  ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
-  (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
-  ;; (log-sclang-debug "Surface syntax is ~.s" CTX-SURFACE)
-  (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
-  (define id (format "~s" (extract-exp-name CTX-SURFACE)))
-  (define err-msg "visibility error")
-  (define visibility-msg
-    (format (string-append "~n  The expression is not allowed to access object of type ~s"
-                           "~n  at: ~.s"
-                           "~n  in: ~.s")
-            (syntax->datum (or (syntax-property OW-TYPE 'surface) OW-TYPE))
-            (syntax->datum (or (syntax-property E 'surface) E))
-            (syntax->datum CTX-SURFACE)))
-
-  (exn:visibility-error
-   (string-append srcloc-msg ": " id ": " err-msg visibility-msg)
-   (current-continuation-marks)
-   (list (syntax-taint CTX))))
+      (check-exn exn:unknown-cparam? (thunk (⊢τ #'(Bar rep (rep o)))))))))
 
 
 ;; Utils
@@ -901,6 +794,148 @@
     ))
 
 
+;; Exceptions
+
+;; Wrong number of context parameters
+(struct exn:arity-error exn:fail:syntax ()
+  #:transparent)
+
+;; (: mk-exn:arity-error ((Identifier Integer) ([U Syntax #f]) . ->* . exn:arity-error))
+(define (mk-exn:arity-error expected-cparam-size given-cparam-size [context #f])
+  (define CTX (or context (current-syntax-context)))
+  (log-sclang-debug "Desugared syntax is ~.s" CTX)
+  (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
+  (log-sclang-debug "Surface syntax is ~.s" CTX-SURFACE)
+  (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
+  (define id (format "~s" (extract-exp-name CTX)))
+  (define err-msg "wrong number of context parameters")
+  (define arity-msg
+    (format (string-append "~n  expected ~a, found ~a"
+                           "~n  in: ~.s")
+            expected-cparam-size given-cparam-size
+            (syntax->datum CTX-SURFACE)))
+
+  (exn:arity-error
+   (string-append srcloc-msg ": " id ": " err-msg arity-msg)
+   (current-continuation-marks)
+   (list (syntax-taint CTX))))
+
+;; Unknown context parameter
+(struct exn:unknown-cparam exn:fail:syntax ()
+  #:transparent)
+
+;; (: mk-exn:unknown-cparam ((Identifer) ([U Syntax #f]) . ->* . exn:unknown-cparam))
+(define (mk-exn:unknown-cparam CPARAM [context #f])
+  (define CTX (or context (current-syntax-context)))
+  (log-sclang-debug "Desugared syntax is ~.s" CTX)
+  (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
+  (log-sclang-debug "Surface syntax is ~.s" CTX-SURFACE)
+  (define srcloc-msg (srcloc->string (build-source-location CPARAM)))
+  (define id (format "~s" (syntax->datum CPARAM)))
+  (define err-msg
+    (format (string-append "unknown context parameter in this scope"
+                           "~n  in: ~.s")
+            (syntax->datum CTX-SURFACE)))
+
+  (exn:unknown-cparam
+   (string-append srcloc-msg ": " id ": " err-msg)
+   (current-continuation-marks)
+   (list (syntax-taint CPARAM))))
+
+;; Ownership mismatch at type checking
+(struct exn:ownership-mismatch exn:fail:syntax ()
+  #:transparent)
+
+;; (: mk-exn:ownership-mismatch
+;;   ((OW-SCHEME OW-SCHEME)
+;;    ((U Syntax #f))
+;;    . ->* . exn:owner-mismatch))
+(define (mk-exn:ownership-mismatch GIVEN-OW-SCHEME EXPECTED-OW-SCHEME [context #f])
+  (define CTX (or context (current-syntax-context)))
+  ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
+  (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
+  ;; (log-sclang-debug "Surface syntax is ~.s" CTX-SURFACE)
+  (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
+  (define id (format "~s" (extract-exp-name CTX-SURFACE)))
+  (define err-msg "owner mismatch")
+  (define elab-msg
+    (format (string-append "~n  The expression elaborate to the ownership ~s"
+                           "~n  But the expected ownership is ~s, referring to declaration at ~a:~a"
+                           "~n  in: ~.s")
+            (syntax->datum GIVEN-OW-SCHEME)
+            (syntax->datum EXPECTED-OW-SCHEME)
+            (syntax-line EXPECTED-OW-SCHEME)
+            (syntax-column EXPECTED-OW-SCHEME)
+            (syntax->datum CTX-SURFACE)))
+
+  (exn:ownership-mismatch
+   (string-append srcloc-msg ": " id ": " err-msg elab-msg)
+   (current-continuation-marks)
+   (list (syntax-taint CTX))))
+
+;; Visibility error of an expression
+(struct exn:visibility-error exn:fail:syntax ()
+  #:transparent)
+
+;; (: mk-exn:visibility-error
+;;   ((Syntax Syntax OW-SCHEME)
+;;    ((U Syntax #f))
+;;    . ->* . exn:visibility-error))
+(define (mk-exn:visibility-error E OW-E OW-TYPE [context #f])
+  (define CTX (or context (current-syntax-context)))
+  ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
+  (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
+  ;; (log-sclang-debug "Surface syntax is ~.s" CTX-SURFACE)
+  (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
+  (define id (format "~s" (extract-exp-name CTX-SURFACE)))
+  (define err-msg "visibility error")
+  (define visibility-msg
+    (format (string-append
+             "~n  The expression is not allowed to access value of ~.s of type ~s"
+             "~n  This value belongs to ~.s instance and cannot be accessed outside of it"
+             "~n  in: ~.s")
+            (syntax->datum (or (syntax-property OW-E 'surface) OW-E))
+            (syntax->datum (or (syntax-property OW-TYPE 'surface) OW-TYPE))
+            (syntax->datum (or (syntax-property E 'surface) E))
+            (syntax->datum CTX-SURFACE)))
+
+  (exn:visibility-error
+   (string-append srcloc-msg ": " id ": " err-msg visibility-msg)
+   (current-continuation-marks)
+   (list (syntax-taint CTX))))
+
+;; Visibility error of an expression
+(struct exn:visibility-error-param exn:visibility-error ()
+  #:transparent)
+
+;; (: mk-exn:visibility-error-param
+;;   ((Syntax Syntax OW-SCHEME)
+;;    ((U Syntax #f))
+;;    . ->* . exn:visibility-error))
+(define (mk-exn:visibility-error-param E OW-E OW-TYPE [context #f])
+  (define CTX (or context (current-syntax-context)))
+  ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
+  (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
+  ;; (log-sclang-debug "Surface syntax is ~.s" CTX-SURFACE)
+  (define srcloc-msg (srcloc->string (build-source-location CTX-SURFACE)))
+  (define id (format "~s" (extract-exp-name CTX-SURFACE)))
+  (define err-msg "visibility error")
+  (define visibility-msg
+    (format (string-append
+             "~n  The expression required an argument of type ~s that belongs to ~.s instance"
+             "~n  However the value of ~.s belongs to another context"
+             "~n  in: ~.s")
+            (syntax->datum (or (syntax-property OW-TYPE 'surface) OW-TYPE))
+            (syntax->datum (or (syntax-property E 'surface) E))
+            (syntax->datum (or (syntax-property OW-E 'surface) OW-E))
+            (syntax->datum CTX-SURFACE)))
+
+  (exn:visibility-error
+   (string-append srcloc-msg ": " id ": " err-msg visibility-msg)
+   (current-continuation-marks)
+   (list (syntax-taint CTX))))
+
+
 ;; Tests
 
 (module+ test
@@ -915,13 +950,7 @@
       (list (make-check-name 'check-τ)
             (make-check-location (build-source-location-list stx))
             (make-check-actual stx-type)
-            (make-check-expected b-type)
-            #;(make-check-message
-               (or msg
-                   (format "#'~.a does not structurally equal to #'~.a"
-                           (syntax->datum stx1)
-                           (syntax->datum stx2)))))
-
+            (make-check-expected b-type))
       (thunk (with-handlers ([exn:arity-error? fail]
                              [exn:unknown-cparam? fail])
                (check-true (τ=? stx-type b-type))))))
@@ -941,11 +970,9 @@
      ⊢τ-parse
      ⊢e-parse
      ⊢m-parse
-     ;; ⊢d-parse
-     ))
+     ⊢d-parse))
 
-  (run-tests ownership-tests)
-  )
+  (run-tests ownership-tests))
 
 
 ;; Bibliography
