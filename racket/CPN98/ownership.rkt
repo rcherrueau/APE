@@ -941,7 +941,6 @@
 (module+ test
   (require rackunit/text-ui
            (prefix-in env: (submod "env.rkt" ownership test)))
-  (provide ownership-tests)
 
   (define-check (check-τ stx b-type)
     (define stx-type (syntax-parse (get-τ stx) [(_ t) #'t]))
@@ -955,24 +954,22 @@
                              [exn:unknown-cparam? fail])
                (check-true (τ=? stx-type b-type))))))
 
-  (define ownership-tests
-    (test-suite
-     "Ownership checking phase"
-     ;; Check env
-     env:Σ-tests
-     env:Γ-tests
-     env:OWS-tests
-     env:FS-tests
-     env:DS-tests
-     ;; Check utils
-     utils
-     ;; Check phase rules
-     ⊢τ-parse
-     ⊢e-parse
-     ⊢m-parse
-     ⊢d-parse))
-
-  (run-tests ownership-tests))
+  (run-tests
+   (test-suite
+    "Ownership checking phase"
+    ;; Check env
+    env:Σ-tests
+    env:Γ-tests
+    env:OWS-tests
+    env:FS-tests
+    env:DS-tests
+    ;; Check utils
+    utils
+    ;; Check phase rules
+    ⊢τ-parse
+    ⊢e-parse
+    ⊢m-parse
+    ⊢d-parse)))
 
 
 ;; Bibliography

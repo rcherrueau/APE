@@ -764,7 +764,6 @@
 (module+ test
   (require rackunit/text-ui
            (prefix-in env: (submod "env.rkt" basic-check test)))
-  (provide simply-typed-tests)
 
   (define-check (check-τ stx b-type)
     (define stx-type (syntax-parse (get-τ stx) [(_ t) #'t]))
@@ -776,24 +775,21 @@
             (make-check-expected b-type))
       (thunk (check-true (τ=? stx-type b-type)))))
 
-  (define simply-typed-tests
-    (test-suite
-     "Simple type checking phase"
-     ;; Check env
-     env:CS-tests
-     env:Γ-tests
-     env:FS-tests
-     env:DS-tests
-     ;; Check utils
-     utils
-     ;; Check phase rules
-     ⊢τ-parse
-     ⊢e-parse
-     ⊢m-parse
-     ⊢d-parse
-     ))
-
-  (run-tests simply-typed-tests))
+  (run-tests
+   (test-suite
+    "Simple type checking phase"
+    ;; Check env
+    env:CS-tests
+    env:Γ-tests
+    env:FS-tests
+    env:DS-tests
+    ;; Check utils
+    utils
+    ;; Check phase rules
+    ⊢τ-parse
+    ⊢e-parse
+    ⊢m-parse
+    ⊢d-parse)))
 
 
 ;; Bibliography

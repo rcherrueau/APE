@@ -182,46 +182,43 @@
 
 (module+ test
   (require rackunit rackunit/text-ui)
-  (provide meta-tests)
 
-  (define meta-tests
-    (test-suite
-     "Meta phase (M>)"
+  (run-test
+   (test-suite
+    "Meta phase (M>)"
 
-     ;; TODO:
-     ;; ;; Check no-name-clash
-     ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((clazz foo))))
-     ;;            "`clazz` is not a `class`")
-     ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((class (foo)))))
-     ;;            "`(foo)` is not a valid name")
-     ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((filed foo))))
-     ;;            "`filed` is not a `field`")
-     ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((field (foo)))))
-     ;;            "`(foo)` is not a valid name for field")
-     ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((dEf (foo) ???))))
-     ;;            "`dEf` is not a `def`")
-     ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((def ((foo)) ???))))
-     ;;            "`(foo)` is not a valid name for def")
+    ;; TODO:
+    ;; ;; Check no-name-clash
+    ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((clazz foo))))
+    ;;            "`clazz` is not a `class`")
+    ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((class (foo)))))
+    ;;            "`(foo)` is not a valid name")
+    ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((filed foo))))
+    ;;            "`filed` is not a `field`")
+    ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((field (foo)))))
+    ;;            "`(foo)` is not a valid name for field")
+    ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((dEf (foo) ???))))
+    ;;            "`dEf` is not a `def`")
+    ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((def ((foo)) ???))))
+    ;;            "`(foo)` is not a valid name for def")
 
-     ;; (check-true (no-name-clash? #'((class foo) (class bar))))
-     ;; (check-true (no-name-clash? #'((field foo) (field bar))))
-     ;; (check-true (no-name-clash? #'((def (foo) ???) (def (bar) ???))))
+    ;; (check-true (no-name-clash? #'((class foo) (class bar))))
+    ;; (check-true (no-name-clash? #'((field foo) (field bar))))
+    ;; (check-true (no-name-clash? #'((def (foo) ???) (def (bar) ???))))
 
-     ;; (check-exn exn:name-clash? (thunk (no-name-clash? #'((class foo) (class foo)))))
-     ;; (check-exn exn:name-clash? (thunk (no-name-clash? #'((field foo) (field foo)))))
-     ;; (check-exn exn:name-clash? (thunk (no-name-clash? #'((def (foo) ???) (def (foo) ???)))))
+    ;; (check-exn exn:name-clash? (thunk (no-name-clash? #'((class foo) (class foo)))))
+    ;; (check-exn exn:name-clash? (thunk (no-name-clash? #'((field foo) (field foo)))))
+    ;; (check-exn exn:name-clash? (thunk (no-name-clash? #'((def (foo) ???) (def (foo) ???)))))
 
 
-     ;; ;; Check (M>)
-     ;; (check-true (no-name-clash? #'((class foo (field foo)) (class bar (field bar)))))
+    ;; ;; Check (M>)
+    ;; (check-true (no-name-clash? #'((class foo (field foo)) (class bar (field bar)))))
 
-     ;; (check-true (no-name-clash? #'((class foo (field foo)) (class bar (field foo))))
-     ;;             "Two field could have the same name in different class")
-     ;; (check-true (no-name-clash? #'((class foo (field foo) (def foo (foo))))))
-     ;; ;; (check-true (no-name-clash? #'((class foo (field foo) (field foo)))))
-     ))
-  (run-tests meta-tests)
-  )
+    ;; (check-true (no-name-clash? #'((class foo (field foo)) (class bar (field foo))))
+    ;;             "Two field could have the same name in different class")
+    ;; (check-true (no-name-clash? #'((class foo (field foo) (def foo (foo))))))
+    ;; ;; (check-true (no-name-clash? #'((class foo (field foo) (field foo)))))
+    )))
 
 
 ;; Bibliography

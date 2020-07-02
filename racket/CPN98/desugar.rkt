@@ -548,21 +548,18 @@
 (module+ test
   (require rackunit/text-ui
            (prefix-in env: (submod "env.rkt" desugar test)))
-  (provide desugar-tests)
 
-  (define desugar-tests
-    (test-suite "Desugaring phase"
-     ;; Check env
-     env:Γ-tests
-     ;; Check syntax class
-     owner/type-stx-split
-     type-parse
-     rtype-parse
-     arg-parse
-     ;; Check phase rules
-     ∗e>-parse
-     ∗f/d>-parse
-     ∗c>-parse))
-
-  (run-tests desugar-tests)
-  )
+  (run-tests
+   (test-suite
+    "Desugaring phase"
+    ;; Check env
+    env:Γ-tests
+    ;; Check syntax class
+    owner/type-stx-split
+    type-parse
+    rtype-parse
+    arg-parse
+    ;; Check phase rules
+    ∗e>-parse
+    ∗f/d>-parse
+    ∗c>-parse)))

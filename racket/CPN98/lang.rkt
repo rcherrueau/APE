@@ -81,6 +81,14 @@
 ;;    TODO...))
 
 
+;; Tests
+(module+ test
+  (require (submod "desugar.rkt" test)
+           (submod "meta.rkt" test)
+           (submod "simply-typed.rkt" test)
+           (submod "ownership.rkt" test)))
+
+
 ;; Bibliography
 ;;
 ;; @InProceedings{CPN98,
