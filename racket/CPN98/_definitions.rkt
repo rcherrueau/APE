@@ -47,7 +47,7 @@
 ;; Application" paper, for a definition of scheme.
 ;;
 ;; http://gallium.inria.fr/~fpottier/publis/fpottier-elaboration.pdf
-(define-syntax-class ow-scheme
+(define-syntax-class ow-type
   #:description "type with ownership and context parameters"
   #:attributes [OWNER CPARAMS TYPE]
   #:commit

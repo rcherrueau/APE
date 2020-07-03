@@ -5,8 +5,35 @@
 ;;   | ; | . ,-| | | |   ,-| | | |   | |
 ;;   '   `-' `-^ `-^ `-' `-^ `-^ `-' `-'
 ;; Ownership Types Checker.
+;;
+;; Naming conventions:
+;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
+;; - XS (with an uppercase "S" at the end) is a syntax list of syntax
+;;   objects, e.g., #'(a b c 1 v)
+;; - Xs (with a small "s" at the end) is a list of syntax objectc,
+;;   e.g., (list #'a #'b #'c #'1 #'v)
+;; - t^ is the ownership scheme of t
+;;
+;; Phases:
+;; - Desugaring phase (ir>) :: Transforms the surface syntax into an
+;;   Intermediate Representation.
+;; - Meta phase (M>) :: Collects meta information for later use and
+;;   checks no duplicate class/field/def names according to [FKF98]
+;;   (see Bibliography).
+;; - Simple type checking (?>) :: Type checks the program for simple
+;;   types ("simple" as in simply typed λ calculus, i.e., no
+;;   ownership). Based on [FKF98] (see Bibliography).
+;; - Ownership type checking (Θ>) :: Type checks the program for
+;;   ownership types. Based on [CPN98] (see Bibliography).
+;;
+;; Global:
+;; - meta:CS is the set of defined ownership scheme
+;; - meta:FS is the map of fields with ownership type field as value
+;; - meta:DS is the map of definitions with return ownership sheme as
+;;   value
 
 (require "utils.rkt"
+         ;; phases
          "desugar.rkt"
          "meta.rkt"
          "simply-typed.rkt"
@@ -32,8 +59,8 @@
   (let*
       (;; Prog in surface syntax
        [prog #`(prog #,@(s-exps read-syntax))]
-       ;; Desugaring
-       [prog (∗> prog)]
+       ;; Desugaring into the IR
+       [prog (ir> prog)]
        ;; Meta-information (Effectful computation)
        [_    (M> prog)]
        ;; Simply Type Checks
@@ -104,4 +131,18 @@
 ;;   year      = {1998},
 ;;   url       = {https://doi.org/10.1145/286936.286947},
 ;;   doi       = {10.1145/286936.286947}
+;; }
+;;
+;; @InProceedings{FKF98,
+;;   author =       {Matthew Flatt and Shriram Krishnamurthi and Matthias
+;;                   Felleisen},
+;;   title =        {Classes and Mixins},
+;;   booktitle =    {{POPL} '98, Proceedings of the 25th {ACM}
+;;                   {SIGPLAN-SIGACT} Symposium on Principles of
+;;                   Programming Languages, San Diego, CA, USA, January
+;;                   19-21, 1998},
+;;   year =         1998,
+;;   pages =        {171--183},
+;;   doi =          {10.1145/268946.268961},
+;;   url =          {https://doi.org/10.1145/268946.268961},
 ;; }

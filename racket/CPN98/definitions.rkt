@@ -14,12 +14,12 @@
          syntax/parse
          typed/racket/unsafe
          "_definitions.rkt"
-         "utils.rkt"
-         )
+         "utils.rkt")
 
 (module+ test (require typed/rackunit))
 
 (require/typed "utils.rkt"
+  [check-stx=? ((Syntax Syntax) (#:msg String) . ->* . Any)]
   [zip (All (a b) ((Listof a) (Listof b) -> (Listof (Pairof a b))))]
   [unzip (All (a b) ((Listof (Pairof a b)) -> (Values (Listof a) (Listof b))))])
 
@@ -29,13 +29,20 @@
 (unsafe-require/typed racket/sequence
   [in-syntax (All (a) (Syntaxof (Listof (Syntaxof a))) -> (Sequenceof (Syntaxof a)))])
 
+(unsafe-require/typed "utils.rkt"
+  [mk-ow-type-surface (TYPE OWNER CPARAMS -> Syntax)]
+  [set-surface-stx (All (a) (Syntaxof a) Syntax -> (Syntaxof a))]
+  [get-surface-stx (Syntax -> Syntax)])
+
 (provide (except-out (all-defined-out)
                      ;; keyword-lits expr-lits
+                     mk-ow-type
+                     def-ow-type-values
                      private:alist-index-of
-                     alist-set
-                     )
-         (all-from-out "_definitions.rkt")
-         )
+                     alist-set)
+         (all-from-out "_definitions.rkt"))
+
+(unsafe-provide mk-ow-type def-ow-type-values)
 
 
 ;; Utils
@@ -44,154 +51,107 @@
   (eq? (syntax-e id1) (syntax-e id2)))
 
 
-;; Language definitions
+;; Ownership type syntax object
 
-(define-type B-TYPE Identifier)                        ;; Basic Type
-(define-type OWNER Identifier)                         ;; Owner
-(define-type C-PARAMS (Syntaxof (Listof Identifier)))  ;; List of ctx params
+;; Definitions
+(define-type TYPE Identifier)                                 ;; Basic type #'Int, #'Bool, ...
+(define-type OWNER Identifier)                                ;; Owner #'rep, #'world, #'Θ, #'o, ...
+(define-type CPARAMS (Syntaxof (Listof Identifier)))         ;; List of ctx params #'(), #'(rep n)
+(define-type OW-TYPE (Syntaxof (List TYPE OWNER CPARAMS))) ;; Ownership type #'(Foo rep {n m})
 
-;; Ownership scheme
-;; #'(a b ())
-;; #'(a b [c d])
-(define-type OW-SCHEME (Syntaxof (List B-TYPE OWNER C-PARAMS)))
-
-(define-type O-TYPE (Syntaxof (List OWNER C-PARAMS)))
-
-;; > (ow-scheme? #'(a b ()))       ; #t
-;; > (ow-scheme? #'(a b [c d e]))  ; #t
-;; > (ow-scheme? #'(a 1 []))       ; #f
-(define-predicate ow-scheme? OW-SCHEME)
-(define-predicate b-type? B-TYPE)
-(define-predicate owner? OWNER)
-(define-predicate c-params? C-PARAMS)
-(define-predicate o-type? O-TYPE)
+;; Predicate for occurrence typing, see [LLNC19] and
+;; https://docs.racket-lang.org/ts-guide/occurrence-typing.html
+(define-predicate type? TYPE)
+(define-predicate ow-type? OW-TYPE)
 
 ;; Make an ownership type
-(: mk-ow-scheme (B-TYPE OWNER (Listof Identifier) -> OW-SCHEME))
-(define (mk-ow-scheme B-TYPE OWNER C-PARAMS)
-  (cast (datum->syntax B-TYPE `(,B-TYPE ,OWNER ,C-PARAMS) B-TYPE)
-        OW-SCHEME))
+(: mk-ow-type
+   ((TYPE OWNER (U CPARAMS (Listof Identifier)))
+    (#:surface Syntax) . ->* . OW-TYPE))
+(define (mk-ow-type type-stx owner-stx cparams #:surface [surface #f])
+  ;; Make cparams-stx of type CPARAMS and not a `(Listof Identifier)`
+  (define cparams-stx : CPARAMS
+    (cond
+      ;; This is the empty list
+      [(and (list? cparams) (null? cparams) #'())]
+      ;; This is a non empty list
+      [(list? cparams)
+       (let ([ctx0 (car cparams)])
+         (cast (datum->syntax ctx0 cparams ctx0) CPARAMS))]
+      ;; This is already a CPARAMS
+      [else cparams]))
 
-;; Destruct an ownership type
-(: strip-ow-scheme (OW-SCHEME -> (List B-TYPE OWNER C-PARAMS)))
-(define strip-ow-scheme syntax-e)
+  ;; Get the surface stx of this type, i.e., owner/type{cparams ...}
+  (define surface-stx
+    (or surface (mk-ow-type-surface type-stx owner-stx cparams-stx)))
 
-;; More destructors
-(: ow-scheme->b-type   (OW-SCHEME -> B-TYPE))
-(: ow-scheme->owner    (OW-SCHEME -> Identifier))
-(: ow-scheme->c-params (OW-SCHEME -> (Syntaxof (Listof Identifier))))
-(define (ow-scheme->b-type ows) (car (syntax-e ows)))
-(define (ow-scheme->owner ows) (cadr (syntax-e ows)))
-(define (ow-scheme->c-params ows) (caddr (syntax-e ows)))
+  ;; Make the ownership type
+  (define ow-type : OW-TYPE
+    (cast (datum->syntax surface-stx   ; ctx
+                         `(,type-stx ,owner-stx ,cparams-stx)
+                         surface-stx   ; srcloc
+                         surface-stx)  ; prop
+          OW-TYPE))
 
-;; Cast a B-TYPE into a degenerated OW-SCHEME
-(: b-type->ow-scheme (B-TYPE -> OW-SCHEME))
-(define (b-type->ow-scheme B-TYPE)
-  (define b-type (syntax-e B-TYPE))
-  (cast (datum->syntax B-TYPE `(,b-type ⊥ ()) B-TYPE)
-        OW-SCHEME))
+  ;; Mark its surface
+  ((inst set-surface-stx (List TYPE OWNER CPARAMS)) ow-type surface-stx))
 
-;; Compare two ow-scheme, but does not instantiate the owner and
-;; context parameters. So it only ensures that both basic types are
-;; bound and both contains the same number of context parameters.
+;; Get ownership type values
+(: ow-type-values (OW-TYPE -> (List TYPE OWNER (Listof Identifier))))
+(define (ow-type-values ow-type-stx)
+  (match-let ([(list ot.type ot.owner ot.cparams) (syntax-e ow-type-stx)])
+    (list ot.type ot.owner (syntax->list ot.cparams))))
+
+;; Destructs an ownership type and binds its values to identifiers
 ;;
-;; > (type=? #'(a b ()) #'(a b ()))            ; #t
-;; > (type=? #'(a b [c d e]) #'(a b [c d e]))  ; #t
-;; > (type=? #'(a b [c d e]) #'(a b [e d c]))  ; #t
-;; > (type=? #'(a b [c d e]) #'(a z [c d e]))  ; #t
-;; > (type=? #'(a b ()) #'(c b ()))            ; #f
-(: type=? (OW-SCHEME OW-SCHEME -> Boolean))
-(define (type=? ow1 ow2)
-  (match-let ([(list TYPE1 OWNER1 CPARAMS1) (syntax-e ow1)]
-              [(list TYPE2 OWNER2 CPARAMS2) (syntax-e ow2)])
-    (and (bound-id=? TYPE1 TYPE2)
-         (eq? (length (syntax->list CPARAMS1))
-              (length (syntax->list CPARAMS2)))
-         )))
+;; > (def-ow-type-values (the-type the-owner the-cparams) #'(Foo o {n m}))
+;; > (printf "type: ~a, owner: ~a, params: ~a" the-type the-owner the-cparams)
+(define-syntax-rule (def-ow-type-values (type-stx owner-stx cparams-stx) E)
+  (match-define (list type-stx owner-stx cparams-stx)
+    (ow-type-values E)))
 
-;; > (ow-scheme-eq? #'(a b ()) #'(a b ()))            ; #t
-;; > (ow-scheme-eq? #'(a b [c d e]) #'(a b [c d e]))  ; #t
-;; > (ow-scheme-eq? #'(a b [c d e]) #'(a b [e d c]))  ; #f
-;; > (ow-scheme-eq? #'(a b [c d e]) #'(a z [c d e]))  ; #f
-;; > (ow-scheme-eq? #'(a b ()) #'(c b ()))            ; #f
-(: ow-scheme-eq? (OW-SCHEME OW-SCHEME -> Boolean))
-(define (ow-scheme-eq? ow1 ow2)
-  (match-let ([(list TYPE1 OWNER1 CPARAMS1) (syntax-e ow1)]
-              [(list TYPE2 OWNER2 CPARAMS2) (syntax-e ow2)])
-    (and (bound-id=? TYPE1 TYPE2)
-         (bound-id=? OWNER1 OWNER2)
-         (for/and ([id1 (in-syntax CPARAMS1)]
-                   [id2 (in-syntax CPARAMS2)])
-           (bound-id=? id1 id2)))))
+(module+ test
+  (check-true  (type? #'Foo))
+  (check-true  (type? #'o))
+  (check-false (type? #'1))
+
+  (check-true  (ow-type? #'(Foo o {})))
+  (check-true  (ow-type? #'(Foo o {n m})))
+  (check-false (ow-type? #'(Foo 1 {n m})))
+
+  (check-true (ow-type? (mk-ow-type #'Foo #'o #'{n m})))
+  (check-true (ow-type? (mk-ow-type #'Foo #'o {list #'n #'m})))
+
+  (check-stx=? (get-surface-stx (mk-ow-type #'Foo #'o #'{n m})) #'|o/Foo{n m}|)
+  (check-stx=? (get-surface-stx (mk-ow-type #'Foo #'o #'{n m} #:surface #'a)) #'a))
 
 
-;; ;; (ids-eq? #'(a b c d) #'(a b c d))
-;; ;; > #t
-;; ;; (ids-eq? #'(a b c d) #'(d c b a))
-;; ;; > #f
-;; ;; (ids-eq? #'(a b c d) #'())
-;; ;; > #f
-;; (: ids-eq?
-;;    ((Syntaxof (Listof Identifier)) (Syntaxof (Listof Identifier)) -> Boolean))
-;; (define (ids-eq? IDS1 IDS2)
-;;   (let ([IDs1 (syntax->list IDS1)]
-;;         [IDs2 (syntax->list IDS2)])
-;;     (for/and ([id1 IDs1][id2 IDs2])
-;;       (eq? (syntax-e id1) (syntax-e id2)))))
-
-
-;; Set or get the binder property of a syntax object.
-;;
-;; The binder property of a syntax object is another syntax object
-;; which is its binder.
-;; (: binder-prop
-;;    (All (a) (case->
-;;              [(Syntaxof a) -> BINDER]
-;;              [(Syntaxof a) BINDER -> (Syntaxof a)])))
-;; (define binder-prop
-;;   (case-lambda
-;;     ;; `(Syntaxof a) -> BINDER` requires a `cast` to type check
-;;     ;; because the type-checker doesn't know that 'binder prop of
-;;     ;; `syntax-property` stores BINDER.
-;;     [(stx)        (cast (syntax-property  stx 'binder) BINDER)]
-;;     [(stx BINDER) (syntax-property stx 'binder BINDER)]))
-
-;; ;; Set or get the class type of a syntax object.
-;; (: c-type-prop
-;;    (All (a) (case->
-;;              [(Syntaxof a) -> C-TYPE]
-;;              [(Syntaxof a) C-TYPE -> (Syntaxof a)])))
-;; (define c-type-prop
-;;   (case-lambda
-;;     [(stx)        (cast (syntax-property stx 'c-type) C-TYPE)]
-;;     [(stx C-TYPE) (syntax-property stx 'c-type C-TYPE)]))
-
 
 ;; Get or set the basic type of a syntax object.
 (: b-type-prop
    (All (a) (case->
-             [(Syntaxof a) -> (U B-TYPE #f)]
-             [(Syntaxof a) B-TYPE -> (Syntaxof a)])))
+             [(Syntaxof a) -> (U TYPE #f)]
+             [(Syntaxof a) TYPE -> (Syntaxof a)])))
 (define b-type-prop
   (case-lambda
     ;; Get the b-type of a syntax object.
     [(stx) (let ([τ (syntax-property stx 'b-type)])
-             (and (b-type? τ) τ))]
+             (and (type? τ) τ))]
     ;; Set the basic type of a syntax object
-    [(stx B-TYPE) (syntax-property stx 'b-type B-TYPE)]))
+    [(stx TYPE) (syntax-property stx 'b-type TYPE)]))
 
-;; Get or set the basic type of a syntax object.
-(: ow-scheme-prop
+;; Get or set the ownership type of a syntax object.
+(: ow-type-prop
    (All (a) (case->
-             [(Syntaxof a) -> (U OW-SCHEME #f)]
-             [(Syntaxof a) OW-SCHEME -> (Syntaxof a)])))
-(define ow-scheme-prop
+             [(Syntaxof a) -> (U OW-TYPE #f)]
+             [(Syntaxof a) OW-TYPE -> (Syntaxof a)])))
+(define ow-type-prop
   (case-lambda
     ;; Get the b-type of a syntax object.
-    [(stx) (let ([τ (syntax-property stx 'ow-scheme)])
-             (and (ow-scheme? τ) τ))]
+    [(stx) (let ([τ (syntax-property stx 'ow-type)])
+             (and (ow-type? τ) τ))]
     ;; Set the basic type of a syntax object
-    [(stx B-TYPE) (syntax-property stx 'ow-scheme B-TYPE)]))
+    [(stx TYPE) (syntax-property stx 'ow-type TYPE)]))
 
 
 ;; Meta
@@ -300,9 +260,9 @@
 ;; FS: Map of fields
 ;;
 ;; With the syntax #'(Class-type . Field-name) as key and the Field
-;; OW-SCHEME as value.
-(define-type FS-key (Syntaxof (Pairof B-TYPE Identifier)))
-(define-type FS (AList FS-key OW-SCHEME))
+;; OW-TYPE as value.
+(define-type FS-key (Syntaxof (Pairof TYPE Identifier)))
+(define-type FS (AList FS-key OW-TYPE))
 
 (module+ test
 
@@ -328,7 +288,7 @@
   ;;   `((,#'(c . foo) . ,test:τFoo)
   ;;     (,#'(c . bar) . ,test:τBar)))
 
-  ;; (: stx-eq? (OW-SCHEME OW-SCHEME -> Boolean))
+  ;; (: stx-eq? (OW-TYPE OW-TYPE -> Boolean))
   ;; (define (stx-eq? a b)
   ;;   (equal? (syntax->datum a) (syntax->datum b)))
 
@@ -356,123 +316,41 @@
 (define-type DS-key (Syntaxof
                      (List Identifier                     ; Class type
                            Identifier                     ; Def name
-                           (Syntaxof (Listof OW-SCHEME))  ; Type of def args
+                           (Syntaxof (Listof OW-TYPE))  ; Type of def args
                            )))
 
-(define-type DS (AList DS-key OW-SCHEME))
+(define-type DS (AList DS-key OW-TYPE))
 ;; (: meta:DS (Boxof DS))
 ;; (define meta:DS (box '()))
 
-;; (define (ow-scheme=?))
+;; (define (ow-type=?))
 ;; (ds-key=? #'(a b ()) #'(a b ()))                  ; #t
 ;; (ds-key=? #'(a b [(c d ())]) #'(a b [(c d ())]))  ; #t
 ;; (ds-key=? #'(a b ()) #'(c d ()))                  ; #f
 ;; (ds-key=? #'(a b [(c d ())]) #'(a b [(d c ())]))  ; #f
-(: ds-key=? ((OW-SCHEME OW-SCHEME -> Boolean) DS-key DS-key -> Boolean))
-(define (ds-key=? ow-scheme=? key1-stx key2-stx)
-  (match-let ([(list C-TYPE1 D-NAME1 ARGs-OW-SCHEME1) (syntax-e key1-stx)]
-              [(list C-TYPE2 D-NAME2 ARGs-OW-SCHEME2) (syntax-e key2-stx)])
+(: ds-key=? ((OW-TYPE OW-TYPE -> Boolean) DS-key DS-key -> Boolean))
+(define (ds-key=? ow-type=? key1-stx key2-stx)
+  (match-let ([(list C-TYPE1 D-NAME1 ARGs-OW-TYPE1) (syntax-e key1-stx)]
+              [(list C-TYPE2 D-NAME2 ARGs-OW-TYPE2) (syntax-e key2-stx)])
     (and
      (bound-id=? C-TYPE1 C-TYPE2)
      (bound-id=? D-NAME1 D-NAME2)
-     (for/and ([ow1 (in-syntax ARGs-OW-SCHEME1)]
-               [ow2 (in-syntax ARGs-OW-SCHEME2)])
-       (ow-scheme=? ow1 ow2)))))
-
-;; Same as `DS-key` except that is as a (Listof B-TYPE) instead of a
-;; (Listof OW-SCHEME) as type of args
-(define-type DS-key* (Syntaxof
-                      (List Identifier                  ; Class type
-                            Identifier                  ; Def name
-                            (Syntaxof (Listof B-TYPE))  ; Type of def args
-                            )))
-
-(: dsk*->dsk (DS-key* -> DS-key))
-(define (dsk*->dsk k*)
-  (match-define (list class def b-types) (syntax-e k*))
-  (define ows (map b-type->ow-scheme (syntax->list b-types)))
-  (cast (datum->syntax k* (list class def ows) k*)
-        DS-key)
-  )
+     (for/and ([ow1 (in-syntax ARGs-OW-TYPE1)]
+               [ow2 (in-syntax ARGs-OW-TYPE2)])
+       (ow-type=? ow1 ow2)))))
 
 
-
-;; ;; Does not work
-;; ;; See https://stackoverflow.com/a/60849727/2072144
-;; (module desugar-def racket/base
-;;   (require racket/set (only-in "utils.rkt" bound-id=?))
-
-;;   (provide (rename-out [immutable-ids? ids?]
-;;                        [make-immutable-ids make-ids]
-;;                        [set-member? ids-member?]
-;;                        [set-add ids-add]))
-
-;;   (define-custom-set-types ids
-;;     ;; This is not necessary because contract will check this
-;;     ;; #:elem? identifier?
-;;     bound-id=?)
-;;   )
-
-;; (require/typed/provide 'desugar-def
-;;   [#:opaque Identifiers ids?]
-;;   [make-ids ((Listof Identifier) -> Identifiers)]
-;;   [ids-member? (Identifiers Identifier -> Boolean)]
-;;   [ids-add (Identifiers Identifier -> Identifiers)])
-
-;; ;; ;; (immutable-id-set? (make-immutable-id-set (list #'a #'b #'c)))
-;; ;; ;; (immutable-id-set? #'(a b c)) ;; fails
-;; ;; (set? #'(a b c))
-;; ;; ;; (immutable-id-set? (list #'a #'b #'c))
-
-;; (module UNTYPED racket/base
-;;   (require  (only-in racket/set gen:set)
-;;             racket/function)
-;;   (provide (struct-out set))
-
-;;   ;; : elems (Listof a)
-;;   ;; : eql? (a a -> Boolean)
-;;   (struct set [elems eql?]
-;;     #:transparent
-;;     #:constructor-name make-set
-;;     #:methods gen:set
-;;     [(define (set-member? st e)
-;;        (let ([elems (set-elems st)]
-;;              [eql?  (set-eql? st)])
-;;          (findf (curry eql? e) elems)))
-;;      (define (set-add st e)
-;;        (let ([elems (set-elems st)]
-;;              [eql?  (set-eql? st)])
-;;          (if (set-member? st e) st
-;;              (make-set (cons e elems) eql?))))]))
-
-;; (require/typed 'UNTYPED
-;;   [#:struct [a] set
-;;    (#;[elems : (Listof a)]
-;;     [eql?  : (Any Any -> Boolean)])
-;;    #:constructor-name make-set
-;;    ;; #:transparent
-;;    ])
-
-;; (module untyped racket/base
-;;   (require racket/dict
-;;            "utils.rkt")
-;;   (provide (rename-out
-;;             [make-immutable-id~>btype make-id~>btype])
-;;            id~>btype?)
-
-;;     ;; (HashTable Identifier B-TYPE)
-;;     (define-custom-hash-types id~>btype
-;;       #:key? identifier?
-;;       (λ (x y) (eq? (syntax-e x) (syntax-e y))))
-;;   )
-
-;; (require 'untyped)
-;; (provide (all-from-out 'untyped))
-
-;; (unsafe-require/typed/provide 'untyped
-;;  [#:opaque Id~>B-TYPE id~>btype?]
-;;  [make-id~>btype ((Listof (Pairof Identifier B-TYPE)) -> Id~>B-TYPE)])
-
-;; (id~>btype? #f)
-;; (id~>btype? #'f)
-;; (make-id~>btype (list (cons #'foo 'a)))
+;; Bibliography
+;;
+;; @article{LLNC19,
+;;   author    = {Victor Lanvin and Micka{\"{e}}l Laurent and
+;;                Kim Nguyen and Giuseppe Castagna},
+;;   title     = {Revisiting Occurrence Typing},
+;;   journal   = {CoRR},
+;;   volume    = {abs/1907.05590},
+;;   year      = {2019},
+;;   url       = {http://arxiv.org/abs/1907.05590},
+;;   archivePrefix = {arXiv},
+;;   eprint    = {1907.05590},
+;;   timestamp = {Wed, 17 Jul 2019 10:27:36 +0200},
+;; }

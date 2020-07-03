@@ -141,11 +141,11 @@
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
   ;; Make a new CS
-  (: make-CS ((Listof B-TYPE) -> (Setof B-TYPE)))
+  (: make-CS ((Listof TYPE) -> (Setof TYPE)))
   (define (make-CS ids) (make-set ids bound-id=?))
 
   ;; Is VAR bounded in CS?
-  (: CS-member? ((Setof B-TYPE) B-TYPE -> Boolean))
+  (: CS-member? ((Setof TYPE) TYPE -> Boolean))
   (define (CS-member? CS VAR) (set-member? CS VAR))
 
   (module+ test
@@ -155,8 +155,7 @@
       (test-suite "Test for CS env"
        (check-true  (CS-member? CS #'foo))
        (check-true  (CS-member? CS #'bar))
-       (check-false (CS-member? CS #'baz))))
-    )
+       (check-false (CS-member? CS #'baz)))))
 
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ;; Γ is the map of locally bound variables
@@ -176,27 +175,27 @@
 
   (unsafe-require/typed 'untyped-Γ
     [#:opaque Γ u:Γ?]
-    [u:make-Γ     ((Listof (Pairof Identifier B-TYPE)) -> Γ)]
+    [u:make-Γ     ((Listof (Pairof Identifier TYPE)) -> Γ)]
     [u:Γ-has-key? (Γ Identifier -> Boolean)]
-    [u:Γ-set      (Γ Identifier B-TYPE -> Γ)]
-    [u:Γ-ref      (Γ Identifier -> B-TYPE)])
+    [u:Γ-set      (Γ Identifier TYPE -> Γ)]
+    [u:Γ-ref      (Γ Identifier -> TYPE)])
 
   (define-predicate listof-Γs?
-    (Listof (Pairof Identifier B-TYPE)))
+    (Listof (Pairof Identifier TYPE)))
 
   (define-predicate stxof-Γs?
-    (Syntaxof (Listof (Syntaxof (Pairof Identifier B-TYPE)))))
+    (Syntaxof (Listof (Syntaxof (Pairof Identifier TYPE)))))
 
   ;; Make a new `Γ`
-  (: make-Γ (() ((U (Listof (Pairof Identifier B-TYPE))
-                    (Syntaxof (Listof (Syntaxof (Pairof Identifier B-TYPE))))
+  (: make-Γ (() ((U (Listof (Pairof Identifier TYPE))
+                    (Syntaxof (Listof (Syntaxof (Pairof Identifier TYPE))))
                     Γ)) . ->* . Γ))
   (define (make-Γ [ids '()])
     (cond
       [(listof-Γs? ids) (u:make-Γ ids)]
       ;; Look at https://docs.racket-lang.org/typed-map/index.html?q=map
       [(stxof-Γs? ids)
-       (u:make-Γ (map (inst syntax-e (Pairof Identifier B-TYPE))
+       (u:make-Γ (map (inst syntax-e (Pairof Identifier TYPE))
                       (syntax->list ids)))]
       ;; Do nothing if its already a Γ
       [else ids]))
@@ -206,13 +205,13 @@
   (define Γ-member? u:Γ-has-key?)
 
   ;; Set `TYPE` of `VAR` in `Γ`
-  (: Γ-add (Γ (Syntaxof (Pairof Identifier B-TYPE)) -> Γ))
+  (: Γ-add (Γ (Syntaxof (Pairof Identifier TYPE)) -> Γ))
   (define (Γ-add Γ VAR.TYPE)
     (match-define (cons VAR TYPE) (syntax-e VAR.TYPE))
     (u:Γ-set Γ VAR TYPE))
 
   ;; Returns the `TYPE` of `VAR` in `Γ`
-  (: Γ-ref (Γ Identifier -> B-TYPE))
+  (: Γ-ref (Γ Identifier -> TYPE))
   (define Γ-ref u:Γ-ref)
 
   (module+ test
@@ -238,8 +237,7 @@
            (check-true  (Γ-member? updated-test:Γ #'foo))
            (check-stx=? (Γ-ref updated-test:Γ #'foo) #'baz)
            (check-true  (Γ-member? inserted-test:Γ #'toto))
-           (check-stx=? (Γ-ref inserted-test:Γ #'toto) #'tata))))
-      ))
+           (check-stx=? (Γ-ref inserted-test:Γ #'toto) #'tata))))))
 
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ;; FS is the map of fields, with the syntax #'(Class-type
@@ -271,16 +269,16 @@
 
     (define-custom-hash-types FS key=?))
 
-  (define-type FS-key (Syntaxof (Pairof B-TYPE Identifier)))
+  (define-type FS-key (Syntaxof (Pairof TYPE Identifier)))
 
   (unsafe-require/typed 'untyped-FS
     [#:opaque FS u:FS?]
-    [u:make-FS     ((Listof (Pairof FS-key B-TYPE)) -> FS)]
+    [u:make-FS     ((Listof (Pairof FS-key TYPE)) -> FS)]
     [u:FS-has-key? (FS FS-key -> Boolean)]
-    [u:FS-ref      (FS FS-key -> B-TYPE)])
+    [u:FS-ref      (FS FS-key -> TYPE)])
 
   ;; Make FS
-  (: make-FS ((Listof (Pairof FS-key B-TYPE)) -> FS))
+  (: make-FS ((Listof (Pairof FS-key TYPE)) -> FS))
   (define make-FS u:make-FS)
 
   ;; Is `Class-type . Field-name` member of `FS`.
@@ -288,7 +286,7 @@
   (define FS-member? u:FS-has-key?)
 
   ;; Returns the `TYPE` of `Field-name` in `Class-type`.
-  (: FS-ref (FS FS-key -> B-TYPE))
+  (: FS-ref (FS FS-key -> TYPE))
   (define FS-ref u:FS-ref)
 
   (module+ test
@@ -305,16 +303,15 @@
        (check-false (FS-member? FS #'(class . Field)))
 
        (check-stx=? (FS-ref FS #'(class . field)) #'t)
-       (check-stx=? (FS-ref FS #'(clazz . dleif)) #'u))
-      ))
+       (check-stx=? (FS-ref FS #'(clazz . dleif)) #'u))))
 
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ;; DS is the map of definitions, with the syntax #'(Class-type
   ;; Def-name (Def-arg-type ...)) as key and the def return type as
   ;; value.
   ;;
-  ;; Note: I go with a Hastable were DS keys are B-TYPE instead of
-  ;; OW-SCHEME because basic-check only take care of B-TYPE.
+  ;; Note: I go with a Hastable were DS keys are TYPE instead of
+  ;; OW-TYPE because basic-check only take care of TYPE.
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
   ;; Untyped world
@@ -341,10 +338,10 @@
     ;;;; Putting all together
     ;;;; (: ds-key=? (DS-key DS-key -> Boolean))
     (define (ds-key=? key1-stx key2-stx)
-      (match-let* ([(list C-TYPE1 D-NAME1 ARGs-B-TYPE1) (syntax-e key1-stx)]
-                   [(list C-TYPE2 D-NAME2 ARGs-B-TYPE2) (syntax-e key2-stx)]
-                   [b-types1 (syntax->list ARGs-B-TYPE1)]
-                   [b-types2 (syntax->list ARGs-B-TYPE2)])
+      (match-let* ([(list C-TYPE1 D-NAME1 ARGs-TYPE1) (syntax-e key1-stx)]
+                   [(list C-TYPE2 D-NAME2 ARGs-TYPE2) (syntax-e key2-stx)]
+                   [b-types1 (syntax->list ARGs-TYPE1)]
+                   [b-types2 (syntax->list ARGs-TYPE2)])
         (and
          (c-type=? C-TYPE1 C-TYPE2)
          (d-name=? D-NAME1 D-NAME2)
@@ -356,21 +353,21 @@
 
   (unsafe-require/typed 'untyped-DS
     [#:opaque DS u:DS?]
-    [u:make-DS     ((Listof (Pairof DS-key B-TYPE)) -> DS)]
+    [u:make-DS     ((Listof (Pairof DS-key TYPE)) -> DS)]
     [u:DS-has-key? (DS DS-key -> Boolean)]
-    [u:DS-ref      (DS DS-key -> B-TYPE)]
+    [u:DS-ref      (DS DS-key -> TYPE)]
     [u:DS-domain   (DS -> (Listof DS-key))])
 
-  ;; Same as `DS-key` except that is as a (Listof B-TYPE) instead of a
-  ;; (Listof OW-SCHEME) as type of args
+  ;; Same as `DS-key` except that is as a (Listof TYPE) instead of a
+  ;; (Listof OW-TYPE) as type of args
   (define-type DS-key (Syntaxof
-                         (List Identifier                  ; Class type
-                               Identifier                  ; Def name
-                               (Syntaxof (Listof B-TYPE))  ; Type of def args
+                         (List Identifier                ; Class type
+                               Identifier                ; Def name
+                               (Syntaxof (Listof TYPE))  ; Type of def args
                                )))
 
   ;; Make DS
-  (: make-DS ((Listof (Pairof DS-key B-TYPE)) -> DS))
+  (: make-DS ((Listof (Pairof DS-key TYPE)) -> DS))
   (define make-DS u:make-DS)
 
   ;; Is `#'(Class-type Def-name (Def-args ...))` member of `DS`.
@@ -378,7 +375,7 @@
   (define DS-member? u:DS-has-key?)
 
   ;; Returns the `TYPE` of `Field-name` in `Class-type`.
-  (: DS-ref (DS DS-key -> B-TYPE))
+  (: DS-ref (DS DS-key -> TYPE))
   (define DS-ref u:DS-ref)
 
   ;; Return the domain of DS
@@ -406,9 +403,7 @@
 
        (check-stx=? (DS-ref DS #'(class def1 ())) #'t)
        (check-stx=? (DS-ref DS #'(clazz def1 ())) #'u)
-       (check-stx=? (DS-ref DS #'(class def2 (t u))) #'v)
-       )))
-  )
+       (check-stx=? (DS-ref DS #'(class def2 (t u))) #'v)))))
 
 
 ;; ownership
@@ -473,8 +468,7 @@
          (check-true  (Σ-member? (Σ-union Σ #'(baz buz)) #'baz))
          (check-true  (Σ-member? (Σ-union Σ #'(baz buz)) #'buz))
          (check-false (Σ-member? Σ #'baz))
-         (check-false (Σ-member? Σ #'buz))
-         ))))
+         (check-false (Σ-member? Σ #'buz))))))
 
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ;; OWS is the mapping from class types to its ownership scheme
@@ -494,59 +488,56 @@
 
   (unsafe-require/typed 'untyped-OWS
     [#:opaque OWS u:OWS?]
-    [u:make-OWS     ((Listof (Pairof Identifier OW-SCHEME)) -> OWS)]
+    [u:make-OWS     ((Listof (Pairof Identifier OW-TYPE)) -> OWS)]
     [u:OWS-has-key? (OWS Identifier -> Boolean)]
-    [u:OWS-ref      (OWS Identifier -> OW-SCHEME)])
+    [u:OWS-ref      (OWS Identifier -> OW-TYPE)])
 
   ;; Make OWS
-  (: make-OWS ((Listof (Pairof Identifier OW-SCHEME)) -> OWS))
+  (: make-OWS ((Listof (Pairof Identifier OW-TYPE)) -> OWS))
   (define make-OWS u:make-OWS)
 
   ;; Get the ownership scheme of a class
-  (: OWS-ref (OWS Identifier -> OW-SCHEME))
+  (: OWS-ref (OWS Identifier -> OW-TYPE))
   (define OWS-ref u:OWS-ref)
 
   ;; Number of context parameters taken by a specific class
   (: OWS-arity (OWS Identifier -> Nonnegative-Integer))
   (define (OWS-arity OWS ctype)
-    (let* ([ows       (OWS-ref OWS ctype)]
-           [cparam... (ow-scheme->c-params ows)])
-      (length (syntax->list cparam...))))
+    (def-ow-type-values (_ _ os.CPARAMs) (OWS-ref OWS ctype))
+    (length os.CPARAMs))
 
-  ;; Construct a substitution table for σ
-  (: ψ (OWS OW-SCHEME -> (Identifier . ~> . Identifier)))
+  ;; Constructs a substitution table for σ
+  (: ψ (OWS OW-TYPE -> (Identifier . ~> . Identifier)))
   (define (ψ OWS otype)
-    ;; Destruct the ownership type
-    (match-define (list ot.TYPE ot.OWNER ot.CPARAMS) (strip-ow-scheme otype))
+    ;; Gets values of an ownership type
+    (def-ow-type-values (ot.TYPE ot.OWNER ot.CPARAMs) otype)
 
-    ;; Find its ownership scheme and destruct it
-    (match-define (list os.TYPE os.OWNER os.CPARAMS)
-      (let ([ow-scheme (OWS-ref OWS ot.TYPE)])
-        (strip-ow-scheme ow-scheme)))
+    ;; Finds its ownership scheme and gets its values
+    (def-ow-type-values (os.TYPE os.OWNER os.CPARAMs)
+      (OWS-ref OWS ot.TYPE))
 
     ;; Make the σ
     (cons
      (cons os.OWNER ot.OWNER)
      (for/list : (Identifier . ~> . Identifier)
-         ([OS-CPARAM : Identifier (in-syntax os.CPARAMS)]
-          [OT-CPARAM : Identifier (in-syntax ot.CPARAMS)])
+         ([OS-CPARAM : Identifier (in-list os.CPARAMs)]
+          [OT-CPARAM : Identifier (in-list ot.CPARAMs)])
        (cons OS-CPARAM OT-CPARAM))))
 
   ;; Substitute element of one scheme using a substitution table
-  (: σ ((Identifier . ~> . Identifier) OW-SCHEME -> OW-SCHEME))
-  (define (σ subs-table ow-scheme)
-    (match-define (list os.TYPE os.OWNER os.CPARAMS)
-      (strip-ow-scheme ow-scheme))
+  (: σ ((Identifier . ~> . Identifier) OW-TYPE -> OW-TYPE))
+  (define (σ subs-table ow-type)
+    (def-ow-type-values (os.TYPE os.OWNER os.CPARAMs) ow-type)
 
-    (let ([b-type : B-TYPE os.TYPE]
+    (let ([b-type : TYPE os.TYPE]
           [owner  : OWNER ((inst alist-ref Identifier Identifier)
                            subs-table os.OWNER bound-id=? identity)]
           [cparams : (Listof Identifier)
                    ((inst map Identifier Identifier)
                     (λ (id) ((inst alist-ref Identifier Identifier)
                              subs-table id bound-id=? identity))
-                    (syntax->list os.CPARAMS))])
-      (mk-ow-scheme b-type owner cparams)))
+                    os.CPARAMs)])
+      (mk-ow-type b-type owner cparams)))
 
 
   (module+ test
@@ -585,8 +576,7 @@
         (check-stx=? (σ `((,#'Θ . ,#'o)) #'(Foo Θ ())) #'(Foo o ()))
         (check-stx=? (σ `((,#'Θ . ,#'o)) #'(Foo z ())) #'(Foo z ()))
         (check-stx=? (σ `((,#'ν . ,#'n)) #'(Bar ν (ν ν))) #'(Bar n (n n)))
-        (check-stx=? (σ `((,#'ν . ,#'n)) #'(Bar o (ν m))) #'(Bar o (n m)))
-        )))
+        (check-stx=? (σ `((,#'ν . ,#'n)) #'(Bar o (ν m))) #'(Bar o (n m))))))
 
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ;; Γ is the mapping of locally bound variables to their ownership type
@@ -602,32 +592,32 @@
               [dict-set         u:Γ-set]
               [dict-ref         u:Γ-ref]))
 
-    ;; TODO: ensure bound-id=? is what I need here
     (define-custom-hash-types Γ bound-id=?))
 
   (unsafe-require/typed 'untyped-Γ
     [#:opaque Γ u:Γ?]
-    [u:make-Γ     ((Listof (Pairof Identifier OW-SCHEME)) -> Γ)]
+    [u:make-Γ     ((Listof (Pairof Identifier OW-TYPE)) -> Γ)]
     [u:Γ-has-key? (Γ Identifier -> Boolean)]
-    [u:Γ-set      (Γ Identifier OW-SCHEME -> Γ)]
-    [u:Γ-ref      (Γ Identifier -> OW-SCHEME)])
+    [u:Γ-set      (Γ Identifier OW-TYPE -> Γ)]
+    [u:Γ-ref      (Γ Identifier -> OW-TYPE)])
 
   (define-predicate listof-Γs?
-    (Listof (Pairof Identifier OW-SCHEME)))
+    (Listof (Pairof Identifier OW-TYPE)))
 
   (define-predicate stxof-Γs?
-    (Syntaxof (Listof (Syntaxof (Pairof Identifier OW-SCHEME)))))
+    (Syntaxof (Listof (Syntaxof (Pairof Identifier OW-TYPE)))))
 
   ;; Make a new `Γ`
-  (: make-Γ (() ((U (Listof (Pairof Identifier OW-SCHEME))
-                    (Syntaxof (Listof (Syntaxof (Pairof Identifier OW-SCHEME))))
+  (: make-Γ (() ((U (Listof (Pairof Identifier OW-TYPE))
+                    (Syntaxof (Listof (Syntaxof (Pairof Identifier OW-TYPE))))
                     Γ)) . ->* . Γ))
   (define (make-Γ [ids '()])
     (cond
       [(listof-Γs? ids) (u:make-Γ ids)]
-      ;; Look at https://docs.racket-lang.org/typed-map/index.html?q=map
+      ;; TODO Look at https://docs.racket-lang.org/typed-map/index.html?q=map
+      ;; to get ride of `inst`
       [(stxof-Γs? ids)
-       (u:make-Γ (map (inst syntax-e (Pairof Identifier OW-SCHEME))
+       (u:make-Γ (map (inst syntax-e (Pairof Identifier OW-TYPE))
                       (syntax->list ids)))]
       ;; Do nothing if its already a Γ
       [else ids]))
@@ -637,13 +627,13 @@
   (define Γ-member? u:Γ-has-key?)
 
   ;; Set `TYPE` of `VAR` in `Γ`
-  (: Γ-add (Γ (Syntaxof (Pairof Identifier OW-SCHEME)) -> Γ))
+  (: Γ-add (Γ (Syntaxof (Pairof Identifier OW-TYPE)) -> Γ))
   (define (Γ-add Γ VAR.TYPE)
     (match-define (cons VAR TYPE) (syntax-e VAR.TYPE))
     (u:Γ-set Γ VAR TYPE))
 
   ;; Returns the `TYPE` of `VAR` in `Γ`
-  (: Γ-ref (Γ Identifier -> OW-SCHEME))
+  (: Γ-ref (Γ Identifier -> OW-TYPE))
   (define Γ-ref u:Γ-ref)
 
   (module+ test
@@ -669,9 +659,7 @@
            (check-true  (Γ-member? updated-test:Γ #'foo))
            (check-stx=? (Γ-ref updated-test:Γ #'foo) #'(t o (c1 c2)))
            (check-true  (Γ-member? inserted-test:Γ #'toto))
-           (check-stx=? (Γ-ref inserted-test:Γ #'toto) #'(t o (c1 c2))))))
-      ))
-
+           (check-stx=? (Γ-ref inserted-test:Γ #'toto) #'(t o (c1 c2))))))))
 
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ;; FS is the map of fields, with the syntax #'(Class-type
@@ -704,17 +692,17 @@
 
     (define-custom-hash-types FS key=?))
 
-  (define-type FS-key (Syntaxof (Pairof B-TYPE Identifier)))
+  (define-type FS-key (Syntaxof (Pairof TYPE Identifier)))
 
   (unsafe-require/typed 'untyped-FS
     [#:opaque FS u:FS?]
-    [u:make-FS     ((Listof (Pairof FS-key OW-SCHEME)) -> FS)]
+    [u:make-FS     ((Listof (Pairof FS-key OW-TYPE)) -> FS)]
     [u:FS-has-key? (FS FS-key -> Boolean)]
-    [u:FS-ref      (FS FS-key -> OW-SCHEME)]
+    [u:FS-ref      (FS FS-key -> OW-TYPE)]
     [u:FS-keys     (FS -> (Listof FS-key))])
 
   ;; Make FS
-  (: make-FS ((Listof (Pairof FS-key OW-SCHEME)) -> FS))
+  (: make-FS ((Listof (Pairof FS-key OW-TYPE)) -> FS))
   (define make-FS u:make-FS)
 
   ;; Is `Class-type . Field-name` member of `FS`.
@@ -722,7 +710,7 @@
   (define FS-member? u:FS-has-key?)
 
   ;; Returns the `TYPE` of `Field-name` in `Class-type`.
-  (: FS-ref (FS FS-key -> OW-SCHEME))
+  (: FS-ref (FS FS-key -> OW-TYPE))
   (define FS-ref u:FS-ref)
 
   ;; List FS keys
@@ -743,8 +731,7 @@
        (check-false (FS-member? FS #'(class . Field)))
 
        (check-stx=? (FS-ref FS #'(class . field)) #'(t Θ (ν μ)))
-       (check-stx=? (FS-ref FS #'(clazz . dleif)) #'(u o (n m))))
-      ))
+       (check-stx=? (FS-ref FS #'(clazz . dleif)) #'(u o (n m))))))
 
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ;; DS is the map of definitions, with the syntax #'(Class-type .
@@ -774,11 +761,11 @@
     (define-custom-hash-types DS ds-key=?))
 
   (define-type DS-key (Syntaxof
-                       (Pairof Identifier                     ; Class type
-                               Identifier)))                  ; Def name
+                       (Pairof Identifier                 ; Class type
+                               Identifier)))              ; Def name
   (define-type DS-val (Syntaxof
-                       (List (Syntaxof (Listof OW-SCHEME))  ; Def arg types
-                             OW-SCHEME)))                   ; Def return type
+                       (List (Syntaxof (Listof OW-TYPE))  ; Def arg types
+                             OW-TYPE)))                   ; Def return type
 
   (unsafe-require/typed 'untyped-DS
     [#:opaque DS u:DS?]
@@ -802,9 +789,10 @@
   (module+ test
     (provide (all-defined-out))
 
-    (define DS (make-DS (list (cons #'(class . def1) #'(((Foo o ())) (Bar o (n m))))
-                              (cons #'(clazz . def1) #'(((Foo u ())) (Bar v (w x))))
-                              (cons #'(class . def0) #'(() (Bar v (w x)))))))
+    (define DS
+      (make-DS (list (cons #'(class . def1) #'(((Foo o ())) (Bar o (n m))))
+                     (cons #'(clazz . def1) #'(((Foo u ())) (Bar v (w x))))
+                     (cons #'(class . def0) #'(() (Bar v (w x)))))))
 
     (define DS-tests
       (test-suite "Test for DS env"
@@ -816,6 +804,4 @@
 
        (check-stx=? (DS-ref DS #'(class . def1)) #'(((Foo o ())) (Bar o (n m))))
        (check-stx=? (DS-ref DS #'(clazz . def1)) #'(((Foo u ())) (Bar v (w x))))
-       (check-stx=? (DS-ref DS #'(class . def0)) #'(() (Bar v (w x))))
-       )))
-  )
+       (check-stx=? (DS-ref DS #'(class . def0)) #'(() (Bar v (w x))))))))

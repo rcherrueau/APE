@@ -13,15 +13,6 @@
 ;;
 ;; Environments:
 ;;
-;; Naming conventions:
-;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
-;; - t^ is the ownership scheme of t
-;;
-;; Global:
-;; - meta:CS is the set of defined ownership scheme
-;; - meta:FS is the map of fields with ownership scheme field as value
-;; - meta:DS is the map of definitions with return ownership sheme as
-;;   value
 
 (require (for-syntax racket/base)
          racket/function
@@ -62,14 +53,14 @@
 
   ;; Store of the ownership scheme of the current class
   ;;
-  ;; (: τ OW-SCHEME)
+  ;; (: τ OW-TYPE)
   (τ #:init #'Bottom
      #:mk   identity)
 
   ;; Mapping from existing class types to its ownership scheme
   ;; (t ~> t^)
   ;;
-  ;; (: OWS (B-TYPE ~> OW-SCHEME))
+  ;; (: OWS (TYPE ~> OW-TYPE))
   (OWS #:init   (meta-map-w/key
                 (λ (kv)
                   (match-define (cons CTYPE CPARAM...) kv)
@@ -80,9 +71,9 @@
 
   ;; Map of fields
   ;;
-  ;; (: FS ((Syntaxof (Pairof B-TYPE        ; Class type
+  ;; (: FS ((Syntaxof (Pairof TYPE        ; Class type
   ;;                          Identifier))  ; Field name
-  ;;        ~> OW-SCHEME))                  ; Field return type
+  ;;        ~> OW-TYPE))                  ; Field return type
   (FS #:init meta:FS
       #:mk env:make-FS
       #:apply? [env:FS-member? env:FS-ref])
@@ -92,8 +83,8 @@
   ;; (: DS ((Syntaxof (Pairof Identifier                     ; Class type
   ;;                          Identifier))                   ; Def name
   ;;        ~>
-  ;;        (Syntaxof (Pairof (Syntaxof (Listof OW-SCHEME))  ; Type of def args
-  ;;                          OW-SCHEME))                    ; Def return type
+  ;;        (Syntaxof (Pairof (Syntaxof (Listof OW-TYPE))  ; Type of def args
+  ;;                          OW-TYPE))                    ; Def return type
   (DS #:init (meta-map-w/key
               (λ (kv)
                 (match-let* ([`(,DS-key . ,RET-OWS) kv]
@@ -105,8 +96,7 @@
 
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ;; Parse
-  (⊢p stx)
-  )
+  (⊢p stx))
 
 
 ;; ⊢p P : t
@@ -170,7 +160,7 @@
 
       ;; Check P,Σ,{ this: NAME<Θ|[CPARAM ...]> } ⊢m DEF
 
-      ;; [(def ~! (_NAME (ARG-NAME ARG-SCHEME) ... RET-SCHEME) E ...+)
+      ;; [(def ~! (_NAME (ARG-NAME ARG-OT) ... RET-OT) E ...+)
       (check-not-exn (thunk (⊢d #'(class Foo [] (def (def/0 (Foo Θ ())) this))))
                      "`this` is of type `Θ/Foo` in `def`"))))
 
@@ -180,23 +170,23 @@
 ;; In context `P,Σ,τ`, `DEF` is well-formed
 (define-rules ⊢m
   ;; [Method]
-  [(def ~! (_NAME (ARG-NAME ARG-SCHEME) ... RET-SCHEME) E ...+)
+  [(def ~! (_NAME (ARG-NAME ARG-OT) ... RET-OT) E ...+)
    ;; Get current class type store in τ environment
    #:with τ0 (τ)
    ;; Check P,Σ ⊢τ t on return type
-   #:when (⊢τ #'RET-SCHEME)
+   #:when (⊢τ #'RET-OT)
    ;; Check P,Σ ⊢τ t on args
-   #:when (stx-for/and ([t #'(ARG-SCHEME ...)]) (⊢τ t))
-   ;; Check P,Σ,{this: τ0, ARG-NAME: ARG-SCHEME, ...} ⊢e E ... LEB : RET-SCHEME
+   #:when (stx-for/and ([t #'(ARG-OT ...)]) (⊢τ t))
+   ;; Check P,Σ,{this: τ0, ARG-NAME: ARG-OT, ...} ⊢e E ... LEB : RET-OT
    #:with [_ ... ΘLEB] (with-Γ #'{ (this     . τ0)
-                                   (???      . RET-SCHEME)
-                                   (ARG-NAME . ARG-SCHEME) ... }
+                                   (???      . RET-OT)
+                                   (ARG-NAME . ARG-OT) ... }
                          (stx-map ⊢e #'(E ...)))
    #:with [_ t-e] (get-τ #'ΘLEB)
-   #:when (or (τ=? #'t-e #'RET-SCHEME)
-              (raise (mk-exn:ownership-mismatch #'t-e #'RET-SCHEME #'ΘLEB)))
+   #:when (or (τ=? #'t-e #'RET-OT)
+              (raise (mk-exn:ownership-mismatch #'t-e #'RET-OT #'ΘLEB)))
    ;; ----------------------------------------------------------------
-   ;; P,Σ,τ0 ⊢m (def (NAME (ARG-NAME ARG-SCHEME) ... RET-SCHEME) E ...+)
+   ;; P,Σ,τ0 ⊢m (def (NAME (ARG-NAME ARG-OT) ... RET-OT) E ...+)
    this-syntax])
 
 (module+ test
@@ -231,7 +221,7 @@
                  (thunk (⊢m #'(def (def/2 (arg1 (Foo o ())) (arg2 (Bar o (n n n))) (Bar o (n m))) _)))
                  "`Bar` takes two context parameters")
 
-      ;; Check P,Σ,{this: τ0, ARG-NAME: ARG-SCHEME, ...} ⊢e E ... LEB : RET-SCHEME
+      ;; Check P,Σ,{this: τ0, ARG-NAME: ARG-OT, ...} ⊢e E ... LEB : RET-OT
       (check-exn exn:ownership-mismatch?
                  (thunk (⊢m #'(def (def/0 (Bar o (n m)))
                                 (new (Bar n (n m))))))
@@ -268,12 +258,12 @@
 ;; In context `P,Γ`, `E` elaborates to `?E` and has type `t`
 (define-rules ⊢e
   ;; [New]
-  [(new ~! SCHEME:ow-scheme)
-   ;; Check P,Σ ⊢τ SCHEME-TYPE
-   #:when (⊢τ #'SCHEME)
+  [(new ~! OT:ow-type)
+   ;; Check P,Σ ⊢τ OT-TYPE
+   #:when (⊢τ #'OT)
    ;; ----------------------------------------------------------------
    ;; P,Σ,Γ ⊢e (new t) : t
-   (add-τ this-syntax #'SCHEME)]
+   (add-τ this-syntax #'OT)]
 
   ;; [Local Access]
   [ID:id
@@ -312,7 +302,7 @@
   ;; `bar` field.
   [(get-field ~! E FNAME)
    ;; Check P,Σ,Γ ⊢e E : t-e
-   #:with [_ t-e:ow-scheme] (get-τ (⊢e #'E))
+   #:with [_ t-e:ow-type] (get-τ (⊢e #'E))
    ;; σ = ψ(t-e)
    #:do [(define σ (curry env:σ (ψ #'t-e)))]
    ;; t-field = FS(t-e.TYPE . foo)  ; Get the type of the field
@@ -355,7 +345,7 @@
   ;;
   [(set-field! ~! E FNAME BODY)
    ;; Check P,Σ,Γ ⊢e E t-e
-   #:with [_ t-e:ow-scheme] (get-τ (⊢e #'E))
+   #:with [_ t-e:ow-type] (get-τ (⊢e #'E))
    ;; σ = ψ(t-e)
    #:do [(define σ (curry env:σ (ψ #'t-e)))]
    ;; t-field = FS(t-e.TYPE . foo)  ; Get the type of the field
@@ -377,7 +367,7 @@
   ;; [Method Call]
   [(send ~! E DNAME PARAM ...)
    ;; Check P,Σ,Γ ⊢e E t-e
-   #:with [_ t-e:ow-scheme] (get-τ (⊢e #'E))
+   #:with [_ t-e:ow-type] (get-τ (⊢e #'E))
    ;; σ = ψ(t-e)
    #:do [(define σ (curry env:σ (ψ #'t-e)))]
    ;; t-arg ... → t-ret = DS(t-e.TYPE . foo)  ; Get args and the return type of the def
@@ -440,20 +430,20 @@
   ;; definition really shows that the `let` notation is a must for
   ;; variable binding because it makes it clear that `VAR-NAME` is
   ;; bound in the `BODY`.
-  [(let ~! (VAR-NAME VAR-SCHEME E) BODY ...)
-   ;; Check P,Σ ⊢τ VAR-SCHEME
-   #:when (⊢τ #'VAR-SCHEME)
-   ;; Check  P,Σ,Γ ⊢e E : VAR-SCHEME
-   #:with [_ t] (get-τ (with-Γ (Γ-add #'(??? . VAR-SCHEME))
+  [(let ~! (VAR-NAME VAR-OT E) BODY ...)
+   ;; Check P,Σ ⊢τ VAR-OT
+   #:when (⊢τ #'VAR-OT)
+   ;; Check  P,Σ,Γ ⊢e E : VAR-OT
+   #:with [_ t] (get-τ (with-Γ (Γ-add #'(??? . VAR-OT))
                          (⊢e #'E)))
-   #:when (or (τ=? #'t #'VAR-SCHEME)
-              (raise (mk-exn:ownership-mismatch #'t #'VAR-SCHEME #'E)))
-   ;; Check P,Σ,{VAR-NAME: VAR-SCHEME, ...} ⊢e E ... LEB : t-leb
-   #:with [_ ... LEB] (with-Γ (Γ-add #'(VAR-NAME . VAR-SCHEME))
+   #:when (or (τ=? #'t #'VAR-OT)
+              (raise (mk-exn:ownership-mismatch #'t #'VAR-OT #'E)))
+   ;; Check P,Σ,{VAR-NAME: VAR-OT, ...} ⊢e E ... LEB : t-leb
+   #:with [_ ... LEB] (with-Γ (Γ-add #'(VAR-NAME . VAR-OT))
                          (stx-map ⊢e #'(BODY ...)))
    #:with [_ t-leb] (get-τ #'LEB)
    ;; ------------------------------------------------------------------
-   ;; P,Γ ⊢e let (VAR-NAME VAR-OW-SCHEME E) BODY ... LEB : t-leb
+   ;; P,Γ ⊢e let (VAR-NAME VAR-OW-TYPE E) BODY ... LEB : t-leb
    (add-τ this-syntax #'t-leb)])
 
 (module+ test
@@ -470,8 +460,8 @@
     (with-Σ #'(n m o Θ)
     (with-Γ #'{ (this . (Foo Θ ())) }
 
-      ;; [New]             (new ~! SCHEME:ow-scheme)
-      ;; Check P,Σ ⊢τ SCHEME-TYPE
+      ;; [New]             (new ~! OT:ow-type)
+      ;; Check P,Σ ⊢τ OT-TYPE
       (check-exn exn:arity-error? (thunk (⊢e #'(new (Foo world (world))))))
       (check-exn exn:unknown-cparam? (thunk (⊢e #'(new (Foo z ())))))
       ;; P,Σ,Γ ⊢e (new t) : t
@@ -605,15 +595,15 @@
                  #'(Foo rep {})
                  "(: world/Foo -> rep/Foo)"))
 
-      ;; [Local Update, Sequence]  (let ~! (VAR-NAME VAR-SCHEME E) BODY ...)
-      ;; Check P,Σ ⊢τ VAR-SCHEME
+      ;; [Local Update, Sequence]  (let ~! (VAR-NAME VAR-OT E) BODY ...)
+      ;; Check P,Σ ⊢τ VAR-OT
       (check-exn exn:arity-error?
                  (thunk (⊢e #'(let (foo (Foo world {world}) _) _)))
                  "type Foo does not have context parameters")
       (check-exn exn:unknown-cparam?
                  (thunk (⊢e #'(let (foo (Foo z {}) _) _)))
                  "Context parameter `z` is not part of Σ")
-      ;; Check  P,Σ,Γ ⊢e E : VAR-SCHEME  (τ=?)
+      ;; Check  P,Σ,Γ ⊢e E : VAR-OT  (τ=?)
       (check-exn exn:ownership-mismatch?
                  (thunk (⊢e #'(let (foo (Foo rep {}) (new (Foo world {}))) _)))
                  "foo expects a rep/Foo but a world/Foo was given")
@@ -623,7 +613,7 @@
       (check-exn exn:ownership-mismatch?
                  (thunk (⊢e #'(let (bar (Bar o {n m}) (new (Bar o {n n}))) _)))
                  "bar expects a o/Bar{n m} but a o/Bar{n n} was given")
-      ;; Check P,Σ,{VAR-NAME: VAR-SCHEME, ...} ⊢e E ... LEB : t-leb
+      ;; Check P,Σ,{VAR-NAME: VAR-OT, ...} ⊢e E ... LEB : t-leb
       (check-not-exn (thunk (⊢e #'(let (foo (Foo Θ {}) this) foo))))
       (check-not-exn (thunk (⊢e #'(let (foo (Foo Θ {}) ???) foo)))
                      "A let binding accepts the `???` as expression")
@@ -633,7 +623,7 @@
       ;; (check-not-exn (thunk (⊢e #'(let (bind-this (Foo Θ {}) this)
       ;;                               (get-field bind-this rep/foo))))
       ;;                "Binding this is still this")
-      ;; P,Γ ⊢e let (VAR-NAME VAR-OW-SCHEME E) BODY ... LEB : t-leb
+      ;; P,Γ ⊢e let (VAR-NAME VAR-OW-TYPE E) BODY ... LEB : t-leb
       (check-τ (⊢e #'(let (foo (Foo rep {}) ???) foo))  #'(Foo rep {}))
       (check-τ (⊢e #'(let (foo (Foo rep {}) ???) this)) #'(Foo Θ {}))
       (check-τ (⊢e #'(let (foo (Foo rep {}) ???) this foo)) #'(Foo rep {}))
@@ -651,7 +641,7 @@
 ;;
 ;; [Type]
 (define-rules ⊢τ
-  [t:ow-scheme
+  [t:ow-type
    #:with [CPARAM ...] #'t.CPARAMS
    ;; Check |{CPARAM ...}| = OWS(TYPE)
    ;;;; We provide enough context parameters for that class.  For
@@ -690,35 +680,32 @@
 
 ;; Utils
 
-;; (Syntaxof a) -> (Syntaxof (Pairof (Syntaxof a) OW-SCHEME))
+;; (Syntaxof a) -> (Syntaxof (Pairof (Syntaxof a) OW-TYPE))
 ;;
-;; Note: I should raise a syntax error if the ow-scheme-prop is
+;; Note: I should raise a syntax error if the ow-type-prop is
 ;; false. For sure, having a term with no type when it should have one
 ;; is an error that should stop the computation.
 (define (get-τ stx)
   (with-syntax ([the-stx stx]
-                [τ-stx (ow-scheme-prop stx)])
+                [τ-stx (ow-type-prop stx)])
     #'(the-stx τ-stx)))
 
-;; (Syntaxof a) OW-SCHEME -> (Syntaxof a)
-(define add-τ ow-scheme-prop)
+;; (Syntaxof a) OW-TYPE -> (Syntaxof a)
+(define add-τ ow-type-prop)
 
-;; (: τ=? (OW-SCHEME OW-SCHEME -> Boolean))
-(define (τ=? stx1 stx2)
-  (define/syntax-parse T1:ow-scheme stx1)
-  (define/syntax-parse T2:ow-scheme stx2)
-
-  (define CPARAMs1 (syntax->list #'T1.CPARAMS))
-  (define CPARAMs2 (syntax->list #'T2.CPARAMS))
+;; (: τ=? (OW-TYPE OW-TYPE -> Boolean))
+(define (τ=? ot-stx1 ot-stx2)
+  (def-ow-type-values (_ ot1.OWNER ot1.CPARAMs) ot-stx1)
+  (def-ow-type-values (_ ot2.OWNER ot2.CPARAMs) ot-stx2)
 
   (and
    ;; Same owner
-   (bound-id=? #'T1.OWNER #'T2.OWNER)
+   (bound-id=? ot1.OWNER ot2.OWNER)
    ;; Same number of context parameters
-   (eq? (length CPARAMs1) (length CPARAMs2))
+   (eq? (length ot1.CPARAMs) (length ot2.CPARAMs))
    ;; Same context parameters
-   (for/and ([CPARAM1 (in-list CPARAMs1)]
-             [CPARAM2 (in-list CPARAMs2)])
+   (for/and ([CPARAM1 (in-list ot1.CPARAMs)]
+             [CPARAM2 (in-list ot2.CPARAMs)])
      (bound-id=? CPARAM1 CPARAM2))))
 
 ;; Static Visibility.
@@ -727,13 +714,12 @@
 ;; `OT.TYPE`.  This implementation follows the definition of CPN98,
 ;; but it has few flaws.  See tests for `visible?` below.
 ;;
-;; (: visible? (Syntax OW-SCHEME -> Boolean))
+;; (: visible? (Syntax OW-TYPE -> Boolean))
 (define (visible? E OT)
-  (match-define (list ot.TYPE ot.OWNER ot.CPARAMS)
-    (strip-ow-scheme OT))
+  (def-ow-type-values (ot.TYPE ot.OWNER ot.CPARAMs) OT)
 
   ;; All context parameters of `OT`
-  (define ctx (cons ot.OWNER (syntax->list ot.CPARAMS)))
+  (define ctx (cons ot.OWNER ot.CPARAMs))
 
   ;; Is the current expression a `this`?
   (define-rules is-this?
@@ -752,7 +738,7 @@
     [(send ~! E DNAME PARAM ...) #f]
     ;; Let is `this` if the expressions returned by the let is `this`.
     ;; TODO: quid it returns a variable bind to `this`?
-    [(let ~! (VAR-NAME VAR-SCHEME E) BODY ... LEB) (is-this? #'LEB)]
+    [(let ~! (VAR-NAME VAR-OT E) BODY ... LEB) (is-this? #'LEB)]
     ;; By default it is false
     [_ #f])
 
@@ -847,10 +833,10 @@
   #:transparent)
 
 ;; (: mk-exn:ownership-mismatch
-;;   ((OW-SCHEME OW-SCHEME)
+;;   ((OW-TYPE OW-TYPE)
 ;;    ((U Syntax #f))
 ;;    . ->* . exn:owner-mismatch))
-(define (mk-exn:ownership-mismatch GIVEN-OW-SCHEME EXPECTED-OW-SCHEME [context #f])
+(define (mk-exn:ownership-mismatch GIVEN-OW-TYPE EXPECTED-OW-TYPE [context #f])
   (define CTX (or context (current-syntax-context)))
   ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
   (define CTX-SURFACE (or (syntax-property CTX 'surface) CTX))
@@ -862,10 +848,10 @@
     (format (string-append "~n  The expression elaborate to the ownership ~s"
                            "~n  But the expected ownership is ~s, referring to declaration at ~a:~a"
                            "~n  in: ~.s")
-            (syntax->datum GIVEN-OW-SCHEME)
-            (syntax->datum EXPECTED-OW-SCHEME)
-            (syntax-line EXPECTED-OW-SCHEME)
-            (syntax-column EXPECTED-OW-SCHEME)
+            (syntax->datum GIVEN-OW-TYPE)
+            (syntax->datum EXPECTED-OW-TYPE)
+            (syntax-line EXPECTED-OW-TYPE)
+            (syntax-column EXPECTED-OW-TYPE)
             (syntax->datum CTX-SURFACE)))
 
   (exn:ownership-mismatch
@@ -878,7 +864,7 @@
   #:transparent)
 
 ;; (: mk-exn:visibility-error
-;;   ((Syntax Syntax OW-SCHEME)
+;;   ((Syntax Syntax OW-TYPE)
 ;;    ((U Syntax #f))
 ;;    . ->* . exn:visibility-error))
 (define (mk-exn:visibility-error E OW-E OW-TYPE [context #f])
@@ -909,7 +895,7 @@
   #:transparent)
 
 ;; (: mk-exn:visibility-error-param
-;;   ((Syntax Syntax OW-SCHEME)
+;;   ((Syntax Syntax OW-TYPE)
 ;;    ((U Syntax #f))
 ;;    . ->* . exn:visibility-error))
 (define (mk-exn:visibility-error-param E OW-E OW-TYPE [context #f])
@@ -942,17 +928,17 @@
   (require rackunit/text-ui
            (prefix-in env: (submod "env.rkt" ownership test)))
 
-  (define-check (check-τ stx b-type)
+  (define-check (check-τ stx ow-type)
     (define stx-type (syntax-parse (get-τ stx) [(_ t) #'t]))
 
     (with-check-info*
       (list (make-check-name 'check-τ)
             (make-check-location (build-source-location-list stx))
             (make-check-actual stx-type)
-            (make-check-expected b-type))
+            (make-check-expected ow-type))
       (thunk (with-handlers ([exn:arity-error? fail]
                              [exn:unknown-cparam? fail])
-               (check-true (τ=? stx-type b-type))))))
+               (check-true (τ=? stx-type ow-type))))))
 
   (run-tests
    (test-suite

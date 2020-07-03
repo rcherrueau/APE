@@ -18,11 +18,13 @@
          racket/pretty
          racket/sequence
          racket/string
+         racket/syntax
          rackunit
          syntax/parse
          syntax/parse/define
          syntax/macro-testing
          syntax/srcloc
+         syntax/stx
          errortrace/errortrace-key
          )
 
@@ -88,6 +90,19 @@
   (eq? (length (indexes-of (string->list str) contained)) 1))
 
 
+;; mk-ow-type-surface
+;;
+;; Build the surface syntax of an ownership type
+;;
+;; (:mk-ow-type-surface (TYPE OWNER CPARAMS -> Syntax))
+(define (mk-ow-type-surface type-stx owner-stx cparams-stx)
+  (let* ([cparams-str
+          (string-join (stx-map (∘ symbol->string syntax-e) cparams-stx))]
+         [ow-type-surface
+          (format-id owner-stx "~a/~a{~a}" owner-stx type-stx cparams-str
+                     #:source type-stx)])
+    (set-surface-stx ow-type-surface ow-type-surface)))
+
 ;; Syntax to string
 (define (stx->string stx #:newline? [newline? #t])
   (call-with-output-string
@@ -318,6 +333,18 @@
   )
 
 
+;; (: set-surface-stx (All (a) (Syntaxof a) Syntax -> (Syntaxof a)))
+(define (set-surface-stx stx surface-stx)
+  ;; Reuse 'surface property of `surface-stx' or make `surface-stx' a
+  ;; property.
+  (define surface-prop (or (syntax-property surface-stx 'surface) surface-stx))
+
+  ;; Mark `stx` with its surface
+  (syntax-property stx 'surface surface-prop #t))
+
+;; (: set-surface-stx (Syntax -> Syntax))
+(define (get-surface-stx stx)
+  (or (syntax-property stx 'surface) stx))
 
 ;; Add or preserve the 'surface property of the `origin' syntax object
 ;; to `stx'.
@@ -326,16 +353,11 @@
 ;; > #<syntax:stdin::233 foo>
 ;; (syntax-property (stx/surface #'baz (stx/surface #'bar #'foo)) 'surface)
 ;; > #<syntax:stdin::306 foo>
-(define-syntax-rule (stx/surface stx origin)
-  (let* (;; Set source location of `stx' by the one of `surface'
-         [stx/loc (syntax/loc origin stx)]
-         ;; Reuse 'surface property of `surface' or make `surface' a
-         ;; property
-         [surface-prop (or (syntax-property origin 'surface) origin)]
-         [new-stx (syntax-property stx/loc 'surface surface-prop #t)])
-    ;; (println surface-prop)
-    ;; (println (syntax-property-symbol-keys new-stx))
-    new-stx))
+(define-syntax-rule (stx/surface stx surface-stx)
+  ;; Set source location of `stx' by the one of `surface-stx'
+  (let ([stx/loc (syntax/loc surface-stx stx)])
+    ;; Set the surface property
+    (set-surface-stx stx/loc surface-stx)))
 
 ;; (dbg (+ 1 2))
 ;; > ; [dbg] stdin::103: (+ 1 2) = 3

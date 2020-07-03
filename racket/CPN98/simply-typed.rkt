@@ -36,15 +36,6 @@
 ;;   + Ensure that a call of a def has arguments of the expected type
 ;;     (raise an `unknown-type` error otherwise).
 ;;   + Get the type of a `send` operation.
-;;
-;; Naming conventions:
-;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
-;;
-;; Global:
-;; - meta:CS is the set of defined ownership scheme
-;; - meta:FS is the map of fields with ownership scheme field as value
-;; - meta:DS is the map of definitions with return ownership sheme as
-;;   value
 
 (require (for-syntax racket/base)
          racket/function
@@ -71,44 +62,42 @@
 
   ;; Map of locally bound variables.
   ;;
-  ;; (: Γ (Identifier ~> B-TYPE))
+  ;; (: Γ (Identifier ~> TYPE))
   (Γ #:init   '()
      #:mk     env:make-Γ
      #:apply? [env:Γ-member? env:Γ-add env:Γ-ref])
 
   ;; Store of the current class type
   ;;
-  ;; (: τ B-TYPE)
+  ;; (: τ TYPE)
   (τ #:init #'Bottom
      #:mk   identity)
 
   ;; Set of existing types
   ;;
-  ;; (: CS (Setof B-TYPE))
+  ;; (: CS (Setof TYPE))
   (CS #:init   (map car meta:CS)
       #:mk     env:make-CS
       #:apply? (env:CS-member?))
 
   ;; Map of fields
   ;;
-  ;; The init instantiate ownership schemes in meta:FS into basic
-  ;; types.
+  ;; The init transforms ownership type in meta:FS into basic types.
   ;;
-  ;; (: FS ((Syntaxof (Pairof B-TYPE        ; Class type
+  ;; (: FS ((Syntaxof (Pairof TYPE        ; Class type
   ;;                          Identifier))  ; Field name
-  ;;        ~> B-TYPE))                     ; Field return type
+  ;;        ~> TYPE))                     ; Field return type
   (FS #:init
       ;; TODO: make a function of these so I can unit-test it
       (meta-map
-       (syntax-parser [SCHEME:ow-scheme #'SCHEME.TYPE])
+       (syntax-parser [OT:ow-type #'OT.TYPE])
        meta:FS)
       #:mk env:make-FS
       #:apply? (env:FS-member? env:FS-ref))
 
   ;; Map of definitions
   ;;
-  ;; The init instantiate ownership schemes in meta:DS into basic
-  ;; types.
+  ;; The init transforms ownership type in meta:DS into basic types.
   ;;
   ;; TODO: I do not support method overloading, so indexing by class
   ;; type and def name and then returning the type of def args and the
@@ -116,17 +105,17 @@
   ;;
   ;; (: DS ((Syntaxof (List Identifier                    ; Class type
   ;;                        Identifier                    ; Def name
-  ;;                        (Syntaxof (Listof B-TYPE))))  ; Type of def args
-  ;;        ~> B-TYPE)                                    ; Def return type
+  ;;                        (Syntaxof (Listof TYPE))))  ; Type of def args
+  ;;        ~> TYPE)                                    ; Def return type
   (DS #:init (meta-map-w/key
               (;; Instantiate ows of keys
                (syntax-parser
-                 [(c-type:id def:id (scheme:ow-scheme ...))
-                  #'(c-type def (scheme.TYPE ...))])
+                 [(c-type:id def:id (OT:ow-type ...))
+                  #'(c-type def (OT.TYPE ...))])
                . *** .
                ;; Instantiate ows of values
                (syntax-parser
-                 [SCHEME:ow-scheme #'SCHEME.TYPE]))
+                 [OT:ow-type #'OT.TYPE]))
               meta:DS)
       #:mk env:make-DS
       #:apply? (env:DS-member? env:DS-ref env:DS-domain))
@@ -160,7 +149,7 @@
    #:with [FIELD ...] (filter field? (stx->list #'(FIELD/DEF ...)))
    #:with [DEF ...] (filter def? (stx->list #'(FIELD/DEF ...)))
    ;; Check P ⊢τ t on fields
-   #:with [(field ~! _F-NAME F:ow-scheme) ...] #'(FIELD ...)
+   #:with [(field ~! _F-NAME F:ow-type) ...] #'(FIELD ...)
    #:when (stx-for/and ([t #'(F.TYPE ...)]) (⊢τ t))
    ;; Check P,NAME ⊢m DEF ≫ ?DEF
    #:when (with-τ #'NAME (stx-map ⊢m #'(DEF ...)))
@@ -194,7 +183,7 @@
 ;; In context `P,τ`, `DEF` elaborates to `?DEF`
 (define-rules ⊢m
   ;; [meth]
-  [(def ~! (NAME (ARG-NAME ARG:ow-scheme) ... RET:ow-scheme) E ...+)
+  [(def ~! (NAME (ARG-NAME ARG:ow-type) ... RET:ow-type) E ...+)
    ;; Get current class type store in τ environment
    #:with τ0 (τ)
    ;; Check P ⊢τ t on args and return type
@@ -215,8 +204,8 @@
    #:when (or (τ=? #'t-e #'RET.TYPE)
               (raise (mk-exn:type-mismatch #'t-e #'RET.TYPE #'?LEB)))
    ;; ----------------------------------------------------------------
-   ;; P,τ0 ⊢m (def (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) E ...+) ≫
-   ;;           (def (NAME (ARG-NAME ARG-OW-SCHEME) ... RET-OW-SCHEME) ?E ...)
+   ;; P,τ0 ⊢m (def (NAME (ARG-NAME ARG-OW-TYPE) ... RET-OW-TYPE) E ...+) ≫
+   ;;           (def (NAME (ARG-NAME ARG-OW-TYPE) ... RET-OW-TYPE) ?E ...)
    this-syntax])
 
 (module+ test
@@ -271,12 +260,12 @@
 ;; In context `P,Γ`, `E` elaborates to `?E` and has type `t`
 (define-rules ⊢e
   ;; [new]
-  [(new ~! SCHEME:ow-scheme)
-   ;; Check P ⊢τ SCHEME-TYPE
-   #:when (⊢τ #'SCHEME.TYPE)
+  [(new ~! OT:ow-type)
+   ;; Check P ⊢τ OT-TYPE
+   #:when (⊢τ #'OT.TYPE)
    ;; ----------------------------------------------------------------
    ;; P,Γ ⊢e (new C) ≫ (new C) : C
-   (add-τ this-syntax #'SCHEME.TYPE)]
+   (add-τ this-syntax #'OT.TYPE)]
 
   ;; [var]
   [ID:id
@@ -340,28 +329,28 @@
    (add-τ this-syntax (DS-ref #'DS-key))]
 
   ;; [let]
-  [(let ~! (VAR-NAME VAR-SCHEME:ow-scheme E) BODY ...)
-   ;; Check P ⊢τ VAR-SCHEME-TYPE
-   #:when (⊢τ #'VAR-SCHEME.TYPE)
-   ;; Check  P,Γ ⊢e E ≫ ?E : VAR-SCHEME-TYPE
-   #:with [?E t] (get-τ (with-Γ (Γ-add #'(??? . VAR-SCHEME.TYPE))
+  [(let ~! (VAR-NAME VAR-OT:ow-type E) BODY ...)
+   ;; Check P ⊢τ VAR-OT-TYPE
+   #:when (⊢τ #'VAR-OT.TYPE)
+   ;; Check  P,Γ ⊢e E ≫ ?E : VAR-OT-TYPE
+   #:with [?E t] (get-τ (with-Γ (Γ-add #'(??? . VAR-OT.TYPE))
                           (⊢e #'E)))
-   #:when (or (τ=? #'t #'VAR-SCHEME.TYPE)
-              (raise (mk-exn:type-mismatch #'t #'VAR-SCHEME.TYPE #'?E)))
-   ;; Check P,Γ{VAR-NAME: VAR-OW-SCHEME} ⊢e BODY ≫ ?BODY : t
+   #:when (or (τ=? #'t #'VAR-OT.TYPE)
+              (raise (mk-exn:type-mismatch #'t #'VAR-OT.TYPE #'?E)))
+   ;; Check P,Γ{VAR-NAME: VAR-OW-TYPE} ⊢e BODY ≫ ?BODY : t
    ;;;; Note: This is a generalization regarding [FKF98].  The paper
    ;;;; only accept one expression in the body of a `let`.  Here we
    ;;;; accept many, with the idea that the results of the last
    ;;;; expression is returned as the result of the `let`.  In such a
    ;;;; case the type of the `let` is the type of the Last Expression
    ;;;; of its BODY (LEB).
-   ;;;; Check P,Γ{VAR-NAME: VAR-OW-SCHEME} ⊢e BODY ... LEB ≫ ?BODY ... ?LEB : t-body
-   #:with [?BODY ... ?LEB] (with-Γ (Γ-add #'(VAR-NAME . VAR-SCHEME.TYPE))
+   ;;;; Check P,Γ{VAR-NAME: VAR-OW-TYPE} ⊢e BODY ... LEB ≫ ?BODY ... ?LEB : t-body
+   #:with [?BODY ... ?LEB] (with-Γ (Γ-add #'(VAR-NAME . VAR-OT.TYPE))
                              (stx-map ⊢e #'(BODY ...)))
    #:with [_ t-body] (get-τ #'?LEB)
    ;; ------------------------------------------------------------------
-   ;; P,Γ ⊢e *let (VAR-NAME VAR-OW-SCHEME E) BODY ... LEB ≫
-   ;;           *let (VAR-NAME VAR-OW-SCHEME ?E) ?BODY ... ?LEB : t-body
+   ;; P,Γ ⊢e *let (VAR-NAME VAR-OW-TYPE E) BODY ... LEB ≫
+   ;;           *let (VAR-NAME VAR-OW-TYPE ?E) ?BODY ... ?LEB : t-body
    (add-τ this-syntax #'t-body)])
 
 (module+ test
@@ -374,7 +363,7 @@
     (with-Γ #'{ (this . Foo) (_ . Bar) }
 
       ;; [new]
-      ;;;; Check P ⊢τ VAR-OW-SCHEME
+      ;;;; Check P ⊢τ VAR-OW-TYPE
       (check-exn exn:unknown-type? (thunk (⊢e #'(new (Baz o ())))))
       (check-not-exn (thunk (⊢e #'(new (Foo o ())))))
       ;;;; P,Γ ⊢e (new C) ≫ (new C) : C
@@ -488,12 +477,12 @@
       ;;  "A `send` accepts the `?_` expression")
       ;; (check-τ (⊢e #'(send (new (Foo o ())) def/2 ?arg1 ?arg2)) #'Bar)
 
-      ;; [let] (let ~! (VAR-NAME VAR-SCHEME:ow-scheme E) BODY ...)
-      ;;;; Check P ⊢τ VAR-SCHEME-TYPE
+      ;; [let] (let ~! (VAR-NAME VAR-OT:ow-type E) BODY ...)
+      ;;;; Check P ⊢τ VAR-OT-TYPE
       (check-exn exn:unknown-type? (thunk (⊢e #'(let (baz (Baz o ()) _) _))))
-      ;;;; Check  P,Γ ⊢e E ≫ ?E : VAR-OW-SCHEME
+      ;;;; Check  P,Γ ⊢e E ≫ ?E : VAR-OW-TYPE
       (check-exn exn:type-mismatch? (thunk (⊢e #'(let (baz (Foo o ()) (new (Bar o ()))) _))))
-      ;;;; Check P,Γ{VAR-NAME: VAR-OW-SCHEME} ⊢e BODY ... LEB ≫ ?BODY ... ?LEB : t-body
+      ;;;; Check P,Γ{VAR-NAME: VAR-OW-TYPE} ⊢e BODY ... LEB ≫ ?BODY ... ?LEB : t-body
       (check-not-exn
        (thunk (⊢e #'(let (foo (Foo o ()) this) foo))))
       (check-not-exn
@@ -509,8 +498,8 @@
        (thunk (⊢e #'(let (foo (Foo p ())  (new (Foo o ()))) _))))  ;;  | basic type,
       (check-not-exn                                               ;;  | not owner
        (thunk (⊢e #'(let (foo (Foo p (c)) (new (Foo o ()))) _))))  ;;  | nor ctx params
-      ;;;; P,Γ ⊢e *let (VAR-NAME VAR-OW-SCHEME E) BODY ... LEB ≫
-      ;;;;           *let (VAR-NAME VAR-OW-SCHEME ?E) ?BODY ... ?LEB : t-body
+      ;;;; P,Γ ⊢e *let (VAR-NAME VAR-OW-TYPE E) BODY ... LEB ≫
+      ;;;;           *let (VAR-NAME VAR-OW-TYPE ?E) ?BODY ... ?LEB : t-body
       (check-τ (⊢e #'(let (foo (Foo o ()) ???) foo))   #'Foo)
       (check-τ (⊢e #'(let (foo (Foo o ()) ???) _))     #'Bar)
       (check-τ (⊢e #'(let (foo (Foo o ()) ???) foo _)) #'Bar)
@@ -558,7 +547,7 @@
   (define looked-def-number-args (length LOOKED-DEF-ARGs))
 
   ;; Get the domain of `DS` and transform info for latter analysis
-  ;; (: def-dom (Listof (List B-TYPE Identifier (Listof B-TYPE))))
+  ;; (: def-dom (Listof (List TYPE Identifier (Listof TYPE))))
   (define def-dom
     (map (∘ (λ (key)
               (match-define (list c-type def-name args) key)
@@ -573,8 +562,8 @@
          (bound-id=? LOOKED-DEF-NAME D-NAME)))
 
   (define (met-def-arity=? ds-key)
-    (match-define (list _ _ ARGs-B-TYPE) ds-key)
-    (eq? looked-def-number-args (length ARGs-B-TYPE)))
+    (match-define (list _ _ ARGs-TYPE) ds-key)
+    (eq? looked-def-number-args (length ARGs-TYPE)))
 
   ;; Lets find entries in dom(DS) with same class and def name
   (define met-cname=/dname=-defs (filter met-cname=/dname=? def-dom))
@@ -613,16 +602,16 @@
 
 ;; Utils
 
-;; (Syntaxof a) -> (Syntaxof (Pairof (Syntaxof a) B-TYPE))
+;; (Syntaxof a) -> (Syntaxof (Pairof (Syntaxof a) TYPE))
 (define (get-τ stx)
   (with-syntax ([the-stx stx]
                 [τ-stx (b-type-prop stx)])
     #'(the-stx τ-stx)))
 
-;; (Syntaxof a) B-TYPE -> (Syntaxof a)
+;; (Syntaxof a) TYPE -> (Syntaxof a)
 (define add-τ b-type-prop)
 
-;; (: τ=? (B-TYPE B-TYPE -> Boolean))
+;; (: τ=? (TYPE TYPE -> Boolean))
 (define τ=? bound-id=?)
 
 (module+ test
@@ -640,22 +629,22 @@
 (struct exn:unknown-type exn:fail:syntax ()
   #:transparent)
 
-(define (mk-exn:unknown-type B-TYPE)
-  (define srcloc-msg (srcloc->string (build-source-location B-TYPE)))
-  (define id (format "~s" (syntax->datum B-TYPE)))
+(define (mk-exn:unknown-type TYPE)
+  (define srcloc-msg (srcloc->string (build-source-location TYPE)))
+  (define id (format "~s" (syntax->datum TYPE)))
   (define err-msg "unknown type in this scope")
 
   (exn:unknown-type
    (string-append srcloc-msg ": " id ": " err-msg)
    (current-continuation-marks)
-   (list (syntax-taint B-TYPE))))
+   (list (syntax-taint TYPE))))
 
 ;; Type mismatch
 (struct exn:type-mismatch exn:fail:syntax ()
   #:transparent)
 
-;; (: mk-exn:type-mismatch  B-TYPE B-TYPE Syntax #:name (U Syntax Symbol #f) -> exn:type-mismatch)
-(define (mk-exn:type-mismatch GIVEN-B-TYPE EXPECTED-B-TYPE [context #f]
+;; (: mk-exn:type-mismatch  TYPE TYPE Syntax #:name (U Syntax Symbol #f) -> exn:type-mismatch)
+(define (mk-exn:type-mismatch GIVEN-TYPE EXPECTED-TYPE [context #f]
                               #:name [n #f])
   (define CTX (or context (current-syntax-context)))
   ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
@@ -670,10 +659,10 @@
     (format (string-append "~n  The expression elaborate to the type ~s"
                            "~n  But the expected type is ~s, referring to declaration at ~a:~a"
                            "~n  in: ~.s")
-            (syntax->datum GIVEN-B-TYPE)
-            (syntax->datum EXPECTED-B-TYPE)
-            (syntax-line EXPECTED-B-TYPE)
-            (syntax-column EXPECTED-B-TYPE)
+            (syntax->datum GIVEN-TYPE)
+            (syntax->datum EXPECTED-TYPE)
+            (syntax-line EXPECTED-TYPE)
+            (syntax-column EXPECTED-TYPE)
             (syntax->datum CTX-SURFACE)))
 
   (exn:type-mismatch
@@ -685,7 +674,7 @@
 (struct exn:arity-error exn:fail:syntax ()
   #:transparent)
 
-;; (: mk-exn:arity-error (Identifier Integer (Listof B-TYPE) STX -> exn:arity-error))
+;; (: mk-exn:arity-error (Identifier Integer (Listof TYPE) STX -> exn:arity-error))
 (define (mk-exn:arity-error def expected-args-size given-args-size [context #f])
   (define CTX (or context (current-syntax-context)))
   ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
@@ -714,7 +703,7 @@
 (struct exn:unknown-def exn:fail:syntax ()
   #:transparent)
 
-;; (: mk-exn:unknown-def (Identifier B-TYPE STX -> exn:unknown-def))
+;; (: mk-exn:unknown-def (Identifier TYPE STX -> exn:unknown-def))
 (define (mk-exn:unknown-def def-name c-type [context #f])
   (define CTX (or context (current-syntax-context)))
   ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)
@@ -738,7 +727,7 @@
 (struct exn:unknown-field exn:fail:syntax ()
   #:transparent)
 
-;; (: mk-exn:unknown-field (Identifier B-TYPE Syntax -> exn:unknown-field))
+;; (: mk-exn:unknown-field (Identifier TYPE Syntax -> exn:unknown-field))
 (define (mk-exn:unknown-field field-name c-type [CONTEXT #f])
   (define CTX (or CONTEXT (current-syntax-context)))
   ;; (log-sclang-debug "Desugared syntax is ~.s" CTX)

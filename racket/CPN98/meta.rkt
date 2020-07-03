@@ -39,10 +39,10 @@
                            )))
 (define meta:CS #f)
 
-(: meta:FS (Dict FS-key OW-SCHEME))
+(: meta:FS (Dict FS-key OW-TYPE))
 (define meta:FS #f)
 
-(: meta:DS (Dict DS-key OW-SCHEME))
+(: meta:DS (Dict DS-key OW-TYPE))
 (define meta:DS #f)
 
 
@@ -106,26 +106,26 @@
 
 ;; Transforms a list of field stx objects `FIELD...` of a specific
 ;; class `C-TYPE` into an associative list of `FS-key` and
-;; `OW-SCHEME`.
+;; `OW-TYPE`.
 (: mk-fs (Identifier (Syntaxof (Listof 'field-stx))
-                     -> (Listof (Pairof FS-key OW-SCHEME))))
+                     -> (Listof (Pairof FS-key OW-TYPE))))
 (define (mk-fs C-TYPE FIELD...)
   (define mk-fs-item (syntax-parser
       #:literal-sets [keyword-lits]
-      [(field NAME OWS:ow-scheme)
+      [(field NAME OWS:ow-type)
        #:with C-TYPE C-TYPE
        (cons #'(C-TYPE . NAME) #'OWS)]))
 
   (stx-map mk-fs-item FIELD...))
 
 ;; Transforms a list of def stx objects `DEF...` of a specific class
-;; `C-TYPE` into an associative list of `DS-key` and `OW-SCHEME`.
+;; `C-TYPE` into an associative list of `DS-key` and `OW-TYPE`.
 (: mk-ds (Identifier (Syntaxof (Listof 'def-stx))
-                     -> (Listof (Pairof DS-key OW-SCHEME))))
+                     -> (Listof (Pairof DS-key OW-TYPE))))
 (define (mk-ds C-TYPE DEF...)
   (define mk-ds-item (syntax-parser
       #:literal-sets [keyword-lits]
-      [(def (NAME (A-NAME A-OWS:ow-scheme) ...  R-OWS:ow-scheme) _ ...)
+      [(def (NAME (A-NAME A-OWS:ow-type) ...  R-OWS:ow-type) _ ...)
        #:with C-TYPE C-TYPE
        (cons #'(C-TYPE NAME (A-OWS ...)) #'R-OWS)]))
 
