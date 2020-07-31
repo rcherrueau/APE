@@ -177,42 +177,63 @@
 (module+ test
   (require rackunit rackunit/text-ui)
 
-  (run-test
+  (run-tests
    (test-suite
     "Meta phase (M>)"
 
-    ;; TODO:
-    ;; ;; Check no-name-clash
-    ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((clazz foo))))
-    ;;            "`clazz` is not a `class`")
-    ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((class (foo)))))
-    ;;            "`(foo)` is not a valid name")
-    ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((filed foo))))
-    ;;            "`filed` is not a `field`")
-    ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((field (foo)))))
-    ;;            "`(foo)` is not a valid name for field")
-    ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((dEf (foo) ???))))
-    ;;            "`dEf` is not a `def`")
-    ;; (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((def ((foo)) ???))))
-    ;;            "`(foo)` is not a valid name for def")
+    ;; Check no-name-clash
+    (check-true (no-name-clash? #'(foo bar)))
+    (check-true (no-name-clash? #'((field foo) (field bar))))
+    (check-true (no-name-clash? #'((def (foo) ???) (def (bar) ???))))
 
-    ;; (check-true (no-name-clash? #'((class foo) (class bar))))
-    ;; (check-true (no-name-clash? #'((field foo) (field bar))))
-    ;; (check-true (no-name-clash? #'((def (foo) ???) (def (bar) ???))))
+    (check-exn exn:name-clash? (thunk (no-name-clash? #'(foo foo))))
+    (check-exn exn:name-clash? (thunk (no-name-clash? #'((field foo) (field foo)))))
+    (check-exn exn:name-clash? (thunk (no-name-clash? #'((def (foo) ???) (def (foo) ???)))))
 
-    ;; (check-exn exn:name-clash? (thunk (no-name-clash? #'((class foo) (class foo)))))
-    ;; (check-exn exn:name-clash? (thunk (no-name-clash? #'((field foo) (field foo)))))
-    ;; (check-exn exn:name-clash? (thunk (no-name-clash? #'((def (foo) ???) (def (foo) ???)))))
+    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'(((foo)))))
+               "`(foo)` is not a valid name")
+    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((filed foo))))
+               "`filed` is not a `field`")
+    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((field (foo)))))
+               "`(foo)` is not a valid name for field")
+    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((dEf (foo) ???))))
+               "`dEf` is not a `def`")
+    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((def ((foo)) ???))))
+               "`(foo)` is not a valid name for def")
 
+    ;; Check (M>)
+    (check-exn exn:name-clash?
+               (thunk (M> #'((class Foo [])
+                             (class Foo [])
+                             expr)))
+               "Classes should have a unique name")
+    (check-exn exn:name-clash?
+               (thunk (M> #'((class Foo []
+                               (field foo (t o {}))
+                               (field foo (t o {})))
+                             expr)))
+               "Fields of a class should have a unique name")
+    (check-exn exn:name-clash?
+               (thunk (M> #'((class Foo []
+                               (def (foo (Foo o ())) ???)
+                               (def (foo (Foo o ())) ???))
+                             expr)))
+               "Methods of a class should have a unique name")
 
-    ;; ;; Check (M>)
-    ;; (check-true (no-name-clash? #'((class foo (field foo)) (class bar (field bar)))))
+    (check-not-exn (thunk (M> #'((class Foo [] (field foo (t o {})))
+                                 (class Bar [] (field bar (t o {})))
+                                 expr))))
 
-    ;; (check-true (no-name-clash? #'((class foo (field foo)) (class bar (field foo))))
-    ;;             "Two field could have the same name in different class")
-    ;; (check-true (no-name-clash? #'((class foo (field foo) (def foo (foo))))))
-    ;; ;; (check-true (no-name-clash? #'((class foo (field foo) (field foo)))))
-    )))
+    (check-not-exn (thunk (M> #'((class Foo [] (field foo (t o {})))
+                                 (class Bar [] (field foo (t o {})))
+                                 expr)))
+                   "Two fields could have the same name in different classes")
+
+    (check-not-exn (thunk (M> #'((class Foo []
+                                   (field foo (t o {}))
+                                   (def (foo (Foo o ())) ???))
+                                 expr)))
+                   "A field and a def could have the same name"))))
 
 
 ;; Bibliography
