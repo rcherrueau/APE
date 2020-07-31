@@ -88,7 +88,7 @@
 (define get-CLASS...
   (syntax-parser
     #:literal-sets [keyword-lits]
-    [(prog ~! CLASS ... E) #'(CLASS ...)]))
+    [(CLASS ... E) #'(CLASS ...)]))
 
 ;; Extracts the type, fields and defs syntax objects of a class
 (: get-class-C-TYPE/CPARAM.../FIELD.../DEF...

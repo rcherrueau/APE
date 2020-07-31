@@ -10,7 +10,7 @@
 ;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
 ;; - XS (with an uppercase "S" at the end) is a syntax list of syntax
 ;;   objects, e.g., #'(a b c 1 v)
-;; - Xs (with a small "s" at the end) is a list of syntax objectc,
+;; - Xs (with a small "s" at the end) is a list of syntax objects,
 ;;   e.g., (list #'a #'b #'c #'1 #'v)
 ;; - t^ is the ownership scheme of t
 ;;

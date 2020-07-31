@@ -104,7 +104,7 @@
 ;; `P` is well-formed with ownership type `t`
 (define-rules ⊢p
   ;; [program]
-  [(prog ~! CLASS ... E)
+  [(CLASS ... E)
    ;; Check P ⊢d CLASS
    #:do [(stx-map ⊢d #'(CLASS ...))]
    ;; Check P,[],[] ⊢e E : t

@@ -29,7 +29,7 @@
   ;; Note: The syntax/parse package require all literals to have a
   ;; binding. To match identifier by their symbolic names, I have to
   ;; use `#:datum-literals` instead.
-  #:datum-literals (prog class field def)
+  #:datum-literals (class field def)
   ;; I have no literals that should be interpreted.
   ())
 

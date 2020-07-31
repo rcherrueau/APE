@@ -130,13 +130,13 @@
 ;; `P` elaborates to `?P` and has type `t`
 (define-rules ⊢p
   ;; [prog]
-  [(prog ~! CLASS ... E)
+  [(CLASS ... E)
    ;; Check P ⊢d CLASS ≫ ?CLASS
    #:with [?CLASS ...] (stx-map ⊢d #'(CLASS ...))
    ;; Check P,[] ⊢e E ≫ ?E : t
    #:with [?E t] (get-τ (with-Γ #'() (⊢e #'E)))
    ;; ----------------------------------------------------------------
-   ;; ⊢p (prog CLASS ... E) ≫ (prog ?CLASS ... ?E) : t
+   ;; ⊢p (CLASS ... E) ≫ (?CLASS ... ?E) : t
    (add-τ this-syntax #'t)])
 
 

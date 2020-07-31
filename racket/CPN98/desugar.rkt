@@ -54,17 +54,17 @@
 
 ;; Program rules
 
-;; A prog is a list of CLASS and one expression E
+;; A program is a list of CLASS and one expression E
 (define-rules ir-p
   ;; Note: The `~!` eliminate backtracking. Hence, if the next
   ;; `fail-when` failed, it will not backtrack to try other cases.
   ;;
   ;; TODO: Add a ~commit to see if it corrects backtracking during an
   ;; error.
-  [(prog ~! CLASS:expr ... E:expr)
+  [(CLASS:expr ... E:expr)
    #:with [*CLASS ...] (stx-map ir-c #'(CLASS ...))
    #:with *E           (ir-e #'E)
-   (stx/surface (prog *CLASS ... *E) this-syntax)])
+   (stx/surface (*CLASS ... *E) this-syntax)])
 
 
 ;; Class rules
