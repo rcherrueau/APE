@@ -192,21 +192,16 @@
     (map (λ (a b) (cons a b)) v ls))
   (foldr vs->ls (build-list (length (car vs)) (const '())) vs))
 
-#;(define-custom-hash-types priv:idid-map
-  #:key? (λ ([K : Idid])
-           (if (syntax? K)
-               (let ([k (syntax-e K)])
-                 (and (pair? k) (identifier? (car k)) (identifier? (cdr k))))
-               #f))
-  (λ ([X : Idid] [Y : Idid])
-    (let* ([x (syntax-e X)]
-           [y (syntax-e Y)]
-           [x1 (car x)] [x2 (cdr x)]
-           [y1 (car y)] [y2 (cdr y)])
-      (if (and (eq? (syntax-e x1) (syntax-e y1))
-               (eq? (syntax-e x2) (syntax-e y2)))
-          #t #f)))
-  )
+
+;; Equivalent of port->lines but uses `read-syntax` instead of
+;; `read-lines`.
+;;
+;; (: port->lines-stx (String Input-Port -> Syntax))
+(define (port->lines-stx source-name in)
+  (define LINEs
+    (port->list (curry read-syntax source-name) in))
+  (datum->syntax #f LINEs))
+
 
 
 ;; cms->srclocs : continuation-marks -> (listof srcloc)

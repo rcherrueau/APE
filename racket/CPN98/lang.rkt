@@ -29,15 +29,11 @@
 ;; Global:
 ;; - meta:CS is the set of defined ownership scheme
 ;; - meta:FS is the map of fields with ownership type field as value
-;; - meta:DS is the map of definitions with return ownership sheme as
+;; - meta:DS is the map of definitions with return ownership type as
 ;;   value
 
 (require "utils.rkt"
-         ;; phases
-         "desugar.rkt"
-         "meta.rkt"
-         "simply-typed.rkt"
-         "ownership.rkt")
+         "check.rkt")
 
 (provide (rename-out
           [lang-read read]
@@ -47,35 +43,20 @@
 (define (lang-read in)
   (syntax->datum (lang-read-syntax #f in)))
 
-(define (lang-read-syntax src in)
-  (define (s-exps rs)
-     (let s-exps ([s-exp (rs src in)])
-       (if (eof-object? s-exp)
-           '()
-           (cons s-exp (s-exps (rs src in))))))
+(define (lang-read-syntax source-name in)
 
-  ;; ~~~~~~~~~~~~~~~~
-  ;; Tower of transformation
-  (let*
-      (;; Prog in surface syntax
-       [prog #`(prog #,@(s-exps read-syntax))]
-       ;; Desugaring into the IR
-       [prog (ir> prog)]
-       ;; Meta-information (Effectful computation)
-       [_    (M> prog)]
-       ;; Simply Type Checks
-       [prog (?> prog)]
-       ;; Ownership Type Checks
-       [prog (Θ> prog)]
-       )
+  ;; Check program, return program in intermediate representation and
+  ;; its meta values.
+  (define-values (prog-ir meta:CS meta:FS meta:DS)
+    (check (port->lines-stx source-name in)))
 
-    ;; Log final AST
-    (log-sclang-debug (stx->string prog #:newline? #f))
+  ;; Log final AST
+  (log-sclang-debug (stx->string prog-ir #:newline? #f))
 
-    ;; Execution
-    #`(module cpn98-lang racket/base
-        ;; #,prog
-        (void))))
+  ;; Execution
+  #`(module cpn98-lang racket/base
+      ;; #,prog
+        (void)))
 
 ;; Profiling lang:
 ;;
