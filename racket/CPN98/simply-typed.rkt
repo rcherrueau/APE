@@ -56,7 +56,7 @@
 
 
 ;; Phase ?>
-(define-phase (?> stx)
+(define-phase (?> stx meta:CS meta:FS meta:DS)
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ;; Env
 
@@ -99,24 +99,30 @@
   ;;
   ;; The init transforms ownership type in meta:DS into basic types.
   ;;
-  ;; TODO: I do not support method overloading, so indexing by class
-  ;; type and def name and then returning the type of def args and the
-  ;; return type as a pair, would have been a better idea.
+  ;; Note: This datatype indexes methods with a triplet of class type,
+  ;; method name and type of args as key and the return type of the
+  ;; method as value.  This may seem a bit overkill as I do not
+  ;; support method overloading, and I could not have two methods with
+  ;; the same name and different args.  So, indexing by class type and
+  ;; def name and then returning the type of def args and the return
+  ;; type as a pair, would have been a better idea.  But, here I tried
+  ;; to stick to [FKF98] definition.
   ;;
-  ;; (: DS ((Syntaxof (List Identifier                    ; Class type
-  ;;                        Identifier                    ; Def name
+  ;; (: DS ((Syntaxof (List Identifier                  ; Class type
+  ;;                        Identifier                  ; Def name
   ;;                        (Syntaxof (Listof TYPE))))  ; Type of def args
   ;;        ~> TYPE)                                    ; Def return type
-  (DS #:init (meta-map-w/key
-              (;; Instantiate ows of keys
-               (syntax-parser
-                 [(c-type:id def:id (OT:ow-type ...))
-                  #'(c-type def (OT.TYPE ...))])
-               . *** .
-               ;; Instantiate ows of values
-               (syntax-parser
-                 [OT:ow-type #'OT.TYPE]))
-              meta:DS)
+  (DS #:init
+      ;; TODO: make a function of these so I can unit-test it
+      (meta-map-w/key
+       (;; Instantiate ows of keys
+        (syntax-parser
+          [(c-type:id def:id (OT:ow-type ...)) #'(c-type def (OT.TYPE ...))])
+        . *** .
+        ;; Instantiate ows of values
+        (syntax-parser
+          [OT:ow-type #'OT.TYPE]))
+       meta:DS)
       #:mk env:make-DS
       #:apply? (env:DS-member? env:DS-ref env:DS-domain))
 

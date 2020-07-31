@@ -149,9 +149,13 @@
        #'((e.NAME e-def e-apply) ...)]))
 
   (syntax-parse parser-stx
-    [(_ (ID:id stx:expr)  ;; Phase name (e.g., `?>`) and its syntax object/id
-        E:env ...         ;; Environment variables ...
-        DEF:expr)         ;; Phase definition
+    [(_
+      ;; Phase name (e.g., `?>`), its syntax object and arguments
+      (ID:id stx:expr ARG:expr ...)
+      ;; Environment variables ...
+      E:env ...
+      ;; Phase definition
+      DEF:expr)
      #:with ((E-NAME E-DEF E-APPLY) ...)
        (stx-flatten (stx-map env->name/def/apply #'(E ...)))
      #'(begin
@@ -173,7 +177,7 @@
 
          ;; Define the parser as a global definition. We parameterize
          ;; the first call of `DEF` with `Env` values
-         (define (ID stx)
+         (define (ID stx ARG ...)
            (parameterize ([E.NAME (E.MAKER E.VAL)] ...) DEF)))]
     ))
 

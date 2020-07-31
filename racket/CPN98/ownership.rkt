@@ -33,7 +33,7 @@
 
 
 ;; Phase θ>
-(define-phase (Θ> stx)
+(define-phase (Θ> stx meta:CS meta:FS meta:DS)
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ;; Env
 

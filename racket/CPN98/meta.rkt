@@ -28,57 +28,51 @@
          "utils.rkt"
          "definitions.rkt")
 
-(provide meta:CS meta:FS meta:DS
-         M>)
-
-
-;; Meta values
-
-(: meta:CS (Listof (Pairof Identifier           ;; class type
-                           (Listof Identifier)  ;; context parameters
-                           )))
-(define meta:CS #f)
-
-(: meta:FS (Dict FS-key OW-TYPE))
-(define meta:FS #f)
-
-(: meta:DS (Dict DS-key OW-TYPE))
-(define meta:DS #f)
+(provide M>)
 
 
 ;; Phase M>
 
-;; Check names clash and set meta values (using global meta:CS/FS/DS).
+;; Check names clash and compute meta values (meta:CS/FS/DS).
 ;;
-;; (: M> (Syntax -> Void))
+;; (: M> (Syntax -> (Values meta:CS meta:FS meta:DS)))
 (define (M> stx)
-  (set!-values
+  (for/foldr (;; Accumulators
+              ;;
+              ;; Set of defined ownership scheme
+              ;; (Listof (Pairof Identifier             ; class type
+              ;;                 (Listof Identifier)))  ; context parameters
+              [meta:CS '()]
+              ;; Map of fields with ownership type field as value
+              ;; (FS-key ~> OW-TYPE)
+              [meta:FS '()]
+              ;; Map of definitions with return ownership type as value
+              ;; (DS-key ~> OW-TYPE)
+              [meta:DS '()]
+              ;; Ensure all class types are unique at the end
+              #:result
+              (when (no-name-clash? (map car meta:CS))
+                (values meta:CS meta:FS meta:DS)))
+             ;; Iterate over all CLASS of `stx`.
+             ([CLASS (in-syntax (get-CLASS... stx))])
 
-   (meta:CS meta:FS meta:DS)
+    ;; For the current class syntax object, extracts its type (i.e.,
+    ;; name), context parameters, and field and def syntax objects.
+    (define-values (C-TYPE CPARAM... FIELD... DEF...)
+      (get-class-C-TYPE/CPARAM.../FIELD.../DEF... CLASS))
 
-   (for/foldr ([cs '()][fs '()][ds '()])
-              ([CLASS (in-syntax (get-CLASS... stx))])
-     ;; For the current class syntax object, extracts its type (i.e.,
-     ;; name), context parameters, and field and def syntax objects.
-     (define-values (C-TYPE CPARAM... FIELD... DEF...)
-       (get-class-C-TYPE/CPARAM.../FIELD.../DEF... CLASS))
+    ;; Ensure all fields and defs are unique in there class
+    (no-name-clash? FIELD...)
+    (no-name-clash? DEF...)
 
-     ;; Ensure all fields and defs are unique in there class
-     (no-name-clash? FIELD...)
-     (no-name-clash? DEF...)
-
-     ;; Compute the new value for cs, fs, ds
-     (values
-      ;; cs
-      (cons (cons C-TYPE CPARAM...) cs)
-      ;; fs
-      (append (mk-fs C-TYPE FIELD...) fs)
-      ;; ds
-      (append (mk-ds C-TYPE DEF...) ds))))
-
-  ;; Ensure all class types are unique
-  (no-name-clash? (map car meta:CS))
-  )
+    ;; Compute the new value for meta:CS, meta:FS, meta:DS
+    (values
+     ;; meta:CS
+     (cons (cons C-TYPE CPARAM...) meta:CS)
+     ;; meta:FS
+     (append (mk-meta:FS C-TYPE FIELD...) meta:FS)
+     ;; meta:DS
+     (append (mk-meta:DS C-TYPE DEF...) meta:DS))))
 
 
 ;; Utils
@@ -107,9 +101,9 @@
 ;; Transforms a list of field stx objects `FIELD...` of a specific
 ;; class `C-TYPE` into an associative list of `FS-key` and
 ;; `OW-TYPE`.
-(: mk-fs (Identifier (Syntaxof (Listof 'field-stx))
-                     -> (Listof (Pairof FS-key OW-TYPE))))
-(define (mk-fs C-TYPE FIELD...)
+(: mk-meta:FS (Identifier (Syntaxof (Listof 'field-stx))
+                          -> (Listof (Pairof FS-key OW-TYPE))))
+(define (mk-meta:FS C-TYPE FIELD...)
   (define mk-fs-item (syntax-parser
       #:literal-sets [keyword-lits]
       [(field NAME OWS:ow-type)
@@ -120,9 +114,9 @@
 
 ;; Transforms a list of def stx objects `DEF...` of a specific class
 ;; `C-TYPE` into an associative list of `DS-key` and `OW-TYPE`.
-(: mk-ds (Identifier (Syntaxof (Listof 'def-stx))
-                     -> (Listof (Pairof DS-key OW-TYPE))))
-(define (mk-ds C-TYPE DEF...)
+(: mk-meta:DS (Identifier (Syntaxof (Listof 'def-stx))
+                          -> (Listof (Pairof DS-key OW-TYPE))))
+(define (mk-meta:DS C-TYPE DEF...)
   (define mk-ds-item (syntax-parser
       #:literal-sets [keyword-lits]
       [(def (NAME (A-NAME A-OWS:ow-type) ...  R-OWS:ow-type) _ ...)
