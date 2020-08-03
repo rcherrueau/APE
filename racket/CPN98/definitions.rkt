@@ -5,23 +5,22 @@
 ;;   | ; | . ,-| | | |   ,-| | | |   | |
 ;;   '   `-' `-^ `-^ `-' `-^ `-^ `-' `-'
 ;;
-;; Common definitions for parsers of the lang.
+;; Common definitions for phases of the lang.
 
 (require (for-syntax racket/base)
-         racket/function
          racket/list
          racket/match
-         syntax/parse
-         typed/racket/unsafe
-         "_definitions.rkt"
-         "utils.rkt")
-
-(module+ test (require typed/rackunit))
+         typed/racket/unsafe)
 
 (require/typed "utils.rkt"
   [check-stx=? ((Syntax Syntax) (#:msg String) . ->* . Any)]
   [zip (All (a b) ((Listof a) (Listof b) -> (Listof (Pairof a b))))]
   [unzip (All (a b) ((Listof (Pairof a b)) -> (Values (Listof a) (Listof b))))])
+
+(unsafe-require/typed "utils.rkt"
+  [mk-ow-type-surface (TYPE OWNER CPARAMS -> Syntax)]
+  [set-surface-stx (All (a) (Syntaxof a) Syntax -> (Syntaxof a))]
+  [get-surface-stx (Syntax -> Syntax)])
 
 (require/typed racket/list
   [index-of (All (a) ((Listof a) a (a a -> Boolean) -> (U Nonnegative-Integer #f)))])
@@ -29,35 +28,25 @@
 (unsafe-require/typed racket/sequence
   [in-syntax (All (a) (Syntaxof (Listof (Syntaxof a))) -> (Sequenceof (Syntaxof a)))])
 
-(unsafe-require/typed "utils.rkt"
-  [mk-ow-type-surface (TYPE OWNER CPARAMS -> Syntax)]
-  [set-surface-stx (All (a) (Syntaxof a) Syntax -> (Syntaxof a))]
-  [get-surface-stx (Syntax -> Syntax)])
-
 (provide (except-out (all-defined-out)
-                     ;; keyword-lits expr-lits
                      mk-ow-type
                      def-ow-type-values
                      private:alist-index-of
                      alist-set)
-         (all-from-out "_definitions.rkt"))
+         (all-from-out 'definition/untyped))
 
 (unsafe-provide mk-ow-type def-ow-type-values)
 
-
-;; Utils
-(: bound-id=? (Identifier Identifier -> Boolean))
-(define (bound-id=? id1 id2)
-  (eq? (syntax-e id1) (syntax-e id2)))
+(module+ test (require typed/rackunit))
 
 
 ;; Ownership type syntax object
 
 ;; Definitions
-(define-type TYPE Identifier)                                 ;; Basic type #'Int, #'Bool, ...
-(define-type OWNER Identifier)                                ;; Owner #'rep, #'world, #'Θ, #'o, ...
-(define-type CPARAMS (Syntaxof (Listof Identifier)))         ;; List of ctx params #'(), #'(rep n)
-(define-type OW-TYPE (Syntaxof (List TYPE OWNER CPARAMS))) ;; Ownership type #'(Foo rep {n m})
+(define-type TYPE Identifier)                               ;; Basic type #'Int, #'Bool, ...
+(define-type OWNER Identifier)                              ;; Owner #'rep, #'world, #'Θ, #'o, ...
+(define-type CPARAMS (Syntaxof (Listof Identifier)))        ;; List of ctx params #'(), #'(rep n)
+(define-type OW-TYPE (Syntaxof (List TYPE OWNER CPARAMS)))  ;; Ownership type #'(Foo rep {n m})
 
 ;; Predicate for occurrence typing, see [LLNC19] and
 ;; https://docs.racket-lang.org/ts-guide/occurrence-typing.html
@@ -67,7 +56,8 @@
 ;; Make an ownership type
 (: mk-ow-type
    ((TYPE OWNER (U CPARAMS (Listof Identifier)))
-    (#:surface Syntax) . ->* . OW-TYPE))
+    [#:surface Syntax]
+    . ->* . OW-TYPE))
 (define (mk-ow-type type-stx owner-stx cparams #:surface [surface #f])
   ;; Make cparams-stx of type CPARAMS and not a `(Listof Identifier)`
   (define cparams-stx : CPARAMS
@@ -152,6 +142,12 @@
              (and (ow-type? τ) τ))]
     ;; Set the basic type of a syntax object
     [(stx TYPE) (syntax-property stx 'ow-type TYPE)]))
+
+
+;; Returns #t if two identifiers are identical
+(: bound-id=? (Identifier Identifier -> Boolean))
+(define (bound-id=? id1 id2)
+  (eq? (syntax-e id1) (syntax-e id2)))
 
 
 ;; Meta
@@ -252,6 +248,9 @@
 (define (alist-keys als)
   (map (λ ([kv : (Pairof k v)]) (car kv)) als))
 
+
+;; TODO: clean this
+
 ;;~~~~~~~~~~~~~~~~~
 ;; CS: Set of Types
 (define-type CS (Listof Identifier))
@@ -338,6 +337,178 @@
      (for/and ([ow1 (in-syntax ARGs-OW-TYPE1)]
                [ow2 (in-syntax ARGs-OW-TYPE2)])
        (ow-type=? ow1 ow2)))))
+
+
+;; Untyped common definitions for phases of the lang.  Generally
+;; speaking, stuffs that encompass syntax objects are hard to type in
+;; racket.  So, I make them to land on here, in the untyped module.  I
+;; should -- as typed/racket evolved -- move definition from this
+;; untyped module to the typed one.
+(module definition/untyped racket/base
+  (require (for-syntax racket/base
+                       racket/string
+                       racket/syntax
+                       syntax/stx
+                       syntax/parse/define
+                       "utils.rkt")
+           syntax/parse
+           syntax/parse/define
+           "utils.rkt")
+
+  (provide (all-defined-out))
+
+  ;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ;;;; Module language def
+
+  ;; Literals for classes definition
+  (define-literal-set keyword-lits
+    #:for-label
+    ;; Note: The syntax/parse package require all literals to have a
+    ;; binding. To match identifier by their symbolic names, I have to
+    ;; use `#:datum-literals` instead.
+    #:datum-literals (class field def)
+    ;; I have no literals that should have a binding.
+    ())
+
+  ;; Literals for expressions definition
+  (define-literal-set expr-lits
+    #:for-label
+    #:datum-literals (let new send get-field set-field! this ???)
+    ())
+
+  ;; Literals for types definition
+  (define-literal-set type-lits
+    #:for-label
+    #:datum-literals (-> → :)
+    ())
+
+  ;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ;;;; Syntax class
+
+  ;; Ownership type syntax
+  ;;
+  ;; TODO: ensure consistency with OW-TYPE, mk-ow-type, ow-type-values
+  ;; > (check-true (syntax-parse (mk-ow-type type owner {}) [_:ow-type] #t))
+  (define-syntax-class ow-type
+    #:description "type with ownership and context parameters"
+    #:attributes [TYPE OWNER CPARAMS]
+    #:commit
+    #:opaque
+    (pattern (TYPE:id OWNER:id (CPARAM:id ...))
+             #:with CPARAMS #'(CPARAM ...)))
+
+  ;; TODO: add path syntax class for modules
+
+  ;;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ;;;; Utils
+
+  ;; Macro to define a new phase of the language
+  ;;
+  ;; A phase is a transformation of or an analyze on the syntax tree
+  ;; of the language. It takes a syntax object as an argument (i.e,
+  ;; the AST) and returns the possibly modified syntax object after
+  ;; transformation/analysis. Every environment variable is
+  ;; dynamically bound (i.e., racket parameter) in the /phase
+  ;; definition/. A constructor, named `with-E`, lets the programmer
+  ;; sets a new value to the environment, similarly to racket
+  ;; `parameterize`.
+  ;;
+  ;; > (define-phase (?> ast-stx arg1 arg2 ...)
+  ;; >   ;; Environment variables (racket parameter -- dynamic binding)
+  ;; >   [E:env ...]
+  ;; >
+  ;; >   ;; Phase definition
+  ;; >   E:expr)
+  (begin-for-syntax
+    ;; Returns #t if a syntax object is of the form #'env:the-id
+    ;; (i.e., an identifier that starts with `env:`), or #f otherwise.
+    ;;
+    ;; (: is-stx-env:the-id? (Identifier -> Boolean))
+    (define (is-stx-env:the-id? stx)
+      (string-prefix? (symbol->string (syntax-e stx)) "env:"))
+
+    ;; Strips the `env:` part of a #'env:the-id syntax object
+    ;;
+    ;; (: env:the-id->the-id (Identifier -> Identifier))
+    (define (env:the-id->the-id stx)
+      (define the-id (string-trim (symbol->string (syntax-e stx))
+                                  "env:" #:right? #f))
+      (format-id stx "~a" the-id #:source stx))
+
+    (define-syntax-class env
+      #:description "an environment variable"
+      #:attributes [NAME MAKER INIT-VAL DEFS WITH]
+      #:commit
+      (pattern (NAME:id #:init INIT-VAL:expr
+                        #:mk MAKER:expr)
+               #:attr DEFS #'()
+               #:attr WITH (format-id #'NAME "with-~a" (syntax-e #'NAME))
+               )
+      (pattern (NAME:id #:init INIT-VAL:expr
+                        #:mk MAKER:expr
+                        #:apply? [envDEF:id ...])
+               ;; Check that all def that should be applied to the env starts with `env:`
+               #:fail-unless (stx-for/and ([id #'(envDEF ...)])
+                                          (is-stx-env:the-id? id))
+               "expected an identifier that starts with `env:`"
+               #:with [DEF-APPLY-NAME ...] (stx-map env:the-id->the-id #'(envDEF ...))
+               #:attr DEFS #'((envDEF DEF-APPLY-NAME) ...)
+               #:attr WITH (format-id #'NAME "with-~a" (syntax-e #'NAME))
+               )))
+
+  (define-syntax (define-phase parser-stx)
+    (define env->name/def/apply
+      (syntax-parser
+        [e:env
+         #:with [(e-def e-apply) ...] #'e.DEFS
+         #'((e.NAME e-def e-apply) ...)]))
+
+    (syntax-parse parser-stx
+      [(_
+        ;; Phase name (e.g., `?>`), its syntax object and arguments
+        (ID:id stx:expr ARG:expr ...)
+        ;; Environment variables ...
+        E:env ...
+        ;; Phase definition
+        DEF:expr)
+       #:with ((E-NAME E-DEF E-APPLY) ...)
+       (stx-flatten (stx-map env->name/def/apply #'(E ...)))
+       #'(begin
+           ;; Define environment variables as parameters
+           ;; (: E.NAME (Parameterof E.TYPE)) ...
+           (define E.NAME (make-parameter #f)) ...
+
+           ;; The with-param macro
+           (... ;; Note: A stat-template is like a template, except that
+            ;; ..., ~?, and ~@ are interpreted as constants instead
+            ;; of template forms. See
+            ;; https://docs.racket-lang.org/reference/stx-patterns.html#%28form._%28%28lib._racket%2Fprivate%2Fstxcase-scheme..rkt%29._syntax%29%29
+            (define-simple-macro (E.WITH THE-PARAM EXPR:expr ...+)
+              (parameterize ([E.NAME (E.MAKER THE-PARAM)]) EXPR ...)))
+           ...
+
+           ;; Partially applied DEF with E-NAME parameter
+           (define (E-APPLY . args) (apply E-DEF (E-NAME) args)) ...
+
+           ;; Define the parser as a global definition. We parameterize
+           ;; the first call of `DEF` with `Env` values
+           (define (ID stx ARG ...)
+             (parameterize ([E.NAME (E.MAKER E.INIT-VAL)] ...) DEF)))]
+      ))
+
+  (define-syntax define-rules
+    (syntax-parser
+      [(_ ID:id RULE:expr ...)
+       #'(define (ID stx)
+           ;; (dbg stx #:ctx ID)
+           (syntax-parse stx
+             #:literal-sets [(keyword-lits #:at ID)
+                             (expr-lits #:at ID)
+                             (type-lits #:at ID)]
+             RULE ...
+             ))])))
+
+(require 'definition/untyped)
 
 
 ;; Bibliography

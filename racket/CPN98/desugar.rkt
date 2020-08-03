@@ -45,7 +45,7 @@
   ;; (: Γ (Setof Identifier))
   (Γ #:init   '()
      #:mk     env:make-Γ
-     #:apply? (env:Γ-member? env:Γ-add))
+     #:apply? [env:Γ-member? env:Γ-add])
 
   ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ;; Parser

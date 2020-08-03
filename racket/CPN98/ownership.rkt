@@ -71,17 +71,17 @@
 
   ;; Map of fields
   ;;
-  ;; (: FS ((Syntaxof (Pairof TYPE        ; Class type
+  ;; (: FS ((Syntaxof (Pairof TYPE          ; Class type
   ;;                          Identifier))  ; Field name
-  ;;        ~> OW-TYPE))                  ; Field return type
+  ;;        ~> OW-TYPE))                    ; Field return type
   (FS #:init meta:FS
       #:mk env:make-FS
       #:apply? [env:FS-member? env:FS-ref])
 
   ;; Map of definitions
   ;;
-  ;; (: DS ((Syntaxof (Pairof Identifier                     ; Class type
-  ;;                          Identifier))                   ; Def name
+  ;; (: DS ((Syntaxof (Pairof Identifier                   ; Class type
+  ;;                          Identifier))                 ; Def name
   ;;        ~>
   ;;        (Syntaxof (Pairof (Syntaxof (Listof OW-TYPE))  ; Type of def args
   ;;                          OW-TYPE))                    ; Def return type
