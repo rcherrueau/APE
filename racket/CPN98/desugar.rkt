@@ -82,10 +82,10 @@
 (module+ test
   (define-test-suite ir-c-parse
     (check-stx=? (ir-c #'(class foo)) #'(class foo ())
-                 #:msg "`class` with no CPARAM implies empty CPARAMS")
+                 "`class` with no CPARAM implies empty CPARAMS")
     (check-stx=? (ir-c #'(class foo (field [bar : o/t])))
                  #'(class foo () (field bar (t o ())))
-                 #:msg "`class` with no CPARAM implies empty CPARAMS")
+                 "`class` with no CPARAM implies empty CPARAMS")
     (check-ill-parsed
       (ir-c #'(class foo (field [bar : o/t]) bar))
       #:msg (string-append
@@ -131,13 +131,13 @@
     ;; def
     (check-stx=? (ir-f/d #'(def (name -> o/t) ???))
                  #'(def (name (t o ())) ???)
-                 #:msg "`def` with no argument is valid")
+                 "`def` with no argument is valid")
     (check-stx=? (ir-f/d #'(def (name [foo : o/t] [bar : o/t] -> o/t) ???))
                  #'(def (name (foo (t o ())) (bar (t o ())) (t o ())) ???)
-                 #:msg "`def` with multiple arguments is valid")
+                 "`def` with multiple arguments is valid")
     (check-stx=? (ir-f/d #'(def (name [foo : o/t] [bar : o/t] -> o/t) foo ???))
                  #'(def (name (foo (t o ())) (bar (t o ())) (t o ())) foo ???)
-                 #:msg "`def` with multiple BODY exprs are kept in order")
+                 "`def` with multiple BODY exprs are kept in order")
     (check-ill-parsed (ir-f/d #'(def (name [foo : o/t]) ???))
                       #:msg "`def` with no return type is not valid")
     (check-ill-parsed (ir-f/d #'(def (name [foo : o/t])))
@@ -146,13 +146,13 @@
     ;; arg bind
     (check-stx=? (ir-f/d #'(def (name [foo : o/t] -> o/t) bar))
                  #'(def (name (foo (t o ())) (t o ())) (get-field this bar))
-                 #:msg "`def` expands its BODY and binds `this`")
+                 "`def` expands its BODY and binds `this`")
     (check-stx=? (ir-f/d #'(def (name [foo : o/t] -> o/t) foo))
                  #'(def (name (foo (t o ())) (t o ())) foo)
-                 #:msg "`def` binds `foo` identifier")
+                 "`def` binds `foo` identifier")
     (check-stx=? (ir-f/d #'(def (name [foo : o/t] [bar : o/t] -> o/t) foo bar))
                  #'(def (name (foo (t o ())) (bar (t o ())) (t o ())) foo bar)
-                 #:msg "`def` args are bind for all expressions of the BODY")))
+                 "`def` args are bind for all expressions of the BODY")))
 
 
 ;; Expression rules
@@ -249,11 +249,11 @@
     (with-Γ #'(this foo)
       ;;Identifier
       (check-stx=? (ir-e #'foo) #'foo
-                   #:msg "Bound identifier is left as it")
+                   "Bound identifier is left as it")
       (check-stx=? (ir-e #'bar) #'(get-field this bar)
-                   #:msg "Free identifier is expended with `get-field` under `this'")
+                   "Free identifier is expended with `get-field` under `this'")
       (check-stx=? (ir-e #'???) #'???
-                   #:msg "The debug placeholder `???` is a valid expr")
+                   "The debug placeholder `???` is a valid expr")
       (check-exn exn:fail:syntax:unbound?
                  (λ () (with-Γ #'() (ir-e #'bar)))
                  "Free identifier raised unbound error")
@@ -269,26 +269,26 @@
                    #'(let (foo (t world (c)) ???) ???))
       (check-stx=? (ir-e #'(let ([foo : o/t ???]) bar))
                    #'(let (foo (t o ()) ???) (get-field this bar))
-                   #:msg "`let` expands its BODY")
+                   "`let` expands its BODY")
       (check-stx=? (ir-e #'(let ([bar : o/t ???]) bar))
                    #'(let (bar (t o ()) ???) bar)
-                   #:msg "`let` binds `bar` identifier")
+                   "`let` binds `bar` identifier")
       (check-stx=?
          (ir-e #'(let ([foo : o/t ???]) (let ([bar : o/t ???]) ???)))
          #'(let (foo (t o ()) ???) (let (bar (t o ()) ???) ???))
-         #:msg "Nested `let`s")
+         "Nested `let`s")
       (check-stx=?
          (ir-e #'(let ([foo : o/t ???][bar : o/t ???]) ???))
          #'(let (foo (t o ()) ???) (let (bar (t o ()) ???) ???))
-         #:msg "`let` with multiple bindings is transformed into nested `let`s")
+         "`let` with multiple bindings is transformed into nested `let`s")
       (check-stx=?
          (ir-e #'(let ([foo : o/t ???]) foo ???))
          #'(let (foo (t o ()) ???) foo ???)
-         #:msg "`let' with multiple BODY exprs are kept in order")
+         "`let' with multiple BODY exprs are kept in order")
       (check-stx=?
          (ir-e #'(let ([foo : o/t ???] [bar : o/t ???]) foo bar))
          #'(let (foo (t o ()) ???) (let (bar (t o ()) ???) foo bar))
-         #:msg "`let' binds arguments for all exprs of the BODY")
+         "`let' binds arguments for all exprs of the BODY")
       (check-ill-parsed (ir-e #'(let ([]) ???)))
       (check-ill-parsed (ir-e #'(let ([foo : t c ???]) ???))
          #:msg "context parameters `c` should be surrounded by parentheses")
@@ -302,35 +302,35 @@
       (check-stx=? (ir-e #'(new o/t))     #'(new (t o ())))
       (check-stx=? (ir-e #'(new o/t (c))) #'(new (t o (c))))
       (check-stx=? (ir-e #'(new o/t (c))) #'(new (t o (c)))
-                   #:msg "`new` accepts no surrounded o/t (c) syntax")
+                   "`new` accepts no surrounded o/t (c) syntax")
       (check-ill-parsed (ir-e #'(new)))
 
       ;; get-field
       (check-stx=? (ir-e #'(get-field object field))
                    #'(get-field (get-field this object) field)
-                   #:msg "`get-field` expands its BODY")
+                   "`get-field` expands its BODY")
       (check-ill-parsed (ir-e #'(get-field () f)))
 
       ;; set-field!
       (check-stx=? (ir-e #'(set-field! object field foo))
                    #'(set-field! (get-field this object) field foo)
-                   #:msg "`set-field!` expands its object")
+                   "`set-field!` expands its object")
       (check-stx=? (ir-e #'(set-field! foo field body))
                    #'(set-field! foo field (get-field this body))
-                   #:msg "`set-field!` expands its BODY")
+                   "`set-field!` expands its BODY")
       (check-ill-parsed (ir-e #'(set-field! () foo bar)))
       (check-ill-parsed (ir-e #'(set-field! foo bar ())))
 
       ;; send
       (check-stx=? (ir-e #'(send object def foo))
                    #'(send (get-field this object) def foo)
-                   #:msg "`send` expands its object")
+                   "`send` expands its object")
       (check-stx=? (ir-e #'(send foo def arg1 arg2))
                    #'(send foo def (get-field this arg1) (get-field this arg2))
-                   #:msg "`send` expands its ARG ...")
+                   "`send` expands its ARG ...")
       (check-stx=? (ir-e #'(send foo def))
                    #'(send foo def)
-                   #:msg "`send` without ARG ...")
+                   "`send` without ARG ...")
       (check-ill-parsed (ir-e #'(send () def arg)))
       (check-ill-parsed (ir-e #'(send foo def ()))))))
 

@@ -232,7 +232,7 @@
 ;; (check-stx=? #'foo #'bar)                               ; failed
 ;; (check-stx=? (syntax-parse #'foo [_:id #'bar])  #'bar)  ; suceed
 ;; (check-stx=? (syntax-parse #'foo [_:id #'bar])  #'baz)  ; faild #'bar != #'baz
-(define (check-stx=? stx1 stx2 #:msg [msg #f])
+(define (check-stx=? stx1 stx2 [msg #f])
   (private:check-stx=?-w/-msg stx1 stx2 msg))
 
 ;; Checks that `stx` raise a `exn-pred?` when parsed as `pattern`.

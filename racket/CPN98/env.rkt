@@ -36,7 +36,7 @@
          "utils.rkt")
 
 (require/typed "utils.rkt"
-  [check-stx=? ((Syntax Syntax) (#:msg String) . ->* . Any)]
+  [check-stx=? ((Syntax Syntax) (String) . ->* . Any)]
   [zip (All (a b) ((Listof a) (Listof b) -> (Listof (Pairof a b))))]
   [unzip (All (a b) ((Listof (Pairof a b)) -> (Values (Listof a) (Listof b))))]
   [*** (All (a b c d) ((a -> b) (c -> d) -> ((Pairof a c) -> (Pairof b d))))]
