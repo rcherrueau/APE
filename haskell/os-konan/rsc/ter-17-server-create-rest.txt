@@ -1,0 +1,91 @@
+Alice
+|
++- Wsgi { "keystone", HTTPReq {path = "/v3", method = Get, query = ""}}
+|
++- Wsgi { "keystone", HTTPReq {path = "/identity/v3/auth/tokens", method = Post, query = ""}}
+|
++- Wsgi { "keystone", HTTPReq {path = "/identity/v3/auth/tokens", method = Post, query = ""}}
+|
++- Wsgi { "glance", HTTPReq {path = "/v2/images/cirros-0.3.4-x86_64-uec", method = Get, query = ""}}
+|  |
+|  `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|
++- Wsgi { "glance", HTTPReq {path = "/v2/images/cirros-0.3.4-x86_64-uec", method = Get, query = ""}}
+|  |
+|  `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|
++- Wsgi { "glance", HTTPReq {path = "/v2/images", method = Get, query = "limit=20"}}
+|  |
+|  `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|
++- Wsgi { "glance", HTTPReq {path = "/v2/schemas/image", method = Get, query = ""}}
+|  |
+|  `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|
++- Wsgi { "nova", HTTPReq {path = "/v2.1/flavors/m1.tiny", method = Get, query = ""}}
+|  |
+|  +- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Post, query = ""}}
+|  |
+|  `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|
++- Wsgi { "nova", HTTPReq {path = "/v2.1/flavors/m1.tiny", method = Get, query = ""}}
+|  |
+|  `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|
++- Wsgi { "nova", HTTPReq {path = "/v2.1/flavors", method = Get, query = ""}}
+|  |
+|  `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|
++- Wsgi { "nova", HTTPReq {path = "/v2.1/flavors/1", method = Get, query = ""}}
+|  |
+|  `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|
++- Wsgi { "nova", HTTPReq {path = "/v2.1/servers", method = Post, query = ""}}
+|  |
+|  +- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|  |
+|  +- Wsgi { "glance", HTTPReq {path = "/v2/images/b56b5cb1-0915-423f-b64a-7245d431c91d", method = Get, query = ""}}
+|  |  |
+|  |  +- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Post, query = ""}}
+|  |  |
+|  |  `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|  |
+|  +- Wsgi { "glance", HTTPReq {path = "/v2/schemas/image", method = Get, query = ""}}
+|  |  |
+|  |  `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|  |
+|  +- Wsgi { "glance", HTTPReq {path = "/v2/images/682a256d-b0b5-40c9-b763-049cb038d27e", method = Get, query = ""}}
+|  |  |
+|  |  `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|  |
+|  +- Wsgi { "glance", HTTPReq {path = "/v2/schemas/image", method = Get, query = ""}}
+|  |  |
+|  |  `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|  |
+|  +- Wsgi { "glance", HTTPReq {path = "/v2/images/9ec0ab83-55c6-4eda-9cbf-3d59f255e7d0", method = Get, query = ""}}
+|  |  |
+|  |  `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|  |
+|  +- Wsgi { "glance", HTTPReq {path = "/v2/schemas/image", method = Get, query = ""}}
+|  |  |
+|  |  `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|  |
+|  +- Wsgi { "keystone", HTTPReq {path = "/v3", method = Get, query = ""}}
+|  |
+|  +- Wsgi { "keystone", HTTPReq {path = "/identity/v3/auth/tokens", method = Post, query = ""}}
+|  |
+|  `- Wsgi { "glance", HTTPReq {path = "/v2/images/682a256d-b0b5-40c9-b763-049cb038d27e/file", method = Get, query = ""}}
+|     |
+|     `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|
++- Wsgi { "nova", HTTPReq {path = "/v2.1/servers/54e5df4d-8b7a-4f3f-b9f5-a03045c8cd1a", method = Get, query = ""}}
+|  |
+|  `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|
++- Wsgi { "glance", HTTPReq {path = "/v2/images/b56b5cb1-0915-423f-b64a-7245d431c91d", method = Get, query = ""}}
+|  |
+|  `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}
+|
+`- Wsgi { "nova", HTTPReq {path = "/v2.1/flavors/1", method = Get, query = ""}}
+   |
+   `- Wsgi { "keystone", HTTPReq {path = "/identity_admin/v3/auth/tokens", method = Get, query = ""}}

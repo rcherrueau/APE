@@ -1,0 +1,31 @@
+Root
+|
++- Wsgi { "glance", HTTPReq {path = "/v2/images/cirros-0.3.5-x86_64-disk", method = Get, query = ""}}
+|
++- Wsgi { "glance", HTTPReq {path = "/v2/images", method = Get, query = "limit=20"}}
+|
++- Wsgi { "glance", HTTPReq {path = "/v2/schemas/image", method = Get, query = ""}}
+|
++- Wsgi { "nova", HTTPReq {path = "/compute/v2.1/flavors/m1.tiny", method = Get, query = ""}}
+|
++- Wsgi { "nova", HTTPReq {path = "/compute/v2.1/flavors", method = Get, query = ""}}
+|
++- Wsgi { "nova", HTTPReq {path = "/compute/v2.1/flavors/1", method = Get, query = ""}}
+|
++- Wsgi { "nova", HTTPReq {path = "/compute/v2.1/servers", method = Post, query = ""}}
+|  |
+|  +- Wsgi { "glance", HTTPReq {path = "/v2/images/0ce7432a-19cb-4682-b656-dcec56f4aab6", method = Get, query = ""}}
+|  |
+|  `- Wsgi { "glance", HTTPReq {path = "/v2/schemas/image", method = Get, query = ""}}
+|
++- Wsgi { "nova", HTTPReq {path = "/compute/v2.1/servers/c7ff266f-8902-4e67-961f-cf9720b6f031", method = Get, query = ""}}
+|
++- Wsgi { "nova", HTTPReq {path = "/compute/v2.1/servers/c7ff266f-8902-4e67-961f-cf9720b6f031", method = Get, query = ""}}
+|
++- Wsgi { "nova", HTTPReq {path = "/compute/v2.1/servers/c7ff266f-8902-4e67-961f-cf9720b6f031", method = Get, query = ""}}
+|
++- Wsgi { "nova", HTTPReq {path = "/compute/v2.1/servers/c7ff266f-8902-4e67-961f-cf9720b6f031", method = Get, query = ""}}
+|
++- Wsgi { "glance", HTTPReq {path = "/v2/images/0ce7432a-19cb-4682-b656-dcec56f4aab6", method = Get, query = ""}}
+|
+`- Wsgi { "nova", HTTPReq {path = "/compute/v2.1/flavors/1", method = Get, query = ""}}
