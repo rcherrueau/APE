@@ -56,15 +56,32 @@
 
 ;; A program is a list of CLASS and one expression E
 (define-rules ir-p
-  ;; Note: The `~!` eliminate backtracking. Hence, if the next
-  ;; `fail-when` failed, it will not backtrack to try other cases.
-  ;;
-  ;; TODO: Add a ~commit to see if it corrects backtracking during an
-  ;; error.
-  [(CLASS:expr ... E:expr)
+  [(IMPORT-MODULES CLASS:expr ... E:expr)
+   #:with (import MODULE ...) #'IMPORT-MODULES
+   #:cut  ;; Eliminate backtracking
    #:with [*CLASS ...] (stx-map ir-c #'(CLASS ...))
    #:with *E           (ir-e #'E)
-   (stx/surface (*CLASS ... *E) this-syntax)])
+   (stx/surface (IMPORT-MODULES *CLASS ... *E) this-syntax)]
+  ;; Transforms a program without modules import into a program with
+  ;; an empty list of modules import.
+  ;;
+  ;; TODO: Add a ~! to see if it corrects backtracking during an
+  ;; error.
+  [(CLASS:expr ... E:expr)
+   (ir-p (stx/surface ((import) CLASS ... E) this-syntax))])
+
+(module+ test
+  (define-test-suite ir-p-parse
+    (with-Γ #'(expr)
+      (check-stx=? (ir-p #'((class Foo ()) expr))
+                   #'((import) (class Foo ()) expr)
+                   "A program without IMPORT implies empty IMPORTS")
+      (check-stx=? (ir-p #'((import A B C) (class Foo ()) expr))
+                   #'((import A B C) (class Foo ()) expr)
+                   "IMPORTs of programs are kept as it")
+      (check-stx=? (ir-p #'((import) (class Foo ()) (new Foo)))
+                   #'((import) (class Foo ()) (new (Foo world {})))
+                   "A program expands its expression"))))
 
 
 ;; Class rules
@@ -72,6 +89,8 @@
 ;; A class is a NAME, an optional list of context parameters
 ;; CPARAM, and a list of fields and definitions.
 (define-rules ir-c
+  ;; Note: The `~!` eliminate backtracking. Hence, if the next
+  ;; `fail-when` failed, it will not backtrack to try other cases.
   [(class NAME:id [CPARAM:id ...] ~! FIELD/DEF:expr ...)
    #:with [*FIELD/DEF ...] (stx-map ir-f/d #'(FIELD/DEF ...))
    (stx/surface (class NAME [CPARAM ...] *FIELD/DEF ...) this-syntax)]
@@ -560,4 +579,6 @@
     ;; Check phase rules
     ir-e-parse
     ir-f/d-parse
-    ir-c-parse)))
+    ir-c-parse
+    ir-p-parse
+    )))
