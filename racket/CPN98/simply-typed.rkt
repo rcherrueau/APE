@@ -136,7 +136,7 @@
 ;; `P` elaborates to `?P` and has type `t`
 (define-rules ⊢p
   ;; [prog]
-  [(CLASS ... E)
+  [((import _ ...) CLASS ... E)
    ;; Check P ⊢d CLASS ≫ ?CLASS
    #:with [?CLASS ...] (stx-map ⊢d #'(CLASS ...))
    ;; Check P,[] ⊢e E ≫ ?E : t

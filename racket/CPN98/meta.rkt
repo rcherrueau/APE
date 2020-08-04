@@ -8,8 +8,9 @@
 ;;
 ;; Phase (M>)
 ;;
-;; Collects meta information for later use and checks no duplicate
-;; class/field/def names according to [FKF98] (see Bibliography).
+;; - Collects meta information for later use
+;; - Checks no duplicate class/field/def names according to [FKF98]
+;;   (see Bibliography).
 ;;
 ;; Naming conventions:
 ;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
@@ -82,7 +83,7 @@
 (define get-CLASS...
   (syntax-parser
     #:literal-sets [keyword-lits]
-    [(CLASS ... E) #'(CLASS ...)]))
+    [((import _ ...) CLASS ... E) #'(CLASS ...)]))
 
 ;; Extracts the type, fields and defs syntax objects of a class
 (: get-class-C-TYPE/CPARAM.../FIELD.../DEF...
@@ -203,33 +204,39 @@
 
     ;; Check (M>)
     (check-exn exn:name-clash?
-               (thunk (M> #'((class Foo [])
+               (thunk (M> #'((import)
+                             (class Foo [])
                              (class Foo [])
                              expr)))
                "Classes should have a unique name")
     (check-exn exn:name-clash?
-               (thunk (M> #'((class Foo []
+               (thunk (M> #'((import)
+                             (class Foo []
                                (field foo (t o {}))
                                (field foo (t o {})))
                              expr)))
                "Fields of a class should have a unique name")
     (check-exn exn:name-clash?
-               (thunk (M> #'((class Foo []
+               (thunk (M> #'((import)
+                             (class Foo []
                                (def (foo (Foo o ())) ???)
                                (def (foo (Foo o ())) ???))
                              expr)))
                "Methods of a class should have a unique name")
 
-    (check-not-exn (thunk (M> #'((class Foo [] (field foo (t o {})))
+    (check-not-exn (thunk (M> #'((import)
+                                 (class Foo [] (field foo (t o {})))
                                  (class Bar [] (field bar (t o {})))
                                  expr))))
 
-    (check-not-exn (thunk (M> #'((class Foo [] (field foo (t o {})))
+    (check-not-exn (thunk (M> #'((import)
+                                 (class Foo [] (field foo (t o {})))
                                  (class Bar [] (field foo (t o {})))
                                  expr)))
                    "Two fields could have the same name in different classes")
 
-    (check-not-exn (thunk (M> #'((class Foo []
+    (check-not-exn (thunk (M> #'((import)
+                                 (class Foo []
                                    (field foo (t o {}))
                                    (def (foo (Foo o ())) ???))
                                  expr)))
