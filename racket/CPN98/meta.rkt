@@ -19,6 +19,7 @@
 
 (require racket/contract/base
          racket/function
+         racket/lazy-require
          racket/list
          racket/match
          racket/syntax
@@ -29,15 +30,105 @@
          "utils.rkt"
          "definitions.rkt")
 
+(lazy-require
+ ["check.rkt" (check)])
+
 (provide M>)
 
 
 ;; Phase M>
 
+(define-phase (M> stx)
+  (M-prog stx))
+
+(define-rules M-prog
+  [((import MOD ...) CLASS ... E)
+   ;; Check modules
+   (for/lists (meta:CS-modules meta:FS-modules meta:DS-modules)
+              ([module (in-syntax #'(MOD ...))])
+     (M-mod module))
+   (define meta:CS (apply append meta:CSs))
+   (apply append meta:FSs)
+   (apply append meta:DSs)
+   ;; (stx-map M-mod #'(MOD ...))
+   ;; Compute meta values
+   (M-class #'(CLASS ...))
+   ])
+
+(define-rules M-mod
+  [(NAME:id PATH)
+   #:declare PATH (expr/c #'path-string? #:name "module path")
+   (define module-path-str (syntax-e #'PATH.c))
+   (define module-path (simplify-path (build-path (current-directory) module-path-str)))
+
+   ;; Open module and check it
+   (define-values (_ meta:CS meta:FS meta:DS)
+     (call-with-input-file module-path
+       (λ (in)
+         (read-line in) ;; Strip `#lang ...` from `in`
+         (check (port->lines-stx module-path in)))))
+
+   ;; Prefix TYPE with NAME of the module
+   (values
+    ;; Meta:CS
+    (map (λ (TYPE.CPARAM...)
+           (match-define (cons TYPE CPARAM...) TYPE.CPARAM...)
+
+           ;; Append NAME to TYPE
+           (define MODULE.TYPE (append-module-name #'NAME TYPE))
+
+           (cons MODULE.TYPE CPARAM...))
+         meta:CS)
+
+    ;; meta:FS
+    ;; > (:type FS)
+    ;; ((Syntaxof (Pairof TYPE Identifier)) ~> OW-TYPE)
+    (meta-map-w/key
+     ;; Expand TYPE with module NAME in keys of FS
+     ((syntax-parser
+        [(TYPE:id . FNAME:id)
+         #:with MODULE.TYPE (append-module-name #'NAME #'TYPE)
+         #'(MODULE.TYPE . FNAME)])
+      . *** .
+      ;; Expend TYPE with module NAME for local type only
+      (syntax-parser
+        [OT:ow-type #:when (is-local-id? #'OT.TYPE)
+         #:with MODULE.TYPE (append-module-name #'NAME #'OT.TYPE)
+         (mk-ow-type #'OT.TYPE #'OT.OWNER #'OT.CPARAMS)]
+        [_ this-syntax]))
+     meta:FS)
+
+    ;; meta:DS
+    ;; > (:type DS)
+    ;; ((Syntaxof (List TYPE Identifier (Syntaxof (Listof OW-TYPE)))) ~> OW-TYPE)
+    (meta-map-w/key
+     ;; Expand TYPE with module NAME in keys of FS
+     ((syntax-parser
+        [(TYPE:id DNAME:id DARGs)
+         #:with MODULE.TYPE (append-module-name #'NAME #'TYPE)
+         #'(MODULE.TYPE DNAME DARGs)])
+      . *** .
+      ;; Expend TYPE with module NAME for local type only
+      (syntax-parser
+        [OT:ow-type #:when (is-local-id? #'OT.TYPE)
+                    #:with MODULE.TYPE (append-module-name #'NAME #'OT.TYPE)
+                    (mk-ow-type #'OT.TYPE #'OT.OWNER #'OT.CPARAMS)]
+        [_ this-syntax]))
+     meta:DS))
+   ])
+
+(: append-module-name (Identifier Identifier -> Identifier))
+(define (append-module-name MODULE ID)
+  (format-id ID "~a.~a" (syntax-e MODULE) (syntax-e ID)
+             #:source ID))
+
+(define-rules M-class
+  [_ #f])
+
 ;; Check names clash and compute meta values (meta:CS/FS/DS).
 ;;
 ;; (: M> (Syntax -> (Values meta:CS meta:FS meta:DS)))
-(define (M> stx)
+#;(define (M> stx)
   (for/foldr (;; Accumulators
               ;;
               ;; Set of defined ownership scheme
