@@ -8,9 +8,10 @@
 ;;
 ;; Phase (M>)
 ;;
-;; - Collects meta information for later use
+;; - Collects meta values for later use
 ;; - Checks no duplicate class/field/def names according to [FKF98]
 ;;   (see Bibliography).
+;; - Check imported modules and collect meta values
 ;;
 ;; Naming conventions:
 ;; - X, Y, FOO (ie, uppercase variables) and `stx' are syntax objects
@@ -19,6 +20,7 @@
 
 (require racket/contract/base
          racket/function
+         racket/lazy-require
          racket/list
          racket/match
          racket/syntax
@@ -29,54 +31,166 @@
          "utils.rkt"
          "definitions.rkt")
 
+(lazy-require
+ ["check.rkt" (check)])
+
 (provide M>)
 
 
 ;; Phase M>
+(define-phase (M> stx)
+  (M-prog stx))
 
-;; Check names clash and compute meta values (meta:CS/FS/DS).
+(define-rules M-prog
+  ;; (import [Prelude "prelude.rkt"]
+  ;;         [IO      "io.rkt"]  ...)
+  ;; (class ...) ...
+  ;; (let ...)
+  [(IMPORT CLASS ... E)
+   #:cut
+
+   ;; Ensure there is no collision in MODULE names
+   #:with (import (NAME:id PATH) ...) #'IMPORT
+   #:when (no-name-clash? #'(NAME ...))
+
+   ;; Compute meta values of the class
+   (define-values (meta:CS-class meta:FS-class meta:DS-class)
+     (M-class #'(CLASS ...)))
+
+   ;; Check modules and get their meta values
+   ;; (List (Listof CS) (Listof FS) (Listof DS))
+   (match-define
+     (list meta:CS-modules
+           meta:FS-modules
+           meta:DS-modules)
+     ;; (: modules (Listof (List CS FS DS)))
+     (let* ([modules (stx-map M-module #'([NAME PATH] ...))])
+       (if (null? modules) '(() () ())
+           (sequence modules))))
+
+   ;; Put everything together
+   (values
+    (apply append (cons meta:CS-class meta:CS-modules))
+    (apply append (cons meta:FS-class meta:FS-modules))
+    (apply append (cons meta:DS-class meta:DS-modules)))])
+
+;; Open, check a module and compute meta values.
 ;;
-;; (: M> (Syntax -> (Values meta:CS meta:FS meta:DS)))
-(define (M> stx)
-  (for/foldr (;; Accumulators
-              ;;
-              ;; Set of defined ownership scheme
-              ;; (Listof (Pairof Identifier             ; class type
-              ;;                 (Listof Identifier)))  ; context parameters
-              [meta:CS '()]
-              ;; Map of fields with ownership type field as value
-              ;; (FS-key ~> OW-TYPE)
-              [meta:FS '()]
-              ;; Map of definitions with return ownership type as value
-              ;; (DS-key ~> OW-TYPE)
-              [meta:DS '()]
-              ;; Ensure all class types are unique at the end
-              #:result
-              (when (no-name-clash? (map car meta:CS))
-                (values meta:CS meta:FS meta:DS)))
-             ;; Iterate over all CLASS of `stx`.
-             ([CLASS (in-syntax (get-CLASS... stx))])
+;; Returns a triplet (List CS FS DS)
+(define-rules M-module
+  ;; (Prelude "prelude.rkt")
+  [(NAME:id PATH:str)
+   #:do [(define module-path-relative-to-def-dir (string->path (syntax-e #'PATH)))
+         (define-values (definition-dir x y)
+           (split-path (srcloc-source (build-source-location #'NAME))))
+         (define module-path (simplify-path (build-path definition-dir
+                                                        module-path-relative-to-def-dir)))
+         ]
+   #:fail-unless (file-exists? module-path) "The module should have a valid path"
 
-    ;; For the current class syntax object, extracts its type (i.e.,
-    ;; name), context parameters, and field and def syntax objects.
-    (define-values (C-TYPE CPARAM... FIELD... DEF...)
-      (get-class-C-TYPE/CPARAM.../FIELD.../DEF... CLASS))
+   ;; Open module and check it
+   (define-values (_ meta:CS meta:FS meta:DS)
+     (call-with-input-file module-path
+       (λ (in)
+         (read-line in) ;; Strip `#lang ...` from `in`
+         (check (port->lines-stx module-path in)))))
 
-    ;; Ensure all fields and defs are unique in there class
-    (no-name-clash? FIELD...)
-    (no-name-clash? DEF...)
+   ;; Prefix TYPE with NAME of the module
+   (list
+    ;; Meta:CS
+    (map (λ (TYPE.CPARAM...)
+           (match-define (cons TYPE CPARAM...) TYPE.CPARAM...)
 
-    ;; Compute the new value for meta:CS, meta:FS, meta:DS
-    (values
-     ;; meta:CS
-     (cons (cons C-TYPE CPARAM...) meta:CS)
-     ;; meta:FS
-     (append (mk-meta:FS C-TYPE FIELD...) meta:FS)
-     ;; meta:DS
-     (append (mk-meta:DS C-TYPE DEF...) meta:DS))))
+           ;; Append NAME to TYPE
+           (define MODULE.TYPE (subst-module-name #'NAME TYPE))
+
+           (cons MODULE.TYPE CPARAM...))
+         meta:CS)
+
+    ;; meta:FS
+    ;; > (:type FS)
+    ;; ((Syntaxof (Pairof TYPE Identifier)) ~> OW-TYPE)
+    (meta-map-w/key
+     ;; Expand TYPE with module NAME in keys of FS
+     ((syntax-parser
+        [(TYPE:id . FNAME:id)
+         #:with MODULE.TYPE (subst-module-name #'NAME #'TYPE)
+         #'(MODULE.TYPE . FNAME)])
+      . *** .
+      ;; Expend TYPE with module NAME for local type only
+      (syntax-parser
+        [OT:ow-type #:when (is-local-id? #'OT.TYPE)
+         #:with MODULE.TYPE (subst-module-name #'NAME #'OT.TYPE)
+         (mk-ow-type #'OT.TYPE #'OT.OWNER #'OT.CPARAMS)]
+        [_ this-syntax]))
+     meta:FS)
+
+    ;; meta:DS
+    ;; > (:type DS)
+    ;; ((Syntaxof (List TYPE Identifier (Syntaxof (Listof OW-TYPE)))) ~> OW-TYPE)
+    (meta-map-w/key
+     ;; Expand TYPE with module NAME in keys of FS
+     ((syntax-parser
+        [(TYPE:id DNAME:id DARGs)
+         #:with MODULE.TYPE (subst-module-name #'NAME #'TYPE)
+         #'(MODULE.TYPE DNAME DARGs)])
+      . *** .
+      ;; Expend TYPE with module NAME for local type only
+      (syntax-parser
+        [OT:ow-type #:when (is-local-id? #'OT.TYPE)
+                    #:with MODULE.TYPE (subst-module-name #'NAME #'OT.TYPE)
+                    (mk-ow-type #'OT.TYPE #'OT.OWNER #'OT.CPARAMS)]
+        [_ this-syntax]))
+     meta:DS))])
+
+;; Check names clash and compute meta values (meta:CS/FS/DS) for the
+;; current program.
+(define-rules M-class
+  [(CLASS ...)
+   (for/foldr (;; Accumulators
+               ;;
+               ;; Set of defined ownership scheme
+               ;; (Listof (Pairof Identifier             ; class type
+               ;;                 (Listof Identifier)))  ; context parameters
+               [meta:CS '()]
+               ;; Map of fields with ownership type field as value
+               ;; (FS-key ~> OW-TYPE)
+               [meta:FS '()]
+               ;; Map of definitions with return ownership type as value
+               ;; (DS-key ~> OW-TYPE)
+               [meta:DS '()]
+               ;; Ensure all class types are unique at the end
+               #:result
+               (when (no-name-clash? meta:CS)
+                 (values meta:CS meta:FS meta:DS)))
+               ;; Iterate over all CLASS of `stx`.
+               ([CLASS (in-syntax #'(CLASS ...))])
+
+      ;; For the current class syntax object, extracts its type (i.e.,
+      ;; name), context parameters, and field and def syntax objects.
+      (define-values (C-TYPE CPARAM... FIELD... DEF...)
+        (get-class-C-TYPE/CPARAM.../FIELD.../DEF... CLASS))
+
+      ;; Ensure all fields and defs are unique in there class
+      (no-name-clash? FIELD...)
+      (no-name-clash? DEF...)
+
+      ;; Compute the new value for meta:CS, meta:FS, meta:DS
+      (values
+       ;; meta:CS
+       (cons (cons C-TYPE CPARAM...) meta:CS)
+       ;; meta:FS
+       (append (mk-meta:FS C-TYPE FIELD...) meta:FS)
+       ;; meta:DS
+       (append (mk-meta:DS C-TYPE DEF...) meta:DS)))])
 
 
 ;; Utils
+
+(: subst-module-name (Identifier Identifier -> Identifier))
+(define (subst-module-name MODULE ID)
+  (format-id ID "~a.~a" (syntax-e MODULE) (syntax-e ID)
+             #:source ID))
 
 ;; Get all classes stx
 (: get-CLASS... (Syntax -> (Syntaxof (Listof 'class-stx))))
@@ -162,6 +276,7 @@
       #:literal-sets [keyword-lits]
       [(field name:id _ ...) #'name]
       [(def (name:id _ ...) _ ...) #'name]
+      [(name:id . (ctx-params:id ...)) #'name]
       [name:id #'name]))
 
   ;; Extract names from `stxs`
@@ -183,7 +298,8 @@
     "Meta phase (M>)"
 
     ;; Check no-name-clash
-    (check-true (no-name-clash? #'(foo bar)))
+    (check-true (no-name-clash? #'(foo bar)))                            ;; Modules
+    (check-true (no-name-clash? #'((foo . ()) (bar . (c1 c2)))))         ;; CS
     (check-true (no-name-clash? #'((field foo) (field bar))))
     (check-true (no-name-clash? #'((def (foo) ???) (def (bar) ???))))
 
@@ -193,7 +309,7 @@
 
     (check-exn exn:fail:syntax? (thunk (no-name-clash? #'(((foo)))))
                "`(foo)` is not a valid name")
-    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((filed foo))))
+    (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((filed (foo)))))
                "`filed` is not a `field`")
     (check-exn exn:fail:syntax? (thunk (no-name-clash? #'((field (foo)))))
                "`(foo)` is not a valid name for field")

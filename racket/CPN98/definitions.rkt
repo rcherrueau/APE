@@ -10,6 +10,7 @@
 (require (for-syntax racket/base)
          racket/list
          racket/match
+         racket/string
          typed/racket/unsafe)
 
 (require/typed "utils.rkt"
@@ -114,6 +115,12 @@
 
   (check-stx=? (get-surface-stx (mk-ow-type #'Foo #'o #'{n m})) #'|o/Foo{n m}|)
   (check-stx=? (get-surface-stx (mk-ow-type #'Foo #'o #'{n m} #:surface #'a)) #'a))
+
+
+;; The identifier is a local one and does not come from a module.
+(: is-local-id? (Identifier -> Boolean))
+(define (is-local-id? id)
+  (string-contains? (symbol->string (syntax-e id)) "."))
 
 
 
@@ -253,7 +260,8 @@
 
 ;;~~~~~~~~~~~~~~~~~
 ;; CS: Set of Types
-(define-type CS (Listof Identifier))
+(define-type CS (Listof (Pairof TYPE                    ; class type
+                                (Listof Identifier))))  ; context parameters
 
 ;;~~~~~~~~~~~~~~~~~~
 ;; FS: Map of fields

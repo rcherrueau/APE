@@ -190,7 +190,9 @@
 (define (sequence vs)
   (define (vs->ls v ls)
     (map (λ (a b) (cons a b)) v ls))
-  (foldr vs->ls (build-list (length (car vs)) (const '())) vs))
+
+  (let ([elems-size (if (null? vs) 0 (length (car vs)))])
+    (foldr vs->ls (build-list elems-size (const '())) vs)))
 
 
 ;; Equivalent of port->lines but uses `read-syntax` instead of
