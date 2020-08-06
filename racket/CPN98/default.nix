@@ -6,8 +6,8 @@
   }) {})
 , temci ? (import (pkgs.fetchFromGitHub {
     owner = "parttimenerd"; repo = "temci";
-    rev = "a741e6eb9c427a0a21a7d04ed430561d51dced2d";
-    sha256 = "0kr9cb0630vdxrpcp5vja43rln6s7sqxqanw75n1726wz5plvqmn";
+    rev = "64c2f43f68b9e0aae8f47730ea7de9b5e762d1a9";
+    sha256 = "1b4l8zik24w3ifcma4jz5wvndg6886r4g1vlv9rrwxpcqll3wzb6";
   }) {})
 }:
 
@@ -18,10 +18,12 @@
 pkgs.mkShell {
   buildInputs = [
     # pkgs.racket
-    # temci  # mesure performances
+    temci  # mesure performances
   ];
 
   shellHook = ''
-    export PLTSTDOUT="debug@sclang"
   '';
+
+  # Set environment variables
+  PLTSTDOUT = "debug@sclang";
 }
