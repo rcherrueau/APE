@@ -260,7 +260,8 @@
 
 ;;~~~~~~~~~~~~~~~~~
 ;; CS: Set of Types
-(define-type CS (Listof Identifier))
+(define-type CS (Listof (Pairof TYPE                    ; class type
+                                (Listof Identifier))))  ; context parameters
 
 ;;~~~~~~~~~~~~~~~~~~
 ;; FS: Map of fields
