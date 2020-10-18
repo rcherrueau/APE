@@ -1,5 +1,5 @@
 (* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
-(* Lambda calculus ~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
+(** * Lambda calculus                          *)
 (* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ *)
 Require Import Arith.
 
@@ -28,14 +28,17 @@ Inductive term: Set :=
 | TmAbs: term -> term
 | TmApp: term -> term -> term.
 
+Notation "% k" := (TmVar k) (at level 20).
+Infix "@@" := TmApp (at level 25 with left associativity).
+Notation "λ∙ t" := (TmAbs t) (at level 35).
+
 (* Some definitions *)
-Definition c0: term := (TmAbs (TmAbs (TmVar 0))).
-Definition c2: term := (TmAbs (TmAbs (TmApp (TmVar 1)(TmApp (TmVar 1) (TmVar 0))))).
-Definition plus: term := (TmAbs (TmAbs (TmAbs (TmAbs (TmApp (TmApp (TmVar 3) (TmVar 1)) (TmApp (TmApp (TmVar 2) (TmVar 1)) (TmVar 0))))))).
+Definition c0: term := λ∙ λ∙ % 0.
+Definition c2: term := λ∙ λ∙ (% 1) @@ ((% 1) @@ (% 0)).
+Definition plus: term := λ∙ λ∙ λ∙ λ∙ (TmApp (TmApp (% 3) (% 1)) (TmApp (TmApp (% 2) (% 1)) (% 0))).
 Definition c2': term := (TmApp (TmApp plus c2) c0).
 
-(*
-Shifting as in 6.2.1
+(** * Shifting definition -- 6.2.1
 
 Renumber free variables in a term `t` during a substitution so the
 free variables remains free after the substitution.  For instance
@@ -83,11 +86,8 @@ For instance:
                 =1⇒ `λ.(0` ↑1,1`1` `)`
                 =2⇒ `λ.(0 2)`
 
-We also write ↑1(t) for ↑0,1(t)
-
-Implementation as in 7.2
-
-*)
+We also write ↑1(t) for ↑0,1(t) *)
+(** * Shifting implementation -- as in 7.2 *)
 Fixpoint shift_walk (c: nat) (d: nat) (t: term): term :=
   match t with
   | TmVar k => if lt_dec k c
