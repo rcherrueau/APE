@@ -21,10 +21,8 @@ Require Import Arith.
 *)
 
 (* Syntax definition -- p.84 *)
-Definition id: Set := nat.
-
 Inductive term: Set :=
-| TmVar: id -> term
+| TmVar: nat -> term
 | TmAbs: term -> term
 | TmApp: term -> term -> term.
 
@@ -33,11 +31,12 @@ Infix "@@" := TmApp (at level 25, left associativity).
 Notation "λ∙ t" := (TmAbs t) (at level 35).
 
 (* Some definitions *)
-Definition c0: term := λ∙ λ∙ %0.
-Definition c2: term := λ∙ λ∙ %1 @@ (%1 @@ %0).
-Definition plus: term := λ∙ λ∙ λ∙ λ∙ %3 @@ %1 @@ (%2 @@ %0 @@ %1).
-Definition c2': term := plus @@ c2 @@ c0.
+Example c0: term := λ∙ λ∙ %0.
+Example c2: term := λ∙ λ∙ %1 @@ (%1 @@ %0).
+Example plus: term := λ∙ λ∙ λ∙ λ∙ %3 @@ %1 @@ (%2 @@ %0 @@ %1).
+Example c2': term := plus @@ c2 @@ c0.
 
+Require Import Decidable.
 
 (** * n-Terms
 
@@ -47,24 +46,76 @@ Definition c2': term := plus @@ c2 @@ c0.
   between 0 and n-1
 
  *)
+
+(* Fixpoint Terms (t: term) (n: nat): Prop := *)
+(*   match t with *)
+(*   | TmVar k => if lt_dec k n *)
+(*                then True   (* k < n  *) *)
+(*                else False   (* k >= n *) *)
+(*   | TmAbs t => Terms t (n + 1) *)
+(*   | TmApp t1 t2 => *)
+(*     let rh := Terms t1 n in *)
+(*     let lh := Terms t2 n in *)
+(*     if dec_True rh *)
+(*     then True *)
+(*     else False *)
+(*   end. *)
+
 Fixpoint Terms (t: term) (n: nat): Prop :=
   match t with
   | TmVar k => if lt_dec k n
                then True   (* k < n  *)
                else False   (* k >= n *)
-  | TmAbs t => Terms t (n + 1)
+  | TmAbs t => Terms t (S n)
   | TmApp t1 t2 =>
     (Terms t1 n) /\ (Terms t2 n)
   end.
 
-Lemma zeroTerms: Terms (λ∙%0) 0 -> True.
-Proof using Type. auto. Qed.
 
-Lemma zeroTerms': Terms (λ∙λ∙%0 @@ %1) 0 -> True.
-Proof using Type. auto. Qed.
+(* Example nTermsVar: forall (n k: nat), *)
+(*     k < n -> Terms (TmVar k) n. *)
+(* Proof. *)
+(*   simpl. *)
+(*   intros. *)
+(*   set (f := lt_dec k n). *)
+(*   destruct f. *)
+(*   exact I. *)
+(*   exact (n0 H). *)
+(* Qed. *)
 
-Lemma zeroTerms'': Terms (λ∙λ∙%0 @@ %4) 0 -> True.
-Proof. simpl.
+(* Example nTermsAbs: forall (t: term) (n: nat), *)
+(*     n > 0 -> Terms t n -> Terms (TmAbs t) (pred n). *)
+(* Proof. *)
+(*   simpl. *)
+(*   intros. *)
+(*   rewrite pred_Sn in H0. *)
+(*   admit. *)
+(* Admitted. *)
+
+(* Example nTermsApp: forall (t1 t2: term) (n: nat), *)
+(*     Terms t1 n -> Terms t2 n -> Terms (TmApp t1 t2) n. *)
+(* Proof using Type. *)
+(*   intros t1 t2 n nT1 nT2. simpl. split. apply nT1. apply nT2. *)
+(* Qed. *)
+
+
+
+(* (* Definition zeroTerms : Terms (λ∙%0) 0 = True. *) *)
+(* (* Definition  zeroTerms':= Terms (λ∙λ∙%0 @@ %1) 0 = True. *) *)
+(* (* Definition  zeroTerms3:= Terms (λ∙λ∙%0 @@ %4) 0 = True. *) *)
+Eval compute in (Terms (λ∙%0) 0).
+Eval compute in (Terms (λ∙λ∙%0 @@ %1) 0).
+Eval compute in (Terms (λ∙λ∙%0 @@ %4) 0).
+
+(* Lemma zeroTerms: Terms (λ∙%0) 0 = True. *)
+(* Proof using Type. simpl. reflexivity. Qed. *)
+
+(* (* Lemma zeroTerms': Terms (λ∙λ∙%0 @@ %1) 0 = True. *) *)
+(* (* Proof. simpl. compute. exfalso. contradict. *) *)
+
+(* Lemma notZeroTerms: Terms (λ∙λ∙ %4) 0 = False. *)
+(* Proof. simpl. reflexivity. Qed. *)
+
 
 (** * Shifting -- 6.2.1
 
@@ -119,7 +170,7 @@ Fixpoint shift_walk (c: nat) (d: nat) (t: term): term :=
   match t with
   | TmVar k => if lt_dec k c
                then TmVar k        (* k < c  *)
-               else TmVar (k + c)  (* k >= c *)
+               else TmVar (k + d)  (* k >= c *)
   | TmAbs t => TmAbs (shift_walk (S c) d t)
   | TmApp t1 t2 =>
     let t1' := shift_walk c d t1 in
@@ -132,21 +183,50 @@ Eval compute in (shift 1 (λ∙ %0 @@ %1)).
 Eval compute in (shift 2 (λ∙ λ∙ %1 @@ %0 @@ %2)).
 Eval compute in (shift 2 (λ∙ %0 @@ %1 @@ (λ∙ %0 @@ %1 @@ %2))).
 
-Check eq_nat.
+Eval compute in (eq_nat 2 (1 + 3)).
+(** * Substitution -- 6.2.4
 
-(** * Substitution -- 6.2.4 *)
-Fixpoint substitute_walk (c: nat) (j: nat) (s: term) (t: term): term :=
+The substitution of a term `s` for a variable number `j` in a term
+`t`, written `[j ↦ s] t`.
+
+*)
+(* Fixpoint substitute_walk (c: nat) (j: nat) (s t: term) : term := *)
+(*   match t with *)
+(*   | TmVar k => if eq_nat_dec k (j + c) *)
+(*                then (shift c s)  (* k = j+c *) *)
+(*                else TmVar k      (* k != j  *) *)
+(*   | TmAbs t => TmAbs (substitute_walk (S c) j s t) *)
+(*   | TmApp t1 t2 => *)
+(*     let t1' := substitute_walk c j s t1 in *)
+(*     let t2' := substitute_walk c j s t2 in *)
+(*     TmApp t1' t2' *)
+(*   end. *)
+(* Definition substitute (j: nat) (s t: term) := substitute_walk 0 j s t. *)
+Fixpoint substitute (j: nat) (s t: term) : term :=
   match t with
-  | TmVar k => if eq_nat_dec k (j + c)
-               then (shift c s)  (* k = j+c *)
+  | TmVar k => if eq_nat_dec k j
+               then s            (* k = j+c *)
                else TmVar k      (* k != j  *)
-  | TmAbs t => TmAbs (substitute_walk (S c) j s t)
+  | TmAbs t => TmAbs (substitute (S j) (shift 1 s) t)
   | TmApp t1 t2 =>
-    let t1' := substitute_walk c j s t1 in
-    let t2' := substitute_walk c j s t2 in
+    let t1' := substitute j s t1 in
+    let t2' := substitute j s t2 in
     TmApp t1' t2'
   end.
-Definition substitute (j: nat) (s t: term) := substitute_walk 0 j s t.
+
+(*
+  Γ = z ↦ 5, y ↦ 4, x ↦ 3, w ↦ 2, b ↦ 1, a ↦ 0.
+*)
+(* [b ↦ a] (b (λx.λy.b)) = (a (λx.λy.a)) *)
+Eval compute in (substitute 1 (%0) (%1 @@ (λ∙ λ∙ %3))).
+(* [b ↦ a (λz.a)] (b (λx.b)) = (a (λz.a) (a (λz.a))) *)
+Eval compute in (substitute 1 (%0 @@ (λ∙ %1)) (%1 @@ (λ∙ %2))).
+(* [b ↦ a] (λb. b a) = *)
+Eval compute in (substitute 1 (%0) (λ∙%0 @@ %1)).
+(* [b ↦ a] (λa. b a) *)
+Eval compute in (substitute 1 (%0) (λ∙%2 @@ %0)).
+(* [x ↦ (λz. z w)](λy.x) = λy.λz. z w *)
+Eval compute in (substitute 3 (λ∙ %6 @@ %3) (λ∙%4)).
 
 Fixpoint isval (t: term): bool :=
   match t with
