@@ -1,0 +1,134 @@
+body {
+    font-family: sans-serif;
+    margin: 0;
+
+    /* CSS variables */
+    --main-spacing: 15px 5px 10px 5px;
+    --header-footer-spacing: 10px 5px;
+
+    --theme-primary-dark: #23242e;
+    /* #f9543e */
+    --theme-primary-red: 249, 84, 62;
+    --theme-primary-blue: #2d2d6c;
+    /* #6c6cc4; */
+    --theme-secondary: 108, 108, 196;
+    --theme-background: 255, 255, 255;
+
+    --theme-primary: var(--theme-secondary);
+    --theme-error: var(--theme-primary-red);
+}
+
+input:focus {
+    outline: none;
+}
+
+button {
+    cursor: pointer;
+    color: rgba(var(--theme-primary));
+    height: 32px;
+    border: 1px solid rgba(var(--theme-primary));
+    border-radius: 4px;
+    background-color: rgba(var(--theme-background));
+    width: 64px;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    text-align: center;
+    /* Hints for the browser on how button will change */
+    will-change: transform, opacity;
+}
+
+button:hover {
+    background-color: rgba(var(--theme-primary), 0.25);
+    transition-duration: 250ms;
+}
+
+button:active {
+    background-color: rgba(var(--theme-primary), 0.50);
+    transition-duration: 100ms;
+}
+
+label > p {
+    font-size: 0.75em;
+    margin: 6px;
+}
+
+label > input[type="text"] {
+    display: block;
+    caret-color: rgba(var(--theme-primary));
+    border: unset;
+    border-bottom: 1px solid rgba(var(--theme-primary));
+}
+
+
+label > input[type="text"]:invalid {
+    display: block;
+    caret-color: rgba(var(--theme-error));
+    border: unset;
+    border-bottom: 1px solid rgba(var(--theme-error));
+}
+
+input[type="checkbox"] {
+    cursor: pointer;
+}
+
+
+/* https://css-tricks.com/how-to-use-css-grid-for-sticky-headers-and-footers/ */
+#root {
+    height: 100vh;
+
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 140px 1fr 64px;
+    grid-template-areas: 'header' 'main' 'footer';
+}
+
+#root > header, #root > footer {
+    /* background-color: lightblue; */
+    box-shadow: 0px 2px 4px -1px rgba(0,0,0,0.2),
+                0px 4px 5px 0px rgba(0,0,0,0.14),
+                0px 1px 10px 0px rgba(0,0,0,0.12);
+}
+
+#root > header {
+    grid-area: header;
+    display: grid;
+    grid-template-rows: repeat(2, 70px);
+    grid-template-areas: 'header-top' 'header-inputs';
+}
+
+#root > header #header-top {
+    padding: var(--header-footer-spacing);
+    grid-area: header-top;
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+    grid-template-columns: repeat(4, 1fr);
+    color: rgba(var(--theme-background));
+    background-color: rgba(var(--theme-primary));
+}
+
+#root > header #header-inputs {
+    padding: var(--header-footer-spacing);
+    grid-area: header-inputs;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+}
+
+#root > header h3 {
+    margin: 0;
+}
+
+
+#root > footer {
+    padding: var(--header-footer-spacing);
+    grid-area: footer;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+}
+
+
+#root > main {
+    grid-area: main;
+    padding: var(--main-spacing);
+    overflow: auto;
+}
