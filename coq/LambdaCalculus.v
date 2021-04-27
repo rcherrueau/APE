@@ -31,17 +31,30 @@ Notation "% k" := (TmVar k) (at level 20).
 Infix "@@" := TmApp (at level 25, left associativity).
 Notation "λ∙ t" := (TmAbs t) (at level 35).
 
-(** ** Some examples -- 6.1.1 *)
-(* λs. λz. z *)
-Example c0: term := λ∙ λ∙ %0.
-(* λs. λz. s (s z) *)
-Example c2: term := λ∙ λ∙ %1 @@ (%1 @@ %0).
-(* λm. λn. λs. λz. m s (n s z) *)
-Example plus: term := λ∙ λ∙ λ∙ λ∙ %3 @@ %1 @@ (%2 @@ %1 @@ %0).
-(* (plus c2) c0 *)
-Example c2': term := plus @@ c2 @@ c0.
-(* (λx. (λx. x)) (λx. x) *)
-Example foo: term := (λ∙ (λ∙%0)) @@ (λ∙%0).
+(** ** Some examples -- 5.1, 5.2 *)
+
+(* λt. t *)
+Definition id: term := λ∙ %0.
+(* id (id (λz. id z)) *)
+Example example51: term := (id @@ (id @@ (λ∙ id @@ %0))).
+
+(** *** Church booleans *)
+(* λt. λf. t *)
+Example tru: term := λ∙ λ∙ %1.
+(* λt. λf. f *)
+Example fls: term := λ∙ λ∙ %0.
+(* λl. λm. λn. l m n *)
+Example test: term := λ∙ λ∙ λ∙ %2 @@ %1 @@ %0.
+(* λb. λc. b c fls *)
+Example and: term := λ∙ λ∙ %1 @@ %0 @@ fls.
+
+(** *** Pairs *)
+(* λf. λs. λb. b f s *)
+Example pair: term := λ∙ λ∙ λ∙ %0 @@ %2 @@ %1.
+(* λp. p tru *)
+Example fst: term := λ∙ %0 @@ tru.
+(* λp. p fls *)
+Example snd: term := λ∙ %0 @@ fls.
 
 Lemma var_inj: forall k l, TmVar k = TmVar l -> k = l.
 Proof. intros. injection H. trivial. Qed.
@@ -64,7 +77,7 @@ Inductive Terms: term -> nat -> Prop :=
 | TermsApp: forall t1 t2 n,
     Terms t1 n -> Terms t2 n -> Terms (TmApp t1 t2) n.
 
-(** **Unit tests *)
+(** ** Unit tests *)
 Example unTerms: Terms (%0) 1 := TermsVar 0 1 (Nat.le_refl 0)  Nat.lt_0_1.
 Example zeroTerms: Terms (λ∙%0) 0 := TermsAbs (%0) 0 unTerms.
 Example zeroTerms': Terms (λ∙λ∙%0 @@ %1) 0.
@@ -76,7 +89,7 @@ Qed.
 Example notZeroTerms: ~ Terms (%0) 0.
 Proof. intro EQ. inversion EQ. apply (Nat.lt_irrefl 0 H1). Qed.
 
-(** **Properties *)
+(** ** Properties *)
 
 (** A term only composed of a var `%k` is obviously a free variable
 (there is no lambda abstraction to bind that variable). Hence, that
@@ -248,19 +261,22 @@ Fixpoint shift_walk (c: nat) (d: nat) (t: term): term :=
     TmApp t1' t2'
   end.
 
-
 (* We also write ↑1[t] for ↑0,1[t] *)
 Definition shift (d: nat) (t: term) := shift_walk 0 d t.
 
-Compute (match lt_dec 0 1 with
-         | left _  => true
-         | right _ => false
-        end).
+(** ** Unit tests *)
+Example check_shift1:
+  shift 1 (λ∙ %0 @@ %1) = λ∙ %0 @@ %2.
+Proof. reflexivity. Qed.
+Example check_shift2:
+  shift 2 (λ∙ λ∙ %1 @@ %0 @@ %2) = λ∙ λ∙ %1 @@ %0 @@ %4.
+Proof. reflexivity. Qed.
+Example check_shift3:
+  shift 2 (λ∙ %0 @@ %1 @@ (λ∙ %0 @@ %1 @@ %2)) = λ∙ %0 @@ %3 @@ (λ∙ %0 @@ %1 @@ %4).
+Proof. reflexivity. Qed.
 
-Eval compute in (shift 1 (λ∙ %0 @@ %1)).
-Eval compute in (shift 2 (λ∙ λ∙ %1 @@ %0 @@ %2)).
-Eval compute in (shift 2 (λ∙ %0 @@ %1 @@ (λ∙ %0 @@ %1 @@ %2))).
 
+(** ** Properties *)
 
 (* Errata  *)
 (* p 79, exercise 6.2.3 *)
@@ -288,19 +304,6 @@ The substitution of a term `s` for a variable number `j` in a term
 `t`, written `[j ↦ s] t`.
 
 *)
-(* Fixpoint substitute_walk (c: nat) (j: nat) (s t: term) : term := *)
-(*   match t with *)
-(*   | TmVar k => match eq_nat_dec k (j + c) with *)
-(*                | right _ => (shift c s)  (* k = j+c *) *)
-(*                | left  _ => TmVar k      (* k != j  *) *)
-(*               end *)
-(*   | TmAbs t => TmAbs (substitute_walk (S c) j s t) *)
-(*   | TmApp t1 t2 => *)
-(*     let t1' := substitute_walk c j s t1 in *)
-(*     let t2' := substitute_walk c j s t2 in *)
-(*     TmApp t1' t2' *)
-(*   end. *)
-(* Definition substitute (j: nat) (s t: term) := substitute_walk 0 j s t. *)
 Fixpoint substitute (j: nat) (s t: term) : term :=
   match t with
   | TmVar k => match eq_nat_dec k j with
@@ -314,10 +317,7 @@ Fixpoint substitute (j: nat) (s t: term) : term :=
     TmApp t1' t2'
   end.
 
-Compute (match eq_nat_dec 0 0 with
-         | left _  => true
-         | right _ => false
-        end).
+(** **Unit tests *)
 
 (*
   Γ = z ↦ 5, y ↦ 4, x ↦ 3, w ↦ 2, b ↦ 1, a ↦ 0.
@@ -333,6 +333,7 @@ Eval compute in (substitute 1 (%0) (λ∙%2 @@ %0)).
 (* [x ↦ (λz. z w)](λy.x) = λy.λz. z w *)
 Eval compute in (substitute 3 (λ∙ %6 @@ %3) (λ∙%4)).
 
+(** * Evaluation *)
 Fixpoint unshift_walk (c: nat) (t: term): term :=
   match t with
   | TmVar k => match lt_dec k c with
@@ -347,88 +348,95 @@ Fixpoint unshift_walk (c: nat) (t: term): term :=
   end.
 Definition unshift t: term := unshift_walk 0 t.
 
-Fixpoint eval1 (t: term) {struct t}: option term :=
-  let isval := fun (t: term) =>
-                 match t with
-                 | TmAbs _ => true
-                 | _       => false
-                 end
-  in match t with
-     (* E-AppAbs*)
-     | TmApp (TmAbs t12) v2 =>
-       if isval v2
-       then let t' := substitute 0 (shift 1 v2) t12
-            in Some (unshift t')
-       else None
-     | TmApp t1 t2 =>
-       if isval t1
-       (* E-App2 *)
-       then match eval1 t2 with
-            | Some t2' => Some (TmApp t1 t2')
-            | _        => None
-            end
-       (* E-App1 *)
-       else match eval1 t1 with
-            | Some t1' => Some (TmApp t1' t2)
-            | _        => None
-            end
-     | _ => None
-     end.
-
-Fixpoint eval (t: term): term :=
+Fixpoint isval (t: term) {struct t}: bool :=
   match t with
-    | TmVar k => t
-    | TmApp (TmAbs t1) t2 =>
-      let v := (eval t2)
-      in unshift (substitute 0 (shift 1 v) t1)
-    | TmApp t1 t2 => TmApp (eval t1) (eval t2)
-    | TmAbs t => TmAbs (eval t)
+  | TmAbs _ => true
+  | _       => false
   end.
 
-Inductive isVal : term -> Set :=
-  | here t1 : isVal (TmAbs t1).
+(** The beta reduction evaluation.
 
-Hint Constructors isVal.
+This reduction use a /call by value/ strategy. Only outermost redexes
+are reduced. Moreover, a redex is reduced only when its RHS has
+already been reduced to a /value/.
 
-Inductive betared1 : term -> term -> Set :=
-  | betared1appabs t1 t2 : isVal t2 -> betared1 ((λ∙ t1) @@ t2)  (unshift (substitute 0 (shift 1 t2) t1))
-  | betared1app2 t1 t2 t2' : isVal t1 -> betared1 t2 t2' -> betared1 (t1 @@ t2) (t1 @@ t2')
-  | betared1app1 t1 t2 t1' : betared1 t1 t1' -> betared1 (t1 @@ t2) (t1' @@ t2).
+This does not implement a full reduction strategy.  Henceforth it may
+be impossible to check equality between two terms based on their
+structure. *)
+Fixpoint eval1 (t: term) {struct t}: option term :=
+  match t with
+  | TmApp t1 t2 =>
+    match t1, isval t2 with
+      (* E-AppAbs *)
+    | (TmAbs t12), true =>
+      let t' := substitute 0 (shift 1 t2) t12
+      in Some (unshift t')
+    | _, _ => if isval t1
+              (* E-App2 *)
+              then match eval1 t2 with
+                   | Some t2' => Some (TmApp t1 t2')
+                   | _        => None
+                   end
+              (* E-App1 *)
+              else match eval1 t1 with
+                   | Some t1' => Some (TmApp t1' t2)
+                   | _        => None
+                   end
+    end
+  | _ => None
+  end.
 
-Hint Constructors betared1.
-
-Compute (eval ((λ∙ %1 @@ %0 @@ %2) @@ (λ∙%0))).
-
-Example test : betared1 ((λ∙ %1 @@ %0 @@ %2) @@ (λ∙%0)) (%0 @@ (λ∙%0) @@ %1).
-Proof.
-  auto with betared1.
-
-
-
-Compute (eval c2).
-(* c0 = λs. λz. z *)
-(* plus = λm. λn. λs. λz. m s (n s z) *)
-(* plus @@ c0 @@ c0 = (λm. λn. λs. λz. m s (n s z)) (λs. λz. z) (λs. λz. z)
-                    ~ (λ . λ . λ . λ . 3 1 (2 1 0)) (λ . λ . 0) (λ . λ . 0)
-            AppAbs => (λn. λs. λz. (λs. λa. a) s (n s z)) (λs. λz. z)
-                    ~ (λ . λ . λ . (λ . λ . 0) 1 (2 1 0)) (λ . λ . 0)
-            AppAbs => λs. λz. (λs. λa. a) s ((λs. λa. a) s z)
-                    ~ λ . λ . (λ . λ . 0) 1 ((λ . λ . 0) 1 0)
-
+(** Coq implementation must consist only of terminating functions, so
+we bound the number of steps the evaluation may take in any given run.
 *)
-(* plus @@ c0 @@ c0 = (λm. λn. λs. λz. m s (n s z)) (λs. λz. z) (λs. λz. z)
-                    ~ (λ . λ . λ . λ . 3 1 (2 1 0)) (λ . λ . 0) (λ . λ . 0)
-            AppAbs => (λn. λs. λz. (λs. λa. a) s (n s z)) (λs. λz. z)
-                    ~ (λ . λ . λ . (λ . λ . 0) 1 (2 1 0)) (λ . λ . 0)
-            AppAbs => λs. λz. (λs. λa. a) s ((λs. λa. a) s z)
-                    ~ λ . λ . (λ . λ . 0) 1 ((λ . λ . 0) 1 0)
+Fixpoint eval (max_steps: nat) (t: term) {struct max_steps}:  term :=
+  match max_steps with
+  | 0 => match eval1 t with
+        | Some t' => t'
+        | None    => t
+        end
+  | S max_steps' => match eval1 t with
+                   | Some t' => eval max_steps' t'
+                   | None    => t
+                   end
+  end.
+
+(** ** Unit tests *)
+Example check_eval_ex51 :
+  eval 100 example51 = λ∙ id @@ %0.
+Proof. reflexivity. Qed.
+
+Example check_eval_test_true :
+  eval 100 (test @@ tru @@ tru @@ fls) = tru.
+Proof. reflexivity. Qed.
+
+Example check_eval_test_false :
+  eval 100 (test @@ fls @@ tru @@ fls) = fls.
+Proof. reflexivity. Qed.
+
+Example check_eval_and_true :
+  eval 100 (and @@ tru @@ tru) = tru.
+Proof. compute. reflexivity. Qed.
+
+Example check_eval_and_false :
+  eval 100 (and @@ tru @@ fls) = fls.
+Proof. reflexivity. Qed.
+
+Example check_eval_fst_pair_true_false :
+  eval 100 (fst @@ (pair @@ tru @@ fls)) = tru.
+Proof. reflexivity. Qed.
+
+Example check_eval_snd_pair_true_false :
+  eval 100 (snd @@ (pair @@ tru @@ fls)) = fls.
+Proof. reflexivity. Qed.
+
+
+(*
+We cannot prove that a program in the lambda calculus is never
+"getting stuck" according to the semantics.
 *)
 
-Example c0': term := (plus @@ c0 @@ c0).
-Compute (eval1 c0').
-Compute (eval c0').
-Compute (eval (eval (eval (eval c0')))).
-Compute (eval c2').
-
-Extraction Language Scheme.
-Extraction eval1.
+Require Extraction.
+Extraction Inline le_lt_dec le_gt_dec le_dec lt_dec shift_walk unshift_walk.
+(* Extraction Language Scheme. *)
+Recursive Extraction eval.
