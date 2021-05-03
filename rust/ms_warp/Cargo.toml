@@ -1,0 +1,14 @@
+[package]
+name = "ms_warp"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+warp = "0.3"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+
+[dependencies.reqwest]
+version = "0.11"
+default-features = false
+
