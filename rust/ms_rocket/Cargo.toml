@@ -1,0 +1,22 @@
+[package]
+name = "ms_rocket"
+version = "0.1.0"
+edition = "2018"
+
+[workspace]
+resolver = "2"
+
+[dependencies]
+hostname = "0.3"
+rocket = "0.4.7"
+serde = { version = "1.0", features = ["derive"] }
+
+[dependencies.reqwest]
+version = "0.11"
+default-features = false
+features = [ "blocking", "json" ]
+
+[dependencies.rocket_contrib]
+version = "0.4.7"
+default-features = false
+features = ["json"]
