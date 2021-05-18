@@ -18,7 +18,7 @@ fn main() {
         compute::rocket(4203).launch();
     });
 
-    ms_identity.join();
-    ms_images.join();
-    ms_compute.join();
+    ms_identity.join().unwrap();
+    ms_images.join().unwrap();
+    ms_compute.join().unwrap();
 }
