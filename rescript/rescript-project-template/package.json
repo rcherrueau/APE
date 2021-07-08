@@ -2,9 +2,9 @@
     "name": "rescript-project-template",
     "version": "0.0.1",
     "scripts": {
-        "build": "bsb -make-world",
-        "clean": "bsb -clean-world; rm -rf .cache",
-        "start": "bsb -clean-world -make-world -w",
+        "build": "rescript",
+        "clean": "rescript clean -with-deps",
+        "start": "rescript build -w",
         "serve": "parcel serve ./index.html"
     },
     "type": "module",
@@ -15,12 +15,11 @@
     "author": "",
     "license": "MIT",
     "devDependencies": {
-        "@rescript/react": "^0.10.1",
-        "bs-platform": "^9.0.2",
+        "@rescript/react": "^0.10.3",
         "parcel": "^2.0.0-beta.2"
     },
     "dependencies": {
-        "@rescript/react": "^0.10.1",
+        "rescript": "*",
         "react": "^17.0.2",
         "react-dom": "^17.0.2"
     }
