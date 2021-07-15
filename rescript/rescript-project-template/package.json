@@ -2,10 +2,11 @@
     "name": "rescript-project-template",
     "version": "0.0.1",
     "scripts": {
-        "build": "rescript",
-        "clean": "rescript clean -with-deps",
-        "start": "rescript build -w",
-        "serve": "parcel serve ./index.html"
+        "build": "parcel build --no-source-maps ./index.html",
+        "serve": "parcel serve ./index.html",
+        "re:build": "rescript",
+        "re:clean": "rescript clean -with-deps",
+        "re:start": "rescript build -w"
     },
     "type": "module",
     "keywords": [
@@ -19,8 +20,10 @@
         "parcel": "^2.0.0-beta.2"
     },
     "dependencies": {
-        "rescript": "*",
+        "@fortawesome/fontawesome-free": "^5.15.3",
+        "normalize.css": "^8.0.1",
         "react": "^17.0.2",
-        "react-dom": "^17.0.2"
+        "react-dom": "^17.0.2",
+        "rescript": "*"
     }
 }

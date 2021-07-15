@@ -6,8 +6,17 @@
 //
 // Adapted Calculator for my Daddy's Needs
 
+// Resources
+%bs.raw(`require("normalize.css")`)
+%bs.raw(`require("@fortawesome/fontawesome-free/js/solid.js")`)
+%bs.raw(`require("@fortawesome/fontawesome-free/js/regular.js")`)
+%bs.raw(`require("@fortawesome/fontawesome-free/js/fontawesome.js")`)
+
+%bs.raw(`require("./app.css")`)
+
 // Useful links
 // https://reactjs.org/docs/dom-elements.html
+
 open Belt
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -25,14 +34,10 @@ type entry = {
   isShipped: bool,
 }
 
-let defaultCoefMin: float = 0.8
-let defaultCoefMax: float = 0.7
-let defaultShipFactor: float = 3.
-let defauntNewEntry: entry = {
-  quantity: infinity,
-  price: infinity,
-  isShipped: true,
-}
+let defaultCoefMin = 0.8
+let defaultCoefMax = 0.7
+let defaultShipFactor = 3.
+let defaultIsShipped = true
 
 let entriesMock = [
   {quantity: 1., price: 1., isShipped: false},
@@ -60,9 +65,9 @@ let computePrice = (shipFactor: float, {quantity, price, isShipped}: entry): flo
 }
 
 /** Compute the total quantity between entries  */
-let totalQuantity = (entries: array<entry>): float => {
-  entries->Array.map(e => e.quantity)->sum
-}
+let totalQuantity = (entries: array<entry>): float =>
+    entries->Array.map(e => e.quantity)->sum
+
 
 /** Compute the mean price for all entries */
 let priceMean = (entries: array<entry>, shipFactor: float): float => {
@@ -80,7 +85,7 @@ let priceMean = (entries: array<entry>, shipFactor: float): float => {
 let floatPattern = "-?[0-9]*\.?[0-9]*"
 
 /** Format a float to 2 digits after the comma */
-let fmtFloat = (f) => Js.Float.toFixedWithPrecision(f, ~digits=2)
+let fmtFloat = (number) => Js.Float.toFixedWithPrecision(number, ~digits=2)
 
 /** Set the value of an input text */
 let updateInputTxt = (setter, evt) => {
@@ -120,33 +125,35 @@ module ViewHeader = {
     // States for a new entry
     let (quantity, setQuantity) = React.useState(_ => "")
     let (price, setPrice) = React.useState(_ => "")
-    let (isShipped, setIsShipped) = React.useState(_ => true)
+    let (isShipped, setIsShipped) = React.useState(_ => defaultIsShipped)
 
+    open React
     <header>
       <div id="results">
         // Headline (first line)
-        <h3>{React.string(j`Total Qté`)}</h3>
-        <h3>{React.string("Prix Moy")}</h3>
-        <h3>{React.string("Moy Min")}</h3>
-        <h3>{React.string("Moy Max")}</h3>
+        <h3>{string(j`Total Qté`)}</h3>
+        <h3>{string("Prix Moy")}</h3>
+        <h3>{string("Moy Min")}</h3>
+        <h3>{string("Moy Max")}</h3>
 
         // Computed values (second line)
-        <p id="total-quantity">{React.string(totalQuantity->fmtFloat)}</p>
-        <p id="price-mean">{React.string(priceMean->fmtFloat)}</p>
-        <p id="price-mean-min">{React.string(priceMeanMin->fmtFloat)}</p>
-        <p id="price-mean-max">{React.string(priceMeanMax->fmtFloat)}</p>
+        <p id="total-quantity">{string(totalQuantity->fmtFloat)}</p>
+        <p id="price-mean">{string(priceMean->fmtFloat)}</p>
+        <p id="price-mean-min">{string(priceMeanMin->fmtFloat)}</p>
+        <p id="price-mean-max">{string(priceMeanMax->fmtFloat)}</p>
       </div>
 
       // User inputs for a new entry (third line)
       <div id="user-inputs">
         <span>
-          <label className="for-input-text" htmlFor="new-entry:quantity"><p>{React.string(j`Qté ..`)}</p>
+          <label className="for-input-text" htmlFor="new-entry:quantity"><p>{string(j`Qté ..`)}</p>
             <input id="new-entry:quantity" type_="text" pattern=floatPattern
+                   autoFocus={true}
                    value={quantity} onChange={updateInputTxt(setQuantity)} />
           </label>
         </span>
         <span>
-          <label className="for-input-text" htmlFor="new-entry:price"><p>{React.string("Prix ...")}</p>
+          <label className="for-input-text" htmlFor="new-entry:price"><p>{string("Prix ...")}</p>
             <input id="new-entry:price" type_="text" pattern=floatPattern
                    value={price} onChange={updateInputTxt(setPrice)} />
           </label>
@@ -164,10 +171,10 @@ module ViewHeader = {
             // Add the new entry to the list of entries
             setEntries(prependEntry(quantity, price, isShipped))
 
-            // Reset textfield
+            // Reset to default values
             setQuantity(_ => "")
             setPrice(_ => "")
-            setIsShipped(_ => true)
+            setIsShipped(_ => defaultIsShipped)
           }}>
           <i className="fas fa-plus" />
           </button>
@@ -187,10 +194,11 @@ module ViewFooter = {
               ~shipFactor: string,
               ~setShipFactor: (string => string) => unit) => {
 
+    open React
     <footer>
       // Coef Min user input
       <span>
-        <label className="for-input-text"><p>{React.string("Coef min ...")}</p>
+        <label className="for-input-text"><p>{string("Coef min ...")}</p>
         <input id="coefMin" type_="text" pattern=floatPattern value={coefMin}
                onChange={{updateInputTxt(setCoefMin)}} />
         </label>
@@ -198,7 +206,7 @@ module ViewFooter = {
 
       // Coef Max user input
       <span>
-        <label className="for-input-text"><p>{React.string("Coef max ...")}</p>
+        <label className="for-input-text"><p>{string("Coef max ...")}</p>
         <input id="coefMax" type_="text" pattern=floatPattern value={coefMax}
                 onChange={{updateInputTxt(setCoefMax)}} />
         </label>
@@ -207,7 +215,7 @@ module ViewFooter = {
       // Shipping factor user input
       <span>
         <label className="for-input-text" htmlFor="shipFactor">
-          <p><i className="fas fa-truck"/>{React.string("(%)")}</p>
+          <p><i className="fas fa-truck"/>{string("(%)")}</p>
           <input id="shipFactor" type_="text" pattern=floatPattern value={shipFactor}
                 onChange={{updateInputTxt(setShipFactor)}} />
         </label>
@@ -245,12 +253,13 @@ module ViewMain = {
 
    /** Render one entry has html and set update and delete actions */
    let renderEntry = (idx: int, e: entry) => {
+     open React
      <div key={Int.toString(idx)}>
        // Quantity
-       <span>{React.string(e.quantity->fmtFloat)}</span>
+       <span>{string(e.quantity->fmtFloat)}</span>
 
        // Price
-       <span>{React.string(e.price->fmtFloat)}</span>
+       <span>{string(e.price->fmtFloat)}</span>
 
        // Is shipped?
        <span>
@@ -276,7 +285,6 @@ module ViewMain = {
 
 
 module App = {
-
   @react.component
   let make = () => {
     // States
@@ -294,7 +302,6 @@ module App = {
                                shipFactor setShipFactor />
     ])
   }
-
 }
 
 switch (ReactDOM.querySelector("#root")) {
