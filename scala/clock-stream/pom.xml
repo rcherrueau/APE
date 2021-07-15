@@ -57,7 +57,7 @@
 
  <properties>
    <scala.version>2.9.1-1</scala.version>
-   <jetty.version>8.1.2.v20120308</jetty.version>
+   <jetty.version>9.4.41.v20210516</jetty.version>
  </properties>
 
  <dependencies>
