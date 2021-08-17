@@ -1,0 +1,126 @@
+#+TITLE: Mail User Agent
+#+SUBTITLE: Retrieve mail with mbsync and notmuch
+
+* Pulling emails script
+1. Build the /email store/ (if any)
+   - The email store is where emails are save on the computer, e.g.,
+     =$HOME/.mail/=
+   - In the store, I should have one directory per email account,
+     e.g., =$HOME/.mail/Gmail=, =$HOME/.mail/Inria= ...
+   - These directories should be the property of
+     ~rfish.name:rfish.group~.
+
+2. Synchronizes IMAP account with ~mbsync~
+   - Command is ~mbsync <email store>-store~
+   - Stick to 4 mailbox: inbox, drafts, sent and trash.
+     + The name of each mailbox may vary from one email store to
+       another.
+     + List all available boxes with mbsync --list --all
+     + Gmail: (inbox → INBOX), (drafts → [Gmail]/Drafts), (sent →
+       [Gmail]/Sent Mail), (trash → [Gmail]/Bin)
+     + Inria: (inbox → INBOX), (drafts → Drafts), (sent → Sent),
+       (trash → Trash)
+   - *Errors*
+     + Ensure errors in one /email store/ does not disturb
+       synchronization of others.
+     + Run one mbsync per /email store/ (e.g., use different threads).
+     + Use libnotify to send errors.
+     + Show the command to redo the mbsync in the shell in verbose
+       mode to get the full errors.
+
+3. Index and tags new emails
+   - Index new emails
+     : notmuch new
+   - Tag emails
+     : notmuch tag --batch --input=<TaggingFile>
+
+* Deleting emails
+Do not rely on mbsync's trash functionality. First, notmuch does not
+set the deleted flag of e-mails. Consequently, mbsync doesn't know
+which e-mails have to be moved to the trash folder.  Second, I would
+prefer to rely on the auto-trashing system of the IMAP account (e.g.,
+Gmail auto-trash mails after 30 days).
+
+Manually move emails marked as deleted to the Trash box.
+- Renames files when moving them in order to delete mbsync UID and
+  avoid conflict.
+- These changes will not be synchronized with the master until the
+  next time ~mbsync~ is invoked.
+- TODO: What is the state on notmuch here?  Does it know the path of
+  relocated deleted files?
+- Note: Manually moving emails should be avoided as much as possible
+  since I can imagine inconsistencies in case of a failure.
+
+At notmuch level, emails in the trash box should always be archived
+(~-inbox~) and marked as ~+deleted~.  Therefore, if some emails have
+been deleted from the webmail interface they will skip the inbox.
+
+: notmuch tag -inbox +deleted -- 'folder:"Gmail/[Gmail]/Bin" OR folder:"Inria/Trash"'
+
+Note: Using double quote (~"~) in the folder part is *really
+important*.  The whole query may also be surrounded, here with simple
+quote (='=) to avoid char escaping.
+
+* Architecture
+** Thread safety
+The pulling script could be executed manually or in a cron job.
+Multiple execution of this script means they could happen
+concurrently.  Similarly, the pulling script and the deleting script
+could be executed at the same time. Hence the question: are the
+pulling and deleting script thread safe?
+
+mbsync states that the synchronization state is kept in one local text
+file per mailbox; these files are protected against concurrent mbsync
+processes. Mailboxes can also be safely modified while mbsync
+operates.
+
+notmuch makes no claims about thread safety.  What could go wrong? pulling over
+pulling, deleting over deleting, pulling over deleting and deleting over
+pulling.
+
+First, make pulling and deleting idempotent. Thus pulling over pulling and
+deleting over deleting are safe even concurrently.
+
+What about deleting over pulling? Emails marked as ~+deleted~ will be
+moved by the deleting script and linked to the trash box in notmuch.
+The worst scenario is that the deleting starts and finishes while
+~notmuch new~ of pulling did not finish yet.  Thus, It may be possible
+that the ~notmuch new~ overwrite the database and does not take into
+account the deleting emails and stills link to the old path.  This
+will be fixed the next time the deleting script will be run.
+
+What about pulling over deleting? I may be in the process of deleting
+emails (i.e., emails have been moved to trash box, but not reindexed
+by calling mbsync a second time) and at the same time pull emails.  In
+that case, I may risk to repull INBOX emails that have been moved to
+the trash box, because they have disappear from the INBOX.  In that
+case, I don't know how to proceed.  Maybe a system-wide semaphore
+https://stackoverflow.com/q/6931342 every time I have to call notmuch.
+
+** Pulling
+*Keep it idempotent*
+
+I generate configuration files for mbsync and notmuch at the nix
+level. This configuration files require the path of email stores.  So
+I will stick to building the email stores at the nix level.  The
+pulling will only be about getting emails and tagging them.
+
+To speed up the synchronization of email stores and to ensure that
+errors in one email store does not disturb synchronization of others,
+run mbsync in different threads.  If an errors occurs, notify the user
+through libnotify and show the command to redo the mbsync in the shell
+in verbose mode to get the full log. But let the script continue to
+the next phase.
+
+The tagging have to be done in one thread because notmuch is not
+thread safe and I don't know how it will behave if I run notmuch in
+the previous threads.  I should join mbsync thread first, and then run
+notmuch. (Maybe I would have to run it in a system-wide semaphore to
+avoid race conditions.)
+
+** Deleting
+*Keep it idempotent*
+
+Find emails outside of the trash box that have been marked as
+~+deleted~ by notmuch.
+: notmuch

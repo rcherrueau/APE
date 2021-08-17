@@ -1,0 +1,39 @@
+# See https://rust-lang.github.io/rustup/overrides.html#the-toolchain-file
+
+[toolchain]
+# Channel to get rustc and components from
+channel = "nightly-2021-08-17"
+
+# Groups of components to downloads:
+# - minimal :: rustc, rust-std, and cargo
+# - default :: minimal + rust-docs, rustfmt, and clippy
+# - complete :: default + miri, rls, ....
+
+# See [0] for the complete list of components.  Also, Check the
+# component availability for your current computer target on [1]
+#
+# [0] https://rust-lang.github.io/rustup/concepts/components.html
+# [1] https://rust-lang.github.io/rustup-components-history/
+profile = "default"
+
+# Extra components to install in addition to the one installed by the
+# current profile.
+components = [
+    "rust-analyzer-preview",  # lsp
+    "rust-src",               # required by lsp
+]
+
+# Extra targets in addition to your current one.  On my current
+# computer the default target is x86_64-unknown-linux-gnu.  Do the
+# following to find out your current target.
+#
+# (eval $(rustc --print cfg | grep [=]);
+#   echo $target_arch-$target_vendor-$target_os-$target_env)
+targets = [
+    # For static Rust binaries (portable to any x86_64)
+    # cargo build --target=x86_64-unknown-linux-musl
+    #
+    # Note: rust will still build for my current system
+    # (i.e., x86_64-unknown-linux-gnu) with `cargo build`
+    "x86_64-unknown-linux-musl",
+  ]
