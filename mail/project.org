@@ -121,6 +121,12 @@ avoid race conditions.)
 ** Deleting
 *Keep it idempotent*
 
-Find emails outside of the trash box that have been marked as
-~+deleted~ by notmuch.
-: notmuch
+Find emails outside of the trash boxes that have been marked as
+~+deleted~ by notmuch.  I have to search through all trash boxes
+because emails may be tag as part of many stores and it would be an
+error to count it twice.
+
+: notmuch search 'tag:Inria and tag:deleted AND NOT (folder:"Inria/Trash" OR folder:"Gmail/[Gmail]/Bin")'
+
+also notmuch new
+also send account json (~builtins.toJSON account~)

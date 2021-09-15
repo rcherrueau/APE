@@ -14,3 +14,20 @@ Cargo.lock
 **/*.rs.bk
 
 # End of https://www.gitignore.io/api/rust
+
+# Created by https://www.toptal.com/developers/gitignore/api/scala
+# Edit at https://www.toptal.com/developers/gitignore?templates=scala
+
+### Scala ###
+*.class
+*.log
+.bloop/
+.bsp/
+.metals/
+project/
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+
+# End of https://www.toptal.com/developers/gitignore/api/scala
+
