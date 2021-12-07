@@ -4,6 +4,7 @@ import scala.concurrent.{Future, Await}
 import scala.concurrent.duration.Duration
 import concurrent.ExecutionContext.Implicits.global
 import scala.util.{Try, Success, Failure}
+import scala.sys.env
 
 import java.io.IOException
 import java.nio.file.{Path, Files}
@@ -13,6 +14,9 @@ import org.freedesktop.Notifications
 import cats.implicits._
 import io.circe.parser.decode
 
+val MBSYNC_BIN = env.getOrElse("MBSYNC_BIN", "mbsync")
+val NOTMUCH_BIN = env.getOrElse("NOTMUCH_BIN", "notmuch")
+
 
 // Tasks
 
@@ -20,17 +24,11 @@ import io.circe.parser.decode
  *
  * > mbsync --verbos <account-store>-inbox
  *
- * TODO make failing a failure ....
  */
-def sync(account: Account): Try[Unit] = {
+def syncEmails(account: Account): Try[Unit] = if (account.sync) {
   val store = s"${account.store}-inbox"
 
-  // Do nothing if the account should not be synchronized
-  if (!account.sync) {
-    return Success(())
-  }
-
-  Command.output("mbsync", "--verbose", store).flatMap(
+  Command.output(MBSYNC_BIN, "--verbose", store).flatMap(
     (output: Output)  =>
     if (output.isSuccess) {   // Sync runs smoothly...
       // Get the stdout and log it
@@ -44,19 +42,22 @@ def sync(account: Account): Try[Unit] = {
       // Get the stderr and log it
       println(s"Sync error for ${store}: ${output.stderr}")
 
-      // Notify user
-      Notifications.critical(
-        "email",
-        s"📪 Sync error for ${store}",
-        s"${output.stderr}\n\nTry 'mbsync -V ${store}' to debug.", 0)
+      // Notify user and Fail
+      Notifications
+        .critical(
+          "email",
+          s"📪 Sync error for ${store}",
+          s"${output.stderr}\n\nTry 'mbsync -V ${store}' to debug.",
+          0)
+        .flatMap(_ => Failure(new IOException(output.stderr)))
     })
-}
+} else { Success(()) /* Do nothing if the account should not be synchronized */ }
 
 /** Index emails
  *
  * > notmuch new
  */
-def indexEmails(): Try[Unit] = Command.output("notmuch", "new").flatMap(
+def indexEmails(): Try[Unit] = Command.output(NOTMUCH_BIN, "new").flatMap(
   (output: Output)  =>
   if (output.isSuccess) {   // Indexing runs smoothly...
     // Get the stdout and log it
@@ -114,7 +115,7 @@ def tagEmails(accounts: List[Account]): Try[Boolean] = {
     file <- mkTmpFile(taggingScript)
 
     // Call notmuch ...
-    output <- Command.output("notmuch", "tag", "--batch", s"--input=${file}")
+    output <- Command.output(NOTMUCH_BIN, "tag", "--batch", s"--input=${file}")
   } yield {
     output.isSuccess match
       // ... tagging runs smoothly:
@@ -137,7 +138,7 @@ def tagEmails(accounts: List[Account]): Try[Boolean] = {
  * > notmuch search --output=files <query>
  */
 def searchEmails(query: String): Try[List[Path]] =
-  Command.output("notmuch", "search", "--output=files", query).flatMap(
+  Command.output(NOTMUCH_BIN, "search", "--output=files", query).flatMap(
     (output: Output) =>
     if (output.isSuccess) {   // Searching runs smoothly...
       // Get the stdout, log it and parse it
@@ -190,7 +191,7 @@ def moveToLocalBox(email: Path, box: BoxPath): Try[Path] = Try {
 /** Pull emails concurrently and tag them */
 def pull(accounts: List[Account]): Future[String] = for {
   // First synchronize email stores concurrently
-  _ <- accounts.map(acc => liftTry(sync(acc))).sequence
+  _ <- accounts.map(acc => liftTry(syncEmails(acc))).sequence
 
   // Then index emails
   _ <- liftTry(indexEmails())
@@ -214,7 +215,7 @@ def delete(accounts: List[Account]): Future[String] = {
                                  .sequence
 
     // Propagate changes to the remote mailbox (if need be)
-    _ <- if !emailPaths.isEmpty then { sync(account) } else { Success(()) }
+    _ <- if !emailPaths.isEmpty then { syncEmails(account) } else { Success(()) }
   } yield (emailPaths.zip(emailTrashPaths))
 
 
@@ -228,20 +229,23 @@ def delete(accounts: List[Account]): Future[String] = {
 }
 
 @main def app(action: String): Unit = {
-  val f = for {
-    accounts <- liftTry(parseAccounts(ACCOUNTS))
-    res <- if (action == "pull") then pull(accounts.values.toList) else Future.successful(())
-    res <- if (action == "delete") then delete(accounts.values.toList) else Future.successful(())
-  } yield (res)
+  // Parse the `accounts` and execute the `action` in a future.
+  val appF = liftTry(parseAccounts(ACCOUNTS)).flatMap(
+    accounts => action match {
+      case "pull"   => pull(accounts.values.toList)
+      case "delete" => delete(accounts.values.toList)
+      case _ => Future.failed(
+        new IOException(s"Unknown action ${action}.  Expected either `pull` or `delete`."))
+    })
 
-  // `Await` for the future to complete and makes the main
-  // thread to not terminate prematurely
-  Await.ready(f, Duration.Inf).onComplete {
+  // `Await` for the future to complete and ensure that the main
+  // thread does not terminate prematurely
+  Await.ready(appF, Duration.Inf).onComplete {
     case Success(x) =>
-      // println(s"in the Success case: ${delta()}")
-      println(x)
+      println(s"Success: ${x}")
     case Failure(e) =>
       e.printStackTrace
+      Notifications.critical("email", s"📪 General ERROR", s"${e}", 0)
       println("*I SHOULD BE PRINTED IN CASE OF ERROR*")
   }
 }
@@ -294,7 +298,7 @@ val ACCOUNTS = """
   },
   "Inria": {
     "store": "Inria",
-    "sync": true,
+    "sync": false,
     "boxes": { "drafts": "Drafts", "inbox": ["*", "!Junk"], "sent": "Sent", "trash": "Trash" },
     "email": "Ronan-Alexandre.Cherrueau@inria.fr",
     "imap": { "host": "zimbra.inria.fr" },
