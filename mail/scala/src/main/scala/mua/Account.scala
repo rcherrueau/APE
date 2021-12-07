@@ -4,13 +4,14 @@ import java.nio.file.{Path}
 
 import io.circe._, io.circe.generic.semiauto._
 
+// TODO: Make this a parameter 
 /** Directory to store emails */
 val MAILDIR = Path.of(System.getProperty("user.home"), ".mail")
 
 /** Path */
 case class BoxPath(_path: String) {
   /** Path of that box */
-  val path: Path = MAILDIR.resolve(_path)
+  val path: Path = MAILDIR.resolve(Path.of(_path, "cur"))
   /** Path Query ob that box */
   val pathQ = s"'path:\"${_path}/**\"'"
   /** Folder Query of that box */
