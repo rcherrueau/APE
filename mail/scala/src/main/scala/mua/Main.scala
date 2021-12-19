@@ -16,6 +16,7 @@ import io.circe.parser.decode
 
 val MBSYNC_BIN = env.getOrElse("MBSYNC_BIN", "mbsync")
 val NOTMUCH_BIN = env.getOrElse("NOTMUCH_BIN", "notmuch")
+val ACCOUNTS = env.get("ACCOUNTS")
 
 
 // Tasks
@@ -25,33 +26,39 @@ val NOTMUCH_BIN = env.getOrElse("NOTMUCH_BIN", "notmuch")
  * > mbsync --verbos <account-store>-inbox
  *
  */
-def syncEmails(account: Account): Try[Unit] = if (account.sync) {
-  val store = s"${account.store}-inbox"
+def syncEmails(account: Account): Try[Unit] = account.sync match {
+  // Call mbsync to synchronize emails
+  case true => {
+    val store = s"${account.store}-inbox"
 
-  Command.output(MBSYNC_BIN, "--verbose", store).flatMap(
-    (output: Output)  =>
-    if (output.isSuccess) {   // Sync runs smoothly...
-      // Get the stdout and log it
-      println(s"Sync of ${store}: ${output.stdout}")
+    Command.output(MBSYNC_BIN, "--verbose", store).flatMap(
+      (output: Output)  =>
+      if (output.isSuccess) {   // Sync runs smoothly...
+        // Get the stdout and log it
+        println(s"Sync of ${store}: ${output.stdout}")
 
-      // TODO: parse stdout to get Inbox changes and notify the use
-      // ...
+        // TODO: parse stdout to get Inbox changes and notify the user
+        // ...
 
-      Success(())
-    } else {                  // Sync runs with errors...
-      // Get the stderr and log it
-      println(s"Sync error for ${store}: ${output.stderr}")
+        Success(())
+      } else {                  // Sync runs with errors...
+        // Get the stderr and log it
+        println(s"Sync error for ${store}: ${output.stderr}")
 
-      // Notify user and Fail
-      Notifications
-        .critical(
-          "email",
-          s"📪 Sync error for ${store}",
-          s"${output.stderr}\n\nTry 'mbsync -V ${store}' to debug.",
-          0)
-        .flatMap(_ => Failure(new IOException(output.stderr)))
-    })
-} else { Success(()) /* Do nothing if the account should not be synchronized */ }
+        // Notify user and Fail
+        Notifications
+          .critical(
+            "email",
+            s"📪 Sync error for ${store}",
+            s"${output.stderr}\n\nTry 'mbsync -V ${store}' to debug.",
+            0)
+          .flatMap(_ => Failure(new IOException(output.stderr)))
+      })
+  }
+
+  // Do nothing if the account should not be synchronized
+  case false => Success(())
+}
 
 /** Index emails
  *
@@ -165,16 +172,16 @@ def searchEmails(query: String): Try[List[Path]] =
  * > needs to be configured to do it: (setq
  * > mu4e-change-filenames-when-moving t)
  */
-def moveToLocalBox(email: Path, box: BoxPath): Try[Path] = Try {
+def moveToBox(email: Path, box: BoxPath): Try[Path] = Try {
   // Strip UID from email name
   //
-  // mbsync adds a unique identifier to file names (e.g.,
+  // mbsync adds a unique identifier to name files (e.g.,
   // `/path/to/mail,U=<UID>:2,SR` -- with `2` stands for the version
   // of UID generation if I am right).  Moving files causes UID
   // conflicts and prevent mbsync from syncing with "Maildir error:
-  // UID 9610 is beyond highest assigned UID 86."  The sed command in
-  // the following removes the UID to force mbsync to regenerate one
-  // and avoid UID conflicts.
+  // UID 9610 is beyond highest assigned UID 86."  The `replaceFirst`
+  // in the following removes the UID to force mbsync to regenerate
+  // one and avoid UID conflicts.
   val emailBasename = email.getFileName().toString
   val emailNoUID = emailBasename.replaceFirst("U=[0-9]+:2", "U=:2")
   val emailInBoxPath = box.path.resolve(emailNoUID)
@@ -211,13 +218,11 @@ def delete(accounts: List[Account]): Future[String] = {
       s"tag:${account.store} AND tag:deleted AND NOT ($trashBoxesQ)")
 
     // Move emails into the trash box locally
-    emailTrashPaths <- emailPaths.map(moveToLocalBox(_, account.trash))
-                                 .sequence
+    emailTrashPaths <- emailPaths.map(moveToBox(_, account.trash)).sequence
 
     // Propagate changes to the remote mailbox (if need be)
     _ <- if !emailPaths.isEmpty then { syncEmails(account) } else { Success(()) }
   } yield (emailPaths.zip(emailTrashPaths))
-
 
   for {
     // First, delete emails for each account concurrently
@@ -230,10 +235,10 @@ def delete(accounts: List[Account]): Future[String] = {
 
 @main def app(action: String): Unit = {
   // Parse the `accounts` and execute the `action` in a future.
-  val appF = liftTry(parseAccounts(ACCOUNTS)).flatMap(
+  val appF = liftTry(parseAccounts(ACCOUNTS.getOrElse(ACCOUNTS_DEBUG))).flatMap(
     accounts => action match {
-      case "pull"   => pull(accounts.values.toList)
-      case "delete" => delete(accounts.values.toList)
+      case "pull"   => pull(accounts)
+      case "delete" => delete(accounts)
       case _ => Future.failed(
         new IOException(s"Unknown action ${action}.  Expected either `pull` or `delete`."))
     })
@@ -246,7 +251,6 @@ def delete(accounts: List[Account]): Future[String] = {
     case Failure(e) =>
       e.printStackTrace
       Notifications.critical("email", s"📪 General ERROR", s"${e}", 0)
-      println("*I SHOULD BE PRINTED IN CASE OF ERROR*")
   }
 }
 
@@ -269,40 +273,39 @@ def mkTmpFile(content: String): Try[Path] = Try {
 }
 
 /** Parses a JSON string input into an Account list */
-def parseAccounts(json: String): Try[Map[String, Account]] =
-  decode[Map[String, Account]](json) match {
+def parseAccounts(json: String): Try[List[Account]] =
+  println(s"Decoding JSON accounts: ${json}")
+
+  decode[List[Account]](json) match {
     case Right(decoded) => Success(decoded)
-    case Left(err) => Failure(new IOException(err.getMessage))
+    case Left(err) => {
+      val errMsg = s"Error while decoding JSON accounts\n\n${err.getMessage}"
+      Failure(new IOException(errMsg))
+    }
   }
 
 
 // Debug
-val ACCOUNTS = """
-{
-  "Gmail": {
-    "store": "Gmail",
+val ACCOUNTS_DEBUG = """
+[
+  {
+    "name": "Gmail",
     "sync": true,
     "boxes": { "drafts": "[Gmail]/Drafts", "inbox": ["*", "![Gmail]*"], "sent": "[Gmail]/Sent Mail", "trash": "[Gmail]/Bin" },
     "default": true,
-    "email": "RonanCherrueau@gmail.com",
-    "imap": { "host": "imap.gmail.com" },
-    "smtp": { "host": "smtp.gmail.com" }
+    "email": "RonanCherrueau@gmail.com"
   },
-  "IMT": {
-    "store": "IMT",
+  {
+    "name": "IMT",
     "sync": false,
     "boxes": { "drafts": "Drafts", "inbox": ["*", "!Junk"], "sent": "Sent", "trash": "Trash" },
-    "email": "Ronan-Alexandre.Cherrueau@imt-atlantique.fr",
-    "imap": { "host": "z.imt.fr" },
-    "smtp": { "host": "z.imt.fr" }
+    "email": "Ronan-Alexandre.Cherrueau@imt-atlantique.fr"
   },
-  "Inria": {
-    "store": "Inria",
+  {
+    "name": "Inria",
     "sync": false,
     "boxes": { "drafts": "Drafts", "inbox": ["*", "!Junk"], "sent": "Sent", "trash": "Trash" },
-    "email": "Ronan-Alexandre.Cherrueau@inria.fr",
-    "imap": { "host": "zimbra.inria.fr" },
-    "smtp": { "host": "smtp.inria.fr", "user": "rcherrue" }
+    "email": "Ronan-Alexandre.Cherrueau@inria.fr"
   }
-}
+]
 """

@@ -1,12 +1,13 @@
 package mua
 
+import scala.sys.env
 import java.nio.file.{Path}
 
 import io.circe._, io.circe.generic.semiauto._
 
-// TODO: Make this a parameter 
 /** Directory to store emails */
-val MAILDIR = Path.of(System.getProperty("user.home"), ".mail")
+val MAILDIR = Path.of(env.getOrElse[String]("MAILDIR",
+                        Path.of(System.getProperty("user.home"), ".mail").toString))
 
 /** Path */
 case class BoxPath(_path: String) {
@@ -23,7 +24,9 @@ case class BoxPath(_path: String) {
 case class Boxes(inbox: List[String], drafts: String, sent: String, trash: String)
 
 /** Email account information */
-case class Account(store: String, email: String, boxes: Boxes, sync: Boolean) {
+case class Account(name: String, email: String, boxes: Boxes, sync: Boolean) {
+  /** mbsync store where emails are saved */
+  val store = name
   /** Returns the folder path of the drafts box */
   val draft = BoxPath(s"$store/${boxes.drafts}")
   /** Returns the path path of the sent box */
