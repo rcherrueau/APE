@@ -353,12 +353,19 @@
 ;; should -- as typed/racket evolved -- move definition from this
 ;; untyped module to the typed one.
 (module definition/untyped racket/base
-  (require (for-syntax racket/base
-                       racket/string
-                       racket/syntax
-                       syntax/stx
-                       syntax/parse/define
-                       "utils.rkt")
+  (module for-syntax racket/base
+    (require racket/string
+             racket/syntax
+             syntax/stx
+             syntax/parse/define
+             "utils.rkt")
+    (provide (all-from-out racket/base
+                           racket/string
+                           racket/syntax
+                           syntax/stx
+                           syntax/parse/define
+                           "utils.rkt")))
+  (require (for-syntax 'for-syntax)
            syntax/parse
            syntax/parse/define
            "utils.rkt")
